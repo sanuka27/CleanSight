@@ -1,0 +1,238 @@
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Menu, X, Leaf, MapPin, Users, BarChart3, Camera, ChevronRight } from "lucide-react";
+
+const navLinks = [
+  { href: "/map", label: "Report Map", icon: MapPin },
+  { href: "/report", label: "Report Waste", icon: Camera },
+  { href: "/volunteer", label: "Volunteer", icon: Users },
+  { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
+];
+
+export function Navbar() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const location = useLocation();
+  const { scrollY } = useScroll();
+  
+  // Dynamic background opacity based on scroll
+  const backgroundOpacity = useTransform(scrollY, [0, 100], [0, 1]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
+
+  return (
+    <>
+      <motion.header 
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+          scrolled 
+            ? "py-2" 
+            : "py-4"
+        }`}
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
+      >
+        <div className="container mx-auto px-4">
+          <motion.nav 
+            className={`relative flex items-center justify-between px-6 py-3 rounded-2xl transition-all duration-500 ${
+              scrolled 
+                ? "glass-premium shadow-elevated" 
+                : "bg-transparent"
+            }`}
+            style={scrolled ? {} : { backgroundColor: "transparent" }}
+          >
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-3 group">
+              <motion.div 
+                className="relative w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow overflow-hidden"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Leaf className="w-5 h-5 text-white relative z-10" />
+                {/* Shimmer effect */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                </div>
+              </motion.div>
+              <span className="font-display text-xl font-bold">
+                Clean<span className="text-gradient">Sight</span>
+              </span>
+            </Link>
+
+            {/* Desktop Navigation */}
+            <div className="hidden lg:flex items-center gap-1 bg-card/50 rounded-xl p-1.5 backdrop-blur-sm">
+              {navLinks.map((link) => {
+                const Icon = link.icon;
+                const isActive = location.pathname === link.href;
+                
+                return (
+                  <Link key={link.href} to={link.href}>
+                    <motion.div
+                      className={`relative px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                        isActive 
+                          ? "text-primary" 
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="navbar-active"
+                          className="absolute inset-0 gradient-primary rounded-lg opacity-10"
+                          initial={false}
+                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                        />
+                      )}
+                      <span className="relative z-10 flex items-center gap-2">
+                        <Icon className="w-4 h-4" />
+                        {link.label}
+                      </span>
+                    </motion.div>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Auth Buttons */}
+            <div className="hidden lg:flex items-center gap-3">
+              <Link to="/login">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Button variant="ghost" size="sm" className="font-medium">
+                    Sign In
+                  </Button>
+                </motion.div>
+              </Link>
+              <Link to="/signup">
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Button 
+                    size="sm" 
+                    className="gradient-primary text-white shadow-glow hover:shadow-glow-lg transition-shadow font-medium gap-2"
+                  >
+                    Get Started
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </motion.div>
+              </Link>
+            </div>
+
+            {/* Mobile Menu Toggle */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="lg:hidden relative w-10 h-10 rounded-xl glass flex items-center justify-center"
+              onClick={() => setIsOpen(!isOpen)}
+              aria-label="Toggle menu"
+            >
+              <AnimatePresence mode="wait">
+                {isOpen ? (
+                  <motion.div
+                    key="close"
+                    initial={{ rotate: -90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 90, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <X className="w-5 h-5" />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="menu"
+                    initial={{ rotate: 90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: -90, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Menu className="w-5 h-5" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          </motion.nav>
+        </div>
+
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, y: -10 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+              className="lg:hidden overflow-hidden"
+            >
+              <div className="container mx-auto px-4 pt-2">
+                <div className="glass-premium rounded-2xl p-4 shadow-elevated">
+                  <div className="flex flex-col gap-2">
+                    {navLinks.map((link, index) => {
+                      const Icon = link.icon;
+                      const isActive = location.pathname === link.href;
+                      
+                      return (
+                        <motion.div
+                          key={link.href}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                        >
+                          <Link to={link.href}>
+                            <div
+                              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                                isActive 
+                                  ? "gradient-primary text-white" 
+                                  : "hover:bg-card/50"
+                              }`}
+                            >
+                              <Icon className="w-5 h-5" />
+                              <span className="font-medium">{link.label}</span>
+                            </div>
+                          </Link>
+                        </motion.div>
+                      );
+                    })}
+                    
+                    <div className="border-t border-border/50 my-2" />
+                    
+                    <motion.div
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: navLinks.length * 0.05 }}
+                      className="grid grid-cols-2 gap-2"
+                    >
+                      <Link to="/login">
+                        <Button variant="outline" className="w-full">
+                          Sign In
+                        </Button>
+                      </Link>
+                      <Link to="/signup">
+                        <Button className="w-full gradient-primary text-white">
+                          Get Started
+                        </Button>
+                      </Link>
+                    </motion.div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.header>
+
+      {/* Spacer for fixed header */}
+      <div className="h-20" />
+    </>
+  );
+}

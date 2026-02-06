@@ -1,14 +1,12 @@
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Camera, MapPin, CheckCircle, ArrowRight, Sparkles, Zap } from "lucide-react";
 import { MeshGradient } from "@/components/shared/MeshGradient";
 import { AnimatedCounter, FloatingCard } from "@/components/shared/AnimatedComponents";
+import { memo } from "react";
 
-export function HeroSection() {
-  const { scrollY } = useScroll();
-  const y = useTransform(scrollY, [0, 500], [0, 150]);
-  const opacity = useTransform(scrollY, [0, 300], [1, 0]);
+export const HeroSection = memo(function HeroSection() {
 
   const stats = [
     { value: 2500, suffix: "+", label: "Reports Filed" },
@@ -30,7 +28,7 @@ export function HeroSection() {
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.34, 1.56, 0.64, 1] }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
             className="text-center lg:text-left"
           >
             {/* Badge */}
@@ -55,7 +53,7 @@ export function HeroSection() {
               className="font-display text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6 leading-[1.1]"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.3 }}
+              transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
             >
               Report Waste.{" "}
               <span className="text-gradient-aurora inline-block">
@@ -68,9 +66,9 @@ export function HeroSection() {
             {/* Description */}
             <motion.p 
               className="text-lg md:text-xl text-muted-foreground mb-10 max-w-xl mx-auto lg:mx-0"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.3, ease: "easeOut" }}
             >
               CleanSight empowers citizens to report garbage issues, volunteers to take action,
               and municipalities to efficiently manage cleanup operations.
@@ -79,14 +77,15 @@ export function HeroSection() {
             {/* CTA Buttons */}
             <motion.div 
               className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-14"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.5 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.4, ease: "easeOut" }}
             >
               <Link to="/report">
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
                 >
                   <Button 
                     size="lg" 
@@ -102,6 +101,7 @@ export function HeroSection() {
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
                 >
                   <Button 
                     variant="outline" 
@@ -118,9 +118,9 @@ export function HeroSection() {
             {/* Stats */}
             <motion.div 
               className="grid grid-cols-3 gap-8"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.6 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.5, ease: "easeOut" }}
             >
               {stats.map((stat, index) => (
                 <motion.div
@@ -141,11 +141,10 @@ export function HeroSection() {
 
           {/* Right Content - Hero Visual */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, x: 50 }}
-            animate={{ opacity: 1, scale: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
             className="relative hidden lg:block"
-            style={{ y }}
           >
             {/* Main visual container */}
             <div className="relative">
@@ -153,11 +152,7 @@ export function HeroSection() {
               <div className="absolute inset-0 gradient-primary rounded-3xl blur-3xl opacity-20 scale-110" />
               
               {/* Main card */}
-              <motion.div 
-                className="relative glass-premium rounded-3xl p-8 shadow-2xl"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              >
+              <div className="relative glass-premium rounded-3xl p-8 shadow-2xl">
                 {/* Dashboard preview mockup */}
                 <div className="space-y-6">
                   {/* Header */}
@@ -220,7 +215,7 @@ export function HeroSection() {
                     </div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Floating cards */}
               <FloatingCard 
@@ -263,4 +258,4 @@ export function HeroSection() {
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
     </section>
   );
-}
+});

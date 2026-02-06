@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, memo } from "react";
 import { motion, useMotionValue, useSpring, useInView } from "framer-motion";
 
 interface AnimatedCounterProps {
@@ -9,7 +9,7 @@ interface AnimatedCounterProps {
   className?: string;
 }
 
-export function AnimatedCounter({ 
+export const AnimatedCounter = memo(function AnimatedCounter({ 
   end, 
   duration = 2, 
   suffix = "", 
@@ -18,7 +18,7 @@ export function AnimatedCounter({
 }: AnimatedCounterProps) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const isInView = useInView(ref, { once: true, margin: "-100px", amount: 0.3 });
 
   useEffect(() => {
     if (!isInView) return;
@@ -26,6 +26,7 @@ export function AnimatedCounter({
     let startTime: number | null = null;
     const startValue = 0;
     const endValue = end;
+    let rafId: number;
 
     const animate = (currentTime: number) => {
       if (startTime === null) startTime = currentTime;
@@ -39,25 +40,28 @@ export function AnimatedCounter({
       setCount(currentCount);
 
       if (progress < 1) {
-        requestAnimationFrame(animate);
+        rafId = requestAnimationFrame(animate);
       }
     };
 
-    requestAnimationFrame(animate);
+    rafId = requestAnimationFrame(animate);
+    
+    return () => cancelAnimationFrame(rafId);
   }, [isInView, end, duration]);
 
   return (
     <motion.span
       ref={ref}
       className={className}
-      initial={{ opacity: 0, y: 10 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-      transition={{ duration: 0.5 }}
+      initial={{ opacity: 0 }}
+      animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      style={{ willChange: "auto" }}
     >
       {prefix}{count.toLocaleString()}{suffix}
     </motion.span>
   );
-}
+});
 
 interface FloatingCardProps {
   children: React.ReactNode;
@@ -66,25 +70,25 @@ interface FloatingCardProps {
   direction?: "left" | "right";
 }
 
-export function FloatingCard({ children, className = "", delay = 0, direction = "left" }: FloatingCardProps) {
+export const FloatingCard = memo(function FloatingCard({ children, className = "", delay = 0, direction = "left" }: FloatingCardProps) {
   const x = direction === "left" ? -20 : 20;
   
   return (
     <motion.div
       initial={{ opacity: 0, x }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.6, delay, ease: [0.34, 1.56, 0.64, 1] }}
+      transition={{ 
+        duration: 0.4, 
+        delay, 
+        ease: "easeOut"
+      }}
+      style={{ willChange: "auto" }}
       className={`glass-premium rounded-2xl p-4 shadow-elevated hover:shadow-glow-lg transition-shadow duration-300 ${className}`}
     >
-      <motion.div
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay }}
-      >
-        {children}
-      </motion.div>
+      {children}
     </motion.div>
   );
-}
+});
 
 interface GlowButtonProps {
   children: React.ReactNode;
@@ -93,12 +97,14 @@ interface GlowButtonProps {
   variant?: "primary" | "secondary";
 }
 
-export function GlowButton({ children, className = "", onClick, variant = "primary" }: GlowButtonProps) {
+export const GlowButton = memo(function GlowButton({ children, className = "", onClick, variant = "primary" }: GlowButtonProps) {
   return (
     <motion.button
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
       onClick={onClick}
+      style={{ willChange: "transform" }}
       className={`
         relative overflow-hidden px-8 py-4 rounded-xl font-semibold
         transition-all duration-300
@@ -109,18 +115,13 @@ export function GlowButton({ children, className = "", onClick, variant = "prima
         ${className}
       `}
     >
-      {/* Shimmer effect */}
-      <span className="absolute inset-0 overflow-hidden rounded-xl">
-        <span className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-      </span>
-      
       {/* Content */}
       <span className="relative z-10 flex items-center justify-center gap-2">
         {children}
       </span>
     </motion.button>
   );
-}
+});
 
 interface RevealOnScrollProps {
   children: React.ReactNode;
@@ -129,20 +130,20 @@ interface RevealOnScrollProps {
   direction?: "up" | "down" | "left" | "right";
 }
 
-export function RevealOnScroll({ 
+export const RevealOnScroll = memo(function RevealOnScroll({ 
   children, 
   className = "", 
   delay = 0,
   direction = "up"
 }: RevealOnScrollProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const isInView = useInView(ref, { once: true, margin: "-80px", amount: 0.2 });
 
   const directionVariants = {
-    up: { y: 40 },
-    down: { y: -40 },
-    left: { x: 40 },
-    right: { x: -40 },
+    up: { y: 30 },
+    down: { y: -30 },
+    left: { x: 30 },
+    right: { x: -30 },
   };
 
   return (
@@ -150,10 +151,15 @@ export function RevealOnScroll({
       ref={ref}
       initial={{ opacity: 0, ...directionVariants[direction] }}
       animate={isInView ? { opacity: 1, x: 0, y: 0 } : { opacity: 0, ...directionVariants[direction] }}
-      transition={{ duration: 0.6, delay, ease: [0.34, 1.56, 0.64, 1] }}
+      transition={{ 
+        duration: 0.35, 
+        delay, 
+        ease: [0.25, 0.1, 0.25, 1]
+      }}
+      style={{ willChange: "auto" }}
       className={className}
     >
       {children}
     </motion.div>
   );
-}
+});

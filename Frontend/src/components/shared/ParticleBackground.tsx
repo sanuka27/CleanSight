@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 
 interface Particle {
   id: number;
@@ -15,7 +15,7 @@ interface ParticleBackgroundProps {
   className?: string;
 }
 
-export function ParticleBackground({ count = 50, className = "" }: ParticleBackgroundProps) {
+export const ParticleBackground = memo(function ParticleBackground({ count = 20, className = "" }: ParticleBackgroundProps) {
   const [particles, setParticles] = useState<Particle[]>([]);
 
   useEffect(() => {
@@ -25,9 +25,9 @@ export function ParticleBackground({ count = 50, className = "" }: ParticleBackg
         id: i,
         x: Math.random() * 100,
         y: Math.random() * 100,
-        size: Math.random() * 4 + 1,
-        duration: Math.random() * 20 + 10,
-        delay: Math.random() * 5,
+        size: Math.random() * 3 + 1,
+        duration: Math.random() * 15 + 15,
+        delay: Math.random() * 3,
       });
     }
     setParticles(newParticles);
@@ -38,7 +38,7 @@ export function ParticleBackground({ count = 50, className = "" }: ParticleBackg
       {particles.map((particle) => (
         <motion.div
           key={particle.id}
-          className="absolute rounded-full bg-primary/20"
+          className="absolute rounded-full bg-primary/15"
           style={{
             left: `${particle.x}%`,
             top: `${particle.y}%`,
@@ -46,17 +46,17 @@ export function ParticleBackground({ count = 50, className = "" }: ParticleBackg
             height: particle.size,
           }}
           animate={{
-            y: [0, -30, 0],
-            opacity: [0.3, 0.8, 0.3],
+            y: [0, -20, 0],
+            opacity: [0.2, 0.5, 0.2],
           }}
           transition={{
             duration: particle.duration,
             delay: particle.delay,
             repeat: Infinity,
-            ease: "easeInOut",
+            ease: "linear",
           }}
         />
       ))}
     </div>
   );
-}
+});

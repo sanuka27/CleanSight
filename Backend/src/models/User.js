@@ -1,7 +1,12 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
+  firebaseUid: {
+    type: String,
+    required: [true, 'Firebase UID is required'],
+    unique: true,
+    index: true
+  },
   name: {
     type: String,
     required: [true, 'Please provide a name'],
@@ -15,15 +20,9 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email']
   },
-  password: {
-    type: String,
-    required: [true, 'Please provide a password'],
-    minlength: [6, 'Password must be at least 6 characters'],
-    select: false
-  },
   role: {
     type: String,
-    enum: ['citizen', 'volunteer', 'admin', 'municipal'],
+    enum: ['citizen', 'volunteer', 'staff', 'admin'],
     default: 'citizen'
   },
   avatar: {
@@ -49,18 +48,6 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
-
-// Hash password before saving
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
-  next();
-});
-
-// Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
 
 const User = mongoose.model('User', userSchema);
 

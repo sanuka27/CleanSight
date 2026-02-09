@@ -1,53 +1,127 @@
-# Welcome to your Lovable project
+# CleanSight
 
-## Project info
+CleanSight is a community-driven platform for reporting and managing waste issues, connecting users with volunteers for cleanup coordination.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- **Waste Reporting**: Users can report waste locations with photos and descriptions
+- **Volunteer Coordination**: Volunteers can view and claim cleanup tasks
+- **Interactive Maps**: Visualize reports and volunteer activities on maps
+- **User Authentication**: Secure login/signup with Firebase
+- **Real-time Updates**: Live dashboard for tracking reports and activities
+- **Responsive Design**: Mobile-friendly interface built with React and Tailwind CSS
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+### Frontend
+- **React** with TypeScript
+- **Vite** for build tooling
+- **Tailwind CSS** for styling
+- **shadcn/ui** for UI components
+- **Framer Motion** for animations
+- **Firebase** for authentication
+- **TanStack Query** for data fetching
+- **React Router** for navigation
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Backend
+- **Node.js** with Express.js
+- **MongoDB** with Mongoose
+- **Firebase Admin** for server-side Firebase operations
+- **JWT** for authentication
+- **Multer** for file uploads
 
-Changes made via Lovable will be committed automatically to this repo.
+## Installation
 
-**Use your preferred IDE**
+1. Ensure you have Node.js and pnpm installed
+2. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+3. Set up environment variables (see configuration sections below)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Configuration
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+### Backend
+Create a `.env` file in the `Backend` directory with:
+```
+MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+FIREBASE_PROJECT_ID=your_firebase_project_id
+FIREBASE_PRIVATE_KEY=your_firebase_private_key
+FIREBASE_CLIENT_EMAIL=your_firebase_client_email
 ```
 
-**Edit a file directly in GitHub**
+### Frontend
+Create a `.env` file in the `Frontend` directory with:
+```
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
+VITE_FIREBASE_PROJECT_ID=your_firebase_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_firebase_app_id
+VITE_API_BASE_URL=http://localhost:5000/api
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Usage
 
-**Use GitHub Codespaces**
+### Development
+Run both frontend and backend in development mode:
+```bash
+pnpm run dev
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
+Run frontend only:
+```bash
+pnpm run dev:frontend
+```
+
+Run backend only:
+```bash
+pnpm run dev:backend
+```
+
+### Build
+Build the frontend for production:
+```bash
+pnpm run build
+```
+
+### Testing
+Run tests for the frontend:
+```bash
+pnpm test
+```
+
+## Project Structure
+
+```
+CleanSight/
+├── Backend/
+│   ├── src/
+│   │   ├── config/
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── models/
+│   │   ├── routes/
+│   │   └── server.js
+│   └── package.json
+├── Frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── context/
+│   │   ├── hooks/
+│   │   ├── lib/
+│   │   ├── pages/
+│   │   └── ...
+│   └── package.json
+├── package.json
+└── pnpm-workspace.yaml
+```
+
+## License
+
+MIT
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
 ## What technologies are used for this project?

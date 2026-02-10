@@ -1,135 +1,163 @@
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import { protect } from '../middleware/auth.js';
+import { verifyToken } from '../middleware/verifyToken.js';
 
 const router = express.Router();
 
-// Generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'cleansight-secret-key', {
-    expiresIn: '30d'
-  });
-};
-
 // @route   POST /api/auth/register
-// @desc    Register a new user
-// @access  Public
-router.post('/register', async (req, res) => {
+// @desc    Register a new user (create MongoDB profile)
+// @access  Protected (requires Firebase token)
+router.post('/register', verifyToken, async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, role } = req.body;
+    const { firebaseUid } = req.user;
 
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    // Validate required fields
+    if (!name || !email) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email'
+        message: 'Please provide name and email'
       });
     }
 
-    // Create user
+    // Check if user already exists with this Firebase UID
+    const existingUser = await User.findOne({ firebaseUid });
+    if (existingUser) {
+      return res.status(200).json({
+        success: true,
+        message: 'User already registered',
+        data: {
+          user: {
+            id: existingUser._id,
+            firebaseUid: existingUser.firebaseUid,
+            name: existingUser.name,
+            email: existingUser.email,
+            role: existingUser.role,
+            createdAt: existingUser.createdAt
+          }
+        }
+      });
+    }
+
+    // Create user in MongoDB
     const user = await User.create({
+      firebaseUid,
       name,
       email,
-      password,
       role: role || 'citizen'
     });
 
-    // Generate token
-    const token = generateToken(user._id);
-
     res.status(201).json({
       success: true,
+      message: 'User registered successfully',
       data: {
         user: {
           id: user._id,
+          firebaseUid: user.firebaseUid,
           name: user.name,
           email: user.email,
-          role: user.role
-        },
-        token
+          role: user.role,
+          createdAt: user.createdAt
+        }
       }
     });
   } catch (error) {
+    console.error('Registration error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Server error during registration'
     });
   }
 });
 
-// @route   POST /api/auth/login
-// @desc    Login user
-// @access  Public
-router.post('/login', async (req, res) => {
+// @route   GET /api/auth/me
+// @desc    Get current user profile
+// @access  Protected (requires Firebase token)
+router.get('/me', verifyToken, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { firebaseUid } = req.user;
 
-    // Validate
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email and password'
-      });
-    }
+    // Find user by Firebase UID
+    const user = await User.findOne({ firebaseUid });
 
-    // Check for user
-    const user = await User.findOne({ email }).select('+password');
     if (!user) {
-      return res.status(401).json({
+      return res.status(404).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'User profile not found. Please complete registration.'
       });
     }
-
-    // Check password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Generate token
-    const token = generateToken(user._id);
 
     res.json({
       success: true,
+      data: {
+        user: {
+          id: user._id,
+          firebaseUid: user.firebaseUid,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          avatar: user.avatar,
+          phone: user.phone,
+          isVerified: user.isVerified,
+          reportsSubmitted: user.reportsSubmitted,
+          cleanupsCompleted: user.cleanupsCompleted,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error fetching profile'
+    });
+  }
+});
+
+// @route   PUT /api/auth/profile
+// @desc    Update user profile
+// @access  Protected (requires Firebase token)
+router.put('/profile', verifyToken, async (req, res) => {
+  try {
+    const { firebaseUid } = req.user;
+    const { name, phone, avatar } = req.body;
+
+    const user = await User.findOne({ firebaseUid });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update allowed fields
+    if (name) user.name = name;
+    if (phone) user.phone = phone;
+    if (avatar) user.avatar = avatar;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
       data: {
         user: {
           id: user._id,
           name: user.name,
           email: user.email,
           role: user.role,
-          avatar: user.avatar
-        },
-        token
+          avatar: user.avatar,
+          phone: user.phone
+        }
       }
     });
   } catch (error) {
+    console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
-    });
-  }
-});
-
-// @route   GET /api/auth/me
-// @desc    Get current logged in user
-// @access  Private
-router.get('/me', protect, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    res.json({
-      success: true,
-      data: user
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
+      message: error.message || 'Server error updating profile'
     });
   }
 });

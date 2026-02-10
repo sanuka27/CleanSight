@@ -1,17 +1,19 @@
 import { motion } from "framer-motion";
+import { memo } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Leaf } from "lucide-react";
 
-export function CTASection() {
+export const CTASection = memo(function CTASection() {
   return (
     <section className="py-20">
       <div className="container mx-auto px-4">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.98 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          style={{ willChange: "auto" }}
           className="relative rounded-3xl gradient-primary p-8 md:p-12 lg:p-16 overflow-hidden"
         >
           {/* Background Elements */}
@@ -59,4 +61,4 @@ export function CTASection() {
       </div>
     </section>
   );
-}
+});

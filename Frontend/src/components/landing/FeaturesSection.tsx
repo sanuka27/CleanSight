@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { memo } from "react";
 import { 
   Camera, 
   MapPin, 
@@ -55,7 +56,7 @@ const features = [
   },
 ];
 
-export function FeaturesSection() {
+export const FeaturesSection = memo(function FeaturesSection() {
   return (
     <section className="py-24 relative overflow-hidden">
       {/* Background elements */}
@@ -98,9 +99,9 @@ export function FeaturesSection() {
                 className="h-full"
               >
                 <motion.div
-                  className="group relative h-full p-6 rounded-2xl glass-premium overflow-hidden hover:shadow-glow transition-all duration-500"
-                  whileHover={{ y: -8, scale: 1.02 }}
-                  transition={{ duration: 0.3 }}
+                  className="group relative h-full p-6 rounded-2xl glass-premium overflow-hidden hover:shadow-glow transition-all duration-300"
+                  whileHover={{ y: -4 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
                 >
                   {/* Gradient overlay on hover */}
                   <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`} />
@@ -138,4 +139,4 @@ export function FeaturesSection() {
       </div>
     </section>
   );
-}
+});

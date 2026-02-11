@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Leaf, Mail, Lock, ArrowRight, Eye, EyeOff, Github, ChromeIcon } from "lucide-react";
 import { MeshGradient } from "@/components/shared/MeshGradient";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { toast } from "sonner";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -17,11 +20,25 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate login
-    setTimeout(() => {
-      setIsLoading(false);
+    
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      toast.success("Welcome back!");
       navigate("/dashboard");
-    }, 1500);
+    } catch (error: unknown) {
+      console.error("Login error:", error);
+      const firebaseError = error as { code?: string; message?: string };
+      const errorMessage = firebaseError.code === "auth/invalid-credential"
+        ? "Invalid email or password"
+        : firebaseError.code === "auth/user-not-found"
+        ? "No account found with this email"
+        : firebaseError.code === "auth/wrong-password"
+        ? "Incorrect password"
+        : "Login failed. Please try again.";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

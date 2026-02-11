@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Leaf, Mail, Lock, User, ArrowRight, CheckCircle } from "lucide-react";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 const roles = [
   { id: "citizen", label: "Citizen", description: "Report waste issues" },
@@ -16,10 +20,45 @@ const Signup = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [selectedRole, setSelectedRole] = useState("citizen");
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle signup
+    setIsLoading(true);
+
+    try {
+      // Create Firebase user
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Update Firebase profile with name
+      await updateProfile(userCredential.user, {
+        displayName: name,
+      });
+
+      // Register user in backend MongoDB
+      await api.register({
+        name,
+        email,
+        role: selectedRole,
+      });
+
+      toast.success("Account created successfully!");
+      navigate("/dashboard");
+    } catch (error: unknown) {
+      console.error("Signup error:", error);
+      const firebaseError = error as { code?: string; message?: string };
+      const errorMessage = firebaseError.code === "auth/email-already-in-use"
+        ? "This email is already registered"
+        : firebaseError.code === "auth/weak-password"
+        ? "Password should be at least 6 characters"
+        : firebaseError.code === "auth/invalid-email"
+        ? "Please enter a valid email address"
+        : firebaseError.message || "Registration failed. Please try again.";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -92,6 +131,7 @@ const Signup = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="pl-10"
+                  required
                 />
               </div>
             </div>
@@ -107,6 +147,7 @@ const Signup = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
+                  required
                 />
               </div>
             </div>
@@ -122,16 +163,24 @@ const Signup = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
+                  required
+                  minLength={6}
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Must be at least 8 characters
+                Must be at least 6 characters
               </p>
             </div>
 
-            <Button type="submit" variant="hero" size="lg" className="w-full gap-2">
-              Create Account
-              <ArrowRight className="w-4 h-4" />
+            <Button type="submit" variant="hero" size="lg" className="w-full gap-2" disabled={isLoading}>
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  Create Account
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </Button>
           </form>
 

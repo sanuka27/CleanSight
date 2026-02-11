@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { memo } from "react";
 import { User, HeartHandshake, Building2, ShieldCheck } from "lucide-react";
 
 const roles = [
@@ -36,7 +37,7 @@ const roles = [
   },
 ];
 
-export function UserRoles() {
+export const UserRoles = memo(function UserRoles() {
   return (
     <section className="py-20 bg-secondary/30">
       <div className="container mx-auto px-4">
@@ -44,7 +45,8 @@ export function UserRoles() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          style={{ willChange: "auto" }}
           className="text-center mb-16"
         >
           <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
@@ -65,7 +67,8 @@ export function UserRoles() {
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+                transition={{ duration: 0.4, delay: index * 0.08, ease: "easeOut" }}
+                style={{ willChange: "auto" }}
               >
                 <div className="h-full bg-card rounded-2xl p-6 border border-border hover:shadow-elevated transition-shadow">
                   <div className="flex items-start gap-4">
@@ -97,4 +100,4 @@ export function UserRoles() {
       </div>
     </section>
   );
-}
+});

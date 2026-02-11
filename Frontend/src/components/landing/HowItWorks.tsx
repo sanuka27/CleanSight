@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { memo } from "react";
 import { Camera, MapPin, Users, CheckCircle } from "lucide-react";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
 
@@ -29,7 +30,7 @@ const steps = [
   },
 ];
 
-export function HowItWorks() {
+export const HowItWorks = memo(function HowItWorks() {
   return (
     <section className="py-24 relative overflow-hidden bg-secondary/30">
       <div className="container mx-auto px-4 relative z-10">
@@ -52,11 +53,12 @@ export function HowItWorks() {
             {steps.map((step, index) => {
               const Icon = step.icon;
               return (
-                <RevealOnScroll key={step.title} delay={index * 0.2}>
+                <RevealOnScroll key={step.title} delay={index * 0.15}>
                   <motion.div
                     className="text-center group"
                     whileHover={{ y: -5 }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    style={{ willChange: "transform" }}
                   >
                     <div className="relative mb-6 mx-auto w-24 h-24">
                       {/* Animated Glow Ring */}
@@ -88,4 +90,4 @@ export function HowItWorks() {
       </div>
     </section>
   );
-}
+});

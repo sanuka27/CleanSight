@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import Map, { Marker, Popup, NavigationControl, FullscreenControl, GeolocateControl } from "react-map-gl";
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,7 @@ const MapView = () => {
     });
   }, [filter, searchQuery]);
 
-  const getMarkerColor = (status: string) => {
+  const getMarkerColor = useCallback((status: string) => {
     switch (status) {
       case "urgent": return "text-destructive";
       case "pending": return "text-warning";
@@ -61,7 +61,21 @@ const MapView = () => {
       case "assigned": return "text-info";
       default: return "text-muted-foreground";
     }
-  };
+  }, []);
+
+  const handleMapMove = useCallback((evt: { viewState: typeof viewState }) => {
+    setViewState(evt.viewState);
+  }, []);
+
+  const handleMarkerClick = useCallback((report: typeof REPORTS[0], e: { originalEvent: Event }) => {
+    e.originalEvent.stopPropagation();
+    setSelectedReport(report);
+  }, []);
+
+  const handleReportClick = useCallback((report: typeof REPORTS[0]) => {
+    setSelectedReport(report);
+    setViewState(prev => ({ ...prev, latitude: report.lat, longitude: report.lng, zoom: 16 }));
+  }, []);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
@@ -72,10 +86,11 @@ const MapView = () => {
         <div className="absolute inset-0 z-0">
           <Map
             {...viewState}
-            onMove={evt => setViewState(evt.viewState)}
+            onMove={handleMapMove}
             mapStyle="mapbox://styles/mapbox/dark-v11"
             mapboxAccessToken={MAPBOX_TOKEN}
             attributionControl={false}
+            reuseMaps
           >
             <GeolocateControl position="top-right" />
             <FullscreenControl position="top-right" />
@@ -87,13 +102,14 @@ const MapView = () => {
                 latitude={report.lat}
                 longitude={report.lng}
                 anchor="bottom"
-                onClick={e => {
-                  e.originalEvent.stopPropagation();
-                  setSelectedReport(report);
-                }}
+                onClick={e => handleMarkerClick(report, e)}
               >
-                <div className="relative group cursor-pointer transition-transform hover:scale-125 duration-200">
-                  <div className={`absolute -inset-2 bg-gradient-to-t from-${getMarkerColor(report.status).split('-')[1]}/50 to-transparent blur-md rounded-full opacity-0 group-hover:opacity-100 transition-opacity`} />
+                <motion.div
+                  className="relative group cursor-pointer"
+                  whileHover={{ scale: 1.15 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  style={{ willChange: "transform" }}
+                >
                   <MapPin className={`w-8 h-8 ${getMarkerColor(report.status)} drop-shadow-md`} />
                   {report.status === 'urgent' && (
                     <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -101,7 +117,7 @@ const MapView = () => {
                       <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
                     </span>
                   )}
-                </div>
+                </motion.div>
               </Marker>
             ))}
 
@@ -139,7 +155,8 @@ const MapView = () => {
               initial={{ x: -400, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -400, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30, mass: 0.8 }}
+              style={{ willChange: "transform, opacity" }}
               className="absolute left-4 top-24 bottom-4 w-96 glass-premium rounded-3xl p-6 shadow-2xl z-10 flex flex-col gap-6 backdrop-blur-xl border border-white/10"
             >
               <div className="flex items-center justify-between">
@@ -188,13 +205,14 @@ const MapView = () => {
                     filteredReports.map(report => (
                     <motion.div
                         key={report.id}
-                        layoutId={`report-${report.id}`}
-                        onClick={() => {
-                            setSelectedReport(report);
-                            setViewState(prev => ({ ...prev, latitude: report.lat, longitude: report.lng, zoom: 16 }));
-                        }}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        style={{ willChange: "transform, opacity" }}
+                        onClick={() => handleReportClick(report)}
                         className={`
-                        p-4 rounded-xl border transition-all cursor-pointer group
+                        p-4 rounded-xl border transition-colors cursor-pointer group
                         ${selectedReport?.id === report.id 
                             ? "bg-primary/10 border-primary shadow-glow" 
                             : "bg-card/40 border-white/5 hover:bg-card/60 hover:border-white/20"

@@ -1,25 +1,34 @@
 import mongoose from 'mongoose';
 
 const reportSchema = new mongoose.Schema({
-  reporter: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  title: {
+  firebaseUid: {
     type: String,
-    required: [true, 'Please provide a title'],
-    trim: true,
-    maxlength: [100, 'Title cannot be more than 100 characters']
+    required: [true, 'Firebase UID is required'],
+    index: true
+  },
+  imageUrl: {
+    type: String,
+    required: [true, 'Image URL is required']
   },
   description: {
     type: String,
+    required: [true, 'Description is required'],
     maxlength: [500, 'Description cannot be more than 500 characters']
+  },
+  location: {
+    lat: {
+      type: Number,
+      required: [true, 'Latitude is required']
+    },
+    lng: {
+      type: Number,
+      required: [true, 'Longitude is required']
+    }
   },
   wasteType: {
     type: String,
     enum: ['general', 'recyclable', 'organic', 'construction', 'hazardous'],
-    required: [true, 'Please specify waste type']
+    default: 'general'
   },
   urgency: {
     type: String,
@@ -28,47 +37,18 @@ const reportSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'verified', 'assigned', 'in-progress', 'completed', 'rejected'],
+    enum: ['pending', 'assigned', 'resolved'],
     default: 'pending'
   },
-  location: {
-    type: {
-      type: String,
-      enum: ['Point'],
-      default: 'Point'
-    },
-    coordinates: {
-      type: [Number],
-      required: [true, 'Please provide location coordinates']
-    },
-    address: String
-  },
-  images: [{
-    url: String,
-    publicId: String
-  }],
-  aiAnalysis: {
-    wasteDetected: Boolean,
-    confidence: Number,
-    suggestedType: String
-  },
-  assignedVolunteer: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+  assignedTo: {
+    type: String,
     default: null
   },
-  completedAt: Date,
-  verifiedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
-
-// Geospatial index for location-based queries
-reportSchema.index({ location: '2dsphere' });
 
 // Index for faster status queries
 reportSchema.index({ status: 1 });

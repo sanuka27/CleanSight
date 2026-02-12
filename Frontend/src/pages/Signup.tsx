@@ -4,8 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Leaf, Mail, Lock, User, ArrowRight, CheckCircle } from "lucide-react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { Leaf, Mail, Lock, User, ArrowRight, CheckCircle, ChromeIcon } from "lucide-react";
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -55,6 +55,38 @@ const Signup = () => {
         : firebaseError.code === "auth/invalid-email"
         ? "Please enter a valid email address"
         : firebaseError.message || "Registration failed. Please try again.";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setIsLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Register user in backend MongoDB with selected role
+      await api.register({
+        name: user.displayName || "Google User",
+        email: user.email || "",
+        role: selectedRole,
+      });
+
+      toast.success("Account created successfully!");
+      navigate("/dashboard");
+    } catch (error: unknown) {
+      console.error("Google sign-up error:", error);
+      const firebaseError = error as { code?: string; message?: string };
+      const errorMessage = firebaseError.code === "auth/popup-closed-by-user"
+        ? "Sign-up cancelled"
+        : firebaseError.code === "auth/popup-blocked"
+        ? "Popup blocked. Please allow popups for this site."
+        : firebaseError.code === "auth/account-exists-with-different-credential"
+        ? "An account already exists with this email"
+        : "Google sign-up failed. Please try again.";
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -181,6 +213,28 @@ const Signup = () => {
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
+            </Button>
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border/50" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-4 text-muted-foreground">Or continue with</span>
+              </div>
+            </div>
+
+            {/* Social Sign Up */}
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={handleGoogleSignUp}
+              disabled={isLoading}
+              className="w-full h-12 rounded-xl glass border-border/50 hover:bg-card/80 transition-all gap-2"
+            >
+              <ChromeIcon className="w-5 h-5" />
+              Continue with Google
             </Button>
           </form>
 

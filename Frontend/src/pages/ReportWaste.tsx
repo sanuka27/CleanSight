@@ -22,6 +22,8 @@ import {
   Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useReports } from "@/hooks/useReports";
+import { useAuth } from "@/context/AuthContext";
 import { MeshGradient } from "@/components/shared/MeshGradient";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
 
@@ -49,13 +51,20 @@ const ReportWaste = () => {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedUrgency, setSelectedUrgency] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState<{ lat: number; lng: number }>({ lat: 40.7128, lng: -74.006 });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<{ detected: boolean; confidence: number } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { createReport } = useReports();
+  const { user, isAuthenticated } = useAuth();
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setImagePreview(event.target?.result as string);
@@ -81,12 +90,52 @@ const ReportWaste = () => {
     }, 2000);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Report Submitted!",
-      description: "Your waste report has been submitted and will be reviewed shortly.",
-    });
+
+    if (!isAuthenticated || !user) {
+      toast({ title: "Authentication Required", description: "Please log in to submit a report.", variant: "destructive" });
+      return;
+    }
+    if (!imageFile) {
+      toast({ title: "Image Required", description: "Please upload a photo of the waste.", variant: "destructive" });
+      return;
+    }
+    if (!description.trim()) {
+      toast({ title: "Description Required", description: "Please provide a description.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createReport(
+        imageFile,
+        description,
+        location,
+        selectedType || undefined,
+        selectedUrgency || undefined
+      );
+      toast({
+        title: "Report Submitted!",
+        description: "Your waste report has been submitted and will be reviewed shortly.",
+      });
+      // Reset form
+      setCurrentStep(1);
+      setImagePreview(null);
+      setImageFile(null);
+      setSelectedType(null);
+      setSelectedUrgency(null);
+      setDescription("");
+      setAnalysisResult(null);
+    } catch (err: unknown) {
+      toast({
+        title: "Submission Failed",
+        description: err instanceof Error ? err.message : "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, 3));
@@ -336,7 +385,9 @@ const ReportWaste = () => {
                     <div className="space-y-2">
                        <Label className="text-base font-semibold">Additional Description</Label>
                        <Textarea 
-                          placeholder="Provide more context about the location or waste..." 
+                          placeholder="Provide more context about the location or waste..."
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
                           className="rounded-xl border-border/50 focus:border-primary/50 focus:ring-primary/20 min-h-[100px]"
                         />
                     </div>
@@ -416,10 +467,20 @@ const ReportWaste = () => {
                 ) : (
                   <Button
                     type="submit"
+                    disabled={isSubmitting}
                     className="gap-2 gradient-primary text-white shadow-glow hover:shadow-glow-lg min-w-[140px]"
                   >
-                    Submit Report
-                    <Upload className="w-4 h-4" />
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        Submit Report
+                        <Upload className="w-4 h-4" />
+                      </>
+                    )}
                   </Button>
                 )}
               </div>

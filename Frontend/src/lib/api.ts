@@ -90,6 +90,35 @@ class ApiClient {
       requiresAuth: false,
     });
   }
+
+  // Report endpoints
+  async createReport(data: {
+    imageUrl: string;
+    description: string;
+    location: { lat: number; lng: number };
+    wasteType?: string;
+    urgency?: string;
+  }): Promise<any> {
+    return this.request("/api/reports", {
+      method: "POST",
+      body: JSON.stringify(data),
+      requiresAuth: true,
+    });
+  }
+
+  async getMyReports(): Promise<any> {
+    return this.request("/api/reports/my", {
+      method: "GET",
+      requiresAuth: true,
+    });
+  }
+
+  async getReports(): Promise<any> {
+    return this.request("/api/reports", {
+      method: "GET",
+      requiresAuth: true,
+    });
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);

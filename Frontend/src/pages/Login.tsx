@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Leaf, Mail, Lock, ArrowRight, Eye, EyeOff, Github, ChromeIcon } from "lucide-react";
 import { MeshGradient } from "@/components/shared/MeshGradient";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
 
 const Login = () => {
@@ -35,6 +36,40 @@ const Login = () => {
         : firebaseError.code === "auth/wrong-password"
         ? "Incorrect password"
         : "Login failed. Please try again.";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Register/sync user in backend MongoDB
+      try {
+        await api.register({
+          name: user.displayName || "Google User",
+          email: user.email || "",
+          role: "citizen",
+        });
+      } catch (err) {
+        console.log("User may already exist in DB, continuing...");
+      }
+
+      toast.success("Welcome back!");
+      navigate("/dashboard");
+    } catch (error: unknown) {
+      console.error("Google sign-in error:", error);
+      const firebaseError = error as { code?: string; message?: string };
+      const errorMessage = firebaseError.code === "auth/popup-closed-by-user"
+        ? "Sign-in cancelled"
+        : firebaseError.code === "auth/popup-blocked"
+        ? "Popup blocked. Please allow popups for this site."
+        : "Google sign-in failed. Please try again.";
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -229,6 +264,8 @@ const Login = () => {
               <Button 
                 type="button" 
                 variant="outline" 
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
                 className="h-12 rounded-xl glass border-border/50 hover:bg-card/80 transition-all gap-2"
               >
                 <ChromeIcon className="w-5 h-5" />
@@ -237,7 +274,8 @@ const Login = () => {
               <Button 
                 type="button" 
                 variant="outline" 
-                className="h-12 rounded-xl glass border-border/50 hover:bg-card/80 transition-all gap-2"
+                disabled
+                className="h-12 rounded-xl glass border-border/50 hover:bg-card/80 transition-all gap-2 opacity-50 cursor-not-allowed"
               >
                 <Github className="w-5 h-5" />
                 GitHub

@@ -20,6 +20,16 @@ router.post('/register', verifyToken, async (req, res) => {
       });
     }
 
+    // Validate role input — only citizen and volunteer are self-assignable
+    const allowedRoles = ['citizen', 'volunteer'];
+    if (role && !allowedRoles.includes(role)) {
+      console.warn(`Role escalation attempt by UID: ${firebaseUid}, attempted role: ${role}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role selection'
+      });
+    }
+
     // Check if user already exists with this Firebase UID
     const existingUser = await User.findOne({ firebaseUid });
     if (existingUser) {
@@ -39,12 +49,13 @@ router.post('/register', verifyToken, async (req, res) => {
       });
     }
 
-    // Create user in MongoDB
+    // Create user in MongoDB with safe role assignment
+    const safeRole = allowedRoles.includes(role) ? role : 'citizen';
     const user = await User.create({
       firebaseUid,
       name,
       email,
-      role: role || 'citizen'
+      role: safeRole
     });
 
     res.status(201).json({

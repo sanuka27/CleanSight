@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -12,33 +12,157 @@ import {
   Clock, 
   CheckCircle,
   Trash2,
-  Layers
+  Layers,
+  Loader2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useReports } from "@/hooks/useReports";
+import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock data for reports
-const mockReports = [
-  { id: 1, title: "Illegal Dumping - Park Area", status: "pending", type: "hazardous", location: "Central Park", date: "2 hours ago" },
-  { id: 2, title: "Overflowing Trash Bin", status: "assigned", type: "general", location: "Main Street", date: "4 hours ago" },
-  { id: 3, title: "Construction Debris", status: "completed", type: "construction", location: "Oak Avenue", date: "1 day ago" },
-  { id: 4, title: "Plastic Waste on Beach", status: "pending", type: "recyclable", location: "Sunset Beach", date: "3 hours ago" },
-  { id: 5, title: "Garden Waste Pile", status: "assigned", type: "organic", location: "Green Lane", date: "6 hours ago" },
-];
+interface ReportItem {
+  _id: string;
+  firebaseUid: string;
+  description: string;
+  status: "pending" | "assigned" | "resolved";
+  wasteType: string;
+  location: { lat: number; lng: number };
+  assignedTo: string | null;
+  createdAt: string;
+}
+
+interface VolunteerUser {
+  firebaseUid: string;
+  name: string;
+  email: string;
+}
 
 const statusColors = {
   pending: "bg-warning/10 text-warning border-warning/20",
   assigned: "bg-info/10 text-info border-info/20",
   completed: "bg-success/10 text-success border-success/20",
+  resolved: "bg-success/10 text-success border-success/20",
 };
 
 const statusIcons = {
   pending: AlertCircle,
   assigned: Clock,
   completed: CheckCircle,
+  resolved: CheckCircle,
 };
 
 const ReportMap = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [reports, setReports] = useState<ReportItem[]>([]);
+  const [userRole, setUserRole] = useState<string>("citizen");
+  const [volunteers, setVolunteers] = useState<VolunteerUser[]>([]);
+  const [assignSelections, setAssignSelections] = useState<Record<string, string>>({});
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const { getReports, assignSelf, assignReport, updateReportStatus } = useReports();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const currentUid = user?.uid || "";
+
+  // Fetch reports and user profile on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [reportsData, meData] = await Promise.all([
+          getReports(),
+          api.getMe(),
+        ]);
+        setReports(reportsData);
+        setUserRole(meData?.data?.user?.role || "citizen");
+
+        // Fetch volunteers list for staff/admin
+        const role = meData?.data?.user?.role;
+        if (role === "staff" || role === "admin") {
+          try {
+            const volData = await api.getVolunteers();
+            setVolunteers(volData.data || []);
+          } catch {
+            // Non-critical: assignment dropdown will be empty
+          }
+        }
+      } catch {
+        // Fallback: show empty list
+      }
+    };
+    if (user) fetchData();
+  }, [user]);
+
+  const refreshReports = async () => {
+    try {
+      const data = await getReports();
+      setReports(data);
+    } catch { /* silent */ }
+  };
+
+  const handleAssignSelf = async (reportId: string) => {
+    setActionLoading(reportId);
+    try {
+      await assignSelf(reportId);
+      toast({ title: "Task Accepted", description: "Report has been assigned to you." });
+      await refreshReports();
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to accept task", variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAssign = async (reportId: string) => {
+    const volunteerUid = assignSelections[reportId];
+    if (!volunteerUid) {
+      toast({ title: "Select Volunteer", description: "Please select a volunteer to assign.", variant: "destructive" });
+      return;
+    }
+    setActionLoading(reportId);
+    try {
+      await assignReport(reportId, volunteerUid);
+      toast({ title: "Assigned", description: "Report assigned to volunteer." });
+      await refreshReports();
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to assign", variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResolve = async (reportId: string) => {
+    setActionLoading(reportId);
+    try {
+      await updateReportStatus(reportId, "resolved");
+      toast({ title: "Resolved", description: "Report marked as resolved." });
+      await refreshReports();
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to resolve", variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins} min ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days > 1 ? "s" : ""} ago`;
+  };
+
+  const filteredReports = reports.filter((r) =>
+    r.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    r.wasteType?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const pendingCount = reports.filter((r) => r.status === "pending").length;
+  const assignedCount = reports.filter((r) => r.status === "assigned").length;
+  const resolvedCount = reports.filter((r) => r.status === "resolved").length;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -89,15 +213,15 @@ const ReportMap = () => {
             <div className="p-4 bg-secondary/50 border-b border-border">
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <p className="font-display text-xl font-bold text-warning">12</p>
+                  <p className="font-display text-xl font-bold text-warning">{pendingCount}</p>
                   <p className="text-xs text-muted-foreground">Pending</p>
                 </div>
                 <div>
-                  <p className="font-display text-xl font-bold text-info">8</p>
+                  <p className="font-display text-xl font-bold text-info">{assignedCount}</p>
                   <p className="text-xs text-muted-foreground">Assigned</p>
                 </div>
                 <div>
-                  <p className="font-display text-xl font-bold text-success">156</p>
+                  <p className="font-display text-xl font-bold text-success">{resolvedCount}</p>
                   <p className="text-xs text-muted-foreground">Completed</p>
                 </div>
               </div>
@@ -105,32 +229,109 @@ const ReportMap = () => {
 
             {/* Report List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {mockReports.map((report) => {
-                const StatusIcon = statusIcons[report.status as keyof typeof statusIcons];
+              {filteredReports.map((report) => {
+                const StatusIcon = statusIcons[report.status as keyof typeof statusIcons] || AlertCircle;
+                const isLoading = actionLoading === report._id;
                 return (
                   <motion.div
-                    key={report.id}
+                    key={report._id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     whileHover={{ scale: 1.02 }}
                     className="p-4 bg-background rounded-xl border border-border hover:border-primary/30 cursor-pointer transition-all"
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-medium text-sm line-clamp-1">{report.title}</h3>
-                      <Badge variant="outline" className={statusColors[report.status as keyof typeof statusColors]}>
+                      <h3 className="font-medium text-sm line-clamp-1">{report.description}</h3>
+                      <Badge variant="outline" className={statusColors[report.status as keyof typeof statusColors] || ""}>
                         <StatusIcon className="w-3 h-3 mr-1" />
                         {report.status}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <MapPin className="w-3 h-3" />
-                      {report.location}
+                      {report.location?.lat?.toFixed(4)}, {report.location?.lng?.toFixed(4)}
                       <span className="mx-1">•</span>
-                      {report.date}
+                      {formatDate(report.createdAt)}
                     </div>
+
+                    {/* Role-based action buttons */}
+                    {userRole === "volunteer" && report.status === "pending" && (
+                      <div className="mt-3 pt-2 border-t border-border/50">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full text-xs gap-1 border-primary/30 hover:bg-primary hover:text-white"
+                          disabled={isLoading}
+                          onClick={(e) => { e.stopPropagation(); handleAssignSelf(report._id); }}
+                        >
+                          {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                          Accept Task
+                        </Button>
+                      </div>
+                    )}
+
+                    {userRole === "volunteer" && report.status === "assigned" && report.assignedTo === currentUid && (
+                      <div className="mt-3 pt-2 border-t border-border/50">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full text-xs gap-1 border-success/30 text-success hover:bg-success hover:text-white"
+                          disabled={isLoading}
+                          onClick={(e) => { e.stopPropagation(); handleResolve(report._id); }}
+                        >
+                          {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                          Mark as Resolved
+                        </Button>
+                      </div>
+                    )}
+
+                    {(userRole === "staff" || userRole === "admin") && report.status === "pending" && (
+                      <div className="mt-3 pt-2 border-t border-border/50 space-y-2">
+                        <div className="flex gap-2">
+                          <select
+                            className="flex-1 text-xs rounded-md border border-border bg-background px-2 py-1.5 outline-none"
+                            value={assignSelections[report._id] || ""}
+                            onChange={(e) => setAssignSelections((prev) => ({ ...prev, [report._id]: e.target.value }))}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value="">Select volunteer...</option>
+                            {volunteers.map((v) => (
+                              <option key={v.firebaseUid} value={v.firebaseUid}>{v.name}</option>
+                            ))}
+                          </select>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs border-primary/30 hover:bg-primary hover:text-white"
+                            disabled={isLoading}
+                            onClick={(e) => { e.stopPropagation(); handleAssign(report._id); }}
+                          >
+                            {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Assign"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {(userRole === "staff" || userRole === "admin") && report.status === "assigned" && (
+                      <div className="mt-3 pt-2 border-t border-border/50">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full text-xs gap-1 border-success/30 text-success hover:bg-success hover:text-white"
+                          disabled={isLoading}
+                          onClick={(e) => { e.stopPropagation(); handleResolve(report._id); }}
+                        >
+                          {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                          Mark as Resolved
+                        </Button>
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}
+              {filteredReports.length === 0 && (
+                <div className="text-center text-sm text-muted-foreground py-8">No reports found.</div>
+              )}
             </div>
           </motion.aside>
 

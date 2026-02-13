@@ -119,6 +119,37 @@ class ApiClient {
       requiresAuth: true,
     });
   }
+
+  // Report lifecycle endpoints
+  async assignSelf(reportId: string): Promise<any> {
+    return this.request(`/api/reports/${reportId}/assign-self`, {
+      method: "PATCH",
+      requiresAuth: true,
+    });
+  }
+
+  async assignReport(reportId: string, volunteerUid: string): Promise<any> {
+    return this.request(`/api/reports/${reportId}/assign`, {
+      method: "PATCH",
+      body: JSON.stringify({ volunteerUid }),
+      requiresAuth: true,
+    });
+  }
+
+  async updateReportStatus(reportId: string, status: string): Promise<any> {
+    return this.request(`/api/reports/${reportId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+      requiresAuth: true,
+    });
+  }
+
+  async getVolunteers(): Promise<any> {
+    return this.request("/api/reports/volunteers", {
+      method: "GET",
+      requiresAuth: true,
+    });
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);

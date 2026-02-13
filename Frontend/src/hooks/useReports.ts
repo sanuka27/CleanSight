@@ -99,9 +99,89 @@ export function useReports() {
     }
   };
 
+  /**
+   * Get all reports (role-based: citizens see own, others see all).
+   */
+  const getReports = async (): Promise<Report[]> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await api.getReports();
+      return response.data;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to fetch reports";
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Volunteer self-assigns a pending report.
+   */
+  const assignSelf = async (reportId: string): Promise<Report> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await api.assignSelf(reportId);
+      return response.data;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to assign report";
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Staff/Admin assigns a report to a volunteer.
+   */
+  const assignReport = async (reportId: string, volunteerUid: string): Promise<Report> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await api.assignReport(reportId, volunteerUid);
+      return response.data;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to assign report";
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Update report status (with transition validation on backend).
+   */
+  const updateReportStatus = async (reportId: string, status: string): Promise<Report> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await api.updateReportStatus(reportId, status);
+      return response.data;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to update status";
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     createReport,
     getMyReports,
+    getReports,
+    assignSelf,
+    assignReport,
+    updateReportStatus,
     isLoading,
     error,
   };

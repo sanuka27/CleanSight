@@ -44,14 +44,17 @@ const reportSchema = new mongoose.Schema({
     type: String,
     default: null
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+}, {
+  timestamps: true  // auto-manages createdAt + updatedAt
 });
 
-// Index for faster status queries
+// Indexes for faster analytics queries
 reportSchema.index({ status: 1 });
+reportSchema.index({ createdAt: -1 });
+reportSchema.index({ status: 1, createdAt: -1 });
+reportSchema.index({ assignedTo: 1, status: 1 });
+reportSchema.index({ wasteType: 1 });
+reportSchema.index({ urgency: 1 });
 
 const Report = mongoose.model('Report', reportSchema);
 

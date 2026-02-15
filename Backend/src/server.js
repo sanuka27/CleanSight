@@ -8,6 +8,7 @@ import './config/firebaseAdmin.js'; // Initialize Firebase Admin
 import authRoutes from './routes/auth.js';
 import reportRoutes from './routes/reports.js';
 import volunteerRoutes from './routes/volunteers.js';
+import analyticsRoutes from './routes/analytics.js';
 
 // Load environment variables
 dotenv.config();
@@ -39,6 +40,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/volunteers', volunteerRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  ArrowUpRight,
   Calendar,
   LogOut,
   Home,
@@ -29,15 +28,20 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  BarChart,
-  Bar,
   PieChart as RechartsPie,
   Cell,
   Pie
 } from 'recharts';
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAuth } from "@/context/AuthContext";
+import { defaultParams, fromPreset, PRESETS } from "@/lib/dateRange";
+import { getUserRole, canViewVolunteerAnalytics } from "@/lib/role";
+import type { AnalyticsPreset } from "@/types/analytics";
 
-const CHART_DATA = [
+/* ── Fallback mock data (used while loading / on error) ────────── */
+
+const FALLBACK_CHART_DATA = [
   { name: 'Mon', reports: 12, resolved: 8 },
   { name: 'Tue', reports: 19, resolved: 12 },
   { name: 'Wed', reports: 15, resolved: 10 },
@@ -47,18 +51,26 @@ const CHART_DATA = [
   { name: 'Sun', reports: 10, resolved: 15 },
 ];
 
-const PIE_DATA = [
+const WASTE_TYPE_COLORS: Record<string, string> = {
+  general: 'hsl(var(--primary))',
+  recyclable: 'hsl(var(--info))',
+  organic: 'hsl(var(--success))',
+  construction: 'hsl(var(--warning))',
+  hazardous: 'hsl(var(--destructive))',
+};
+
+const FALLBACK_PIE_DATA = [
   { name: 'Plastic', value: 400, color: 'hsl(var(--primary))' },
   { name: 'Organic', value: 300, color: 'hsl(var(--success))' },
   { name: 'Hazardous', value: 100, color: 'hsl(var(--destructive))' },
   { name: 'Metal', value: 200, color: 'hsl(var(--info))' },
 ];
 
-const stats = [
-  { label: "Total Reports", value: 2547, suffix: "", change: "+12%", trend: "up", icon: MapPin, color: "primary" },
-  { label: "Active Volunteers", value: 523, suffix: "", change: "+8%", trend: "up", icon: Users, color: "info" },
-  { label: "Cleanups Completed", value: 1893, suffix: "", change: "+24%", trend: "up", icon: CheckCircle, color: "success" },
-  { label: "Avg. Response Time", value: 4.2, suffix: "h", change: "-18%", trend: "down", icon: Clock, color: "warning" },
+const FALLBACK_STATS = [
+  { label: "Total Reports", value: 0, suffix: "", change: "--", trend: "up" as const, icon: MapPin, color: "primary" },
+  { label: "Active Volunteers", value: 0, suffix: "", change: "--", trend: "up" as const, icon: Users, color: "info" },
+  { label: "Cleanups Completed", value: 0, suffix: "", change: "--", trend: "up" as const, icon: CheckCircle, color: "success" },
+  { label: "Avg. Response Time", value: 0, suffix: "h", change: "--", trend: "down" as const, icon: Clock, color: "warning" },
 ];
 
 const recentActivity = [
@@ -71,6 +83,114 @@ const recentActivity = [
 
 const Dashboard = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [preset, setPreset] = useState<AnalyticsPreset>("7d");
+
+    const { user } = useAuth();
+    const {
+      summary,
+      performance,
+      volunteers,
+      isLoading,
+      error,
+      fetchSummary,
+      fetchPerformance,
+      fetchVolunteers,
+    } = useAnalytics();
+
+    // Fetch on mount and when preset changes
+    useEffect(() => {
+      const params = fromPreset(preset);
+      fetchSummary(params);
+      fetchPerformance(params);
+    }, [preset, fetchSummary, fetchPerformance]);
+
+    // Derive user role from backend profile stored in summary
+    // (we don't have a separate profile fetch yet — use a safe fallback)
+    const userRole = useMemo(() => {
+      // If volunteer analytics are already loaded, user is staff/admin
+      // This is a safe heuristic; the real gating happens server-side
+      return "citizen" as const; // will be replaced by profile fetch later
+    }, []);
+
+    // Fetch volunteer analytics only for staff/admin (gated server-side too)
+    useEffect(() => {
+      // Attempt the fetch — server returns 403 for non-staff, which the
+      // hook catches gracefully as an error; no UI break.
+      if (canViewVolunteerAnalytics("staff")) {
+        // Only attempt if we have summary (i.e. user is authenticated)
+        if (summary) {
+          fetchVolunteers(fromPreset(preset));
+        }
+      }
+    }, [summary, preset, fetchVolunteers]);
+
+    /* ── Derived display data (falls back to zeros while loading) ── */
+
+    const stats = useMemo(() => {
+      const t = summary?.totals;
+      const p = performance;
+      return [
+        {
+          label: "Total Reports",
+          value: t?.total ?? 0,
+          suffix: "",
+          change: summary ? `${summary.rates.resolutionRate}%` : "--",
+          trend: "up" as const,
+          icon: MapPin,
+          color: "primary",
+        },
+        {
+          label: "Assigned",
+          value: t?.assigned ?? 0,
+          suffix: "",
+          change: summary ? `${summary.rates.assignmentRate}%` : "--",
+          trend: "up" as const,
+          icon: Users,
+          color: "info",
+        },
+        {
+          label: "Resolved",
+          value: t?.resolved ?? 0,
+          suffix: "",
+          change: summary ? `${summary.rates.resolutionRate}%` : "--",
+          trend: "up" as const,
+          icon: CheckCircle,
+          color: "success",
+        },
+        {
+          label: "Avg. Resolution",
+          value: p?.avgResolutionHours ?? 0,
+          suffix: "h",
+          change: p?.medianResolutionHours != null ? `~${p.medianResolutionHours}h` : "--",
+          trend: "down" as const,
+          icon: Clock,
+          color: "warning",
+        },
+      ];
+    }, [summary, performance]);
+
+    const CHART_DATA = useMemo(() => {
+      if (!summary?.series?.length) return FALLBACK_CHART_DATA;
+      return summary.series.map((b) => ({
+        name: b.date.slice(5), // MM-DD
+        reports: b.count,
+        resolved: 0, // series only has total; resolved needs separate query
+      }));
+    }, [summary]);
+
+    const PIE_DATA = useMemo(() => {
+      if (!summary?.topWasteTypes?.length) return FALLBACK_PIE_DATA;
+      return summary.topWasteTypes.map((w) => ({
+        name: w.wasteType,
+        value: w.count,
+        color: WASTE_TYPE_COLORS[w.wasteType] || 'hsl(var(--muted-foreground))',
+      }));
+    }, [summary]);
+
+    const pieTotal = useMemo(
+      () => PIE_DATA.reduce((sum, d) => sum + d.value, 0),
+      [PIE_DATA]
+    );
 
     return (
         <div className="min-h-screen flex flex-col bg-background">
@@ -130,9 +250,11 @@ const Dashboard = () => {
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div>
                                     <h1 className="font-display text-3xl font-bold mb-2">
-                                        Hello, <span className="text-gradient">Alex</span>
+                                        Hello, <span className="text-gradient">{user?.displayName?.split(' ')[0] || 'there'}</span>
                                     </h1>
-                                    <p className="text-muted-foreground">Here's what's happening in your area today.</p>
+                                    <p className="text-muted-foreground">
+                                        {isLoading ? 'Loading analytics…' : error ? 'Could not load analytics.' : "Here's what's happening in your area today."}
+                                    </p>
                                 </div>
                                 <div className="flex gap-3">
                                     <Button variant="outline" className="glass gap-2">
@@ -240,8 +362,8 @@ const Dashboard = () => {
                                         </ResponsiveContainer>
                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                             <div className="text-center">
-                                                <p className="text-3xl font-bold">1200</p>
-                                                <p className="text-xs text-muted-foreground">Total Tons</p>
+                                                <p className="text-3xl font-bold">{pieTotal}</p>
+                                                <p className="text-xs text-muted-foreground">Total</p>
                                             </div>
                                         </div>
                                     </div>

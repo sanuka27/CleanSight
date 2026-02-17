@@ -1,4 +1,10 @@
 import { auth } from "./firebase";
+import type {
+  AnalyticsQueryParams,
+  SummaryResponse,
+  PerformanceResponse,
+  VolunteerAnalyticsResponse,
+} from "@/types/analytics";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -149,6 +155,45 @@ class ApiClient {
       method: "GET",
       requiresAuth: true,
     });
+  }
+
+  // ── Analytics endpoints ──────────────────────────────────────────
+
+  private buildAnalyticsQuery(params?: AnalyticsQueryParams): string {
+    if (!params) return "";
+    const qs = new URLSearchParams();
+    if (params.preset) qs.set("preset", params.preset);
+    if (params.from) qs.set("from", params.from);
+    if (params.to) qs.set("to", params.to);
+    const str = qs.toString();
+    return str ? `?${str}` : "";
+  }
+
+  async getAnalyticsSummary(
+    params?: AnalyticsQueryParams
+  ): Promise<SummaryResponse> {
+    return this.request(`/api/analytics/summary${this.buildAnalyticsQuery(params)}`, {
+      method: "GET",
+      requiresAuth: true,
+    });
+  }
+
+  async getAnalyticsPerformance(
+    params?: AnalyticsQueryParams
+  ): Promise<PerformanceResponse> {
+    return this.request(
+      `/api/analytics/performance${this.buildAnalyticsQuery(params)}`,
+      { method: "GET", requiresAuth: true }
+    );
+  }
+
+  async getVolunteerAnalytics(
+    params?: AnalyticsQueryParams
+  ): Promise<VolunteerAnalyticsResponse> {
+    return this.request(
+      `/api/analytics/volunteers${this.buildAnalyticsQuery(params)}`,
+      { method: "GET", requiresAuth: true }
+    );
   }
 }
 

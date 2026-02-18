@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.js';
 import reportRoutes from './routes/reports.js';
 import volunteerRoutes from './routes/volunteers.js';
 import analyticsRoutes from './routes/analytics.js';
+import dashboardRoutes from './routes/dashboard.js';
 
 // Load environment variables
 dotenv.config();
@@ -24,9 +25,6 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Connect to MongoDB
-connectDB();
-
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -41,6 +39,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/volunteers', volunteerRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

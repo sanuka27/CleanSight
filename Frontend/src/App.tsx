@@ -23,6 +23,7 @@ const Contact = lazy(() => import("./pages/Contact"));
 const Help = lazy(() => import("./pages/Help"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
+const ChooseRole = lazy(() => import("./pages/onboarding/ChooseRole"));
 
 // Role-based dashboards
 const DashboardRouter = lazy(() => import("./routes/DashboardRouter"));
@@ -58,6 +59,7 @@ const AnimatedRoutes = () => {
           <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
           <Route path="/signup" element={<PageTransition><Signup /></PageTransition>} />
           <Route path="/register" element={<Navigate to="/signup" replace />} />
+          <Route path="/onboarding/role" element={<PageTransition><ChooseRole /></PageTransition>} />
           {/* /dashboard → role-based router */}
           <Route 
             path="/dashboard" 

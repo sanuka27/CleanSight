@@ -58,23 +58,19 @@ const features = [
 
 export const FeaturesSection = memo(function FeaturesSection() {
   return (
-    <section className="py-24 relative overflow-hidden">
+    <section className="py-24 relative overflow-hidden" style={{ contain: "layout style" }}>
       {/* Background elements */}
       <div className="absolute inset-0 gradient-mesh opacity-50" />
       
       <div className="container mx-auto px-4 relative z-10">
         {/* Section Header */}
         <RevealOnScroll className="text-center mb-16">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
+          <div
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-premium mb-6"
           >
             <Zap className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium">Powerful Features</span>
-          </motion.div>
+          </div>
           
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
             Everything You Need to{" "}
@@ -102,6 +98,7 @@ export const FeaturesSection = memo(function FeaturesSection() {
                   className="group relative h-full p-6 rounded-2xl glass-premium overflow-hidden hover:shadow-glow transition-all duration-300"
                   whileHover={{ y: -4 }}
                   transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  style={{ willChange: "transform" }}
                 >
                   {/* Gradient overlay on hover */}
                   <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`} />

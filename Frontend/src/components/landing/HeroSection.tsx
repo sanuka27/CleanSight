@@ -82,36 +82,24 @@ export const HeroSection = memo(function HeroSection() {
               transition={{ duration: 0.3, delay: 0.4, ease: "easeOut" }}
             >
               <Link to="/report">
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                <Button 
+                  size="lg" 
+                  className="w-full sm:w-auto gap-2 gradient-primary text-white shadow-glow hover:shadow-glow-lg transition-all duration-300 px-8 py-6 text-lg rounded-xl shimmer hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <Button 
-                    size="lg" 
-                    className="w-full sm:w-auto gap-2 gradient-primary text-white shadow-glow hover:shadow-glow-lg transition-all duration-300 px-8 py-6 text-lg rounded-xl shimmer"
-                  >
-                    <Camera className="w-5 h-5" />
-                    Report Waste Now
-                    <ArrowRight className="w-5 h-5" />
-                  </Button>
-                </motion.div>
+                  <Camera className="w-5 h-5" />
+                  Report Waste Now
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
               </Link>
               <Link to="/map">
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="w-full sm:w-auto gap-2 glass-premium hover:bg-card/80 transition-all duration-300 px-8 py-6 text-lg rounded-xl border-primary/30 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <Button 
-                    variant="outline" 
-                    size="lg" 
-                    className="w-full sm:w-auto gap-2 glass-premium hover:bg-card/80 transition-all duration-300 px-8 py-6 text-lg rounded-xl border-primary/30"
-                  >
-                    <MapPin className="w-5 h-5" />
-                    View Report Map
-                  </Button>
-                </motion.div>
+                  <MapPin className="w-5 h-5" />
+                  View Report Map
+                </Button>
               </Link>
             </motion.div>
 

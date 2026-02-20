@@ -1,32 +1,42 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Leaf, MapPin, Users, BarChart3, Camera, ChevronRight } from "lucide-react";
-
-const navLinks = [
-  { href: "/map", label: "Report Map", icon: MapPin },
-  { href: "/report", label: "Report Waste", icon: Camera },
-  { href: "/volunteer", label: "Volunteer", icon: Users },
-  { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
-];
+import { Menu, X, Leaf, ChevronRight, LogOut } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { getUserRole } from "@/lib/role";
+import { NAV_LINKS, canSeeNavLink } from "@/constants/roles";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
-  const { scrollY } = useScroll();
-  
-  // Dynamic background opacity based on scroll
-  const backgroundOpacity = useTransform(scrollY, [0, 100], [0, 1]);
+  const rafRef = useRef<number | null>(null);
+
+  const { isAuthenticated, isLoading, appUser, isAppUserLoading, logout } = useAuth();
+  const role = appUser ? getUserRole(appUser) : undefined;
+
+  /** Filter nav links based on auth state + role. */
+  const visibleLinks = useMemo(
+    () => NAV_LINKS.filter((link) => canSeeNavLink(link, isAuthenticated, role)),
+    [isAuthenticated, role],
+  );
+
+  const handleScroll = useCallback(() => {
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      setScrolled(window.scrollY > 20);
+      rafRef.current = null;
+    });
+  }, []);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [handleScroll]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -74,7 +84,7 @@ export function Navbar() {
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center gap-1 bg-card/50 rounded-xl p-1.5 backdrop-blur-sm">
-              {navLinks.map((link) => {
+              {visibleLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive = location.pathname === link.href;
                 
@@ -109,24 +119,37 @@ export function Navbar() {
 
             {/* Auth Buttons */}
             <div className="hidden lg:flex items-center gap-3">
-              <Link to="/login">
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button variant="ghost" size="sm" className="font-medium">
-                    Sign In
-                  </Button>
-                </motion.div>
-              </Link>
-              <Link to="/signup">
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button 
-                    size="sm" 
-                    className="gradient-primary text-white shadow-glow hover:shadow-glow-lg transition-shadow font-medium gap-2"
-                  >
-                    Get Started
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </motion.div>
-              </Link>
+              {isLoading || isAppUserLoading ? (
+                /* Tiny skeleton while auth resolves — prevents layout shift */
+                <div className="w-20 h-9 rounded-lg bg-muted/50 animate-pulse" />
+              ) : isAuthenticated ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="font-medium transition-transform hover:scale-[1.02] active:scale-[0.98] gap-2"
+                  onClick={() => void logout()}
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </Button>
+              ) : (
+                <>
+                  <Link to="/login">
+                    <Button variant="ghost" size="sm" className="font-medium transition-transform hover:scale-[1.02] active:scale-[0.98]">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/signup">
+                    <Button 
+                      size="sm" 
+                      className="gradient-primary text-white shadow-glow hover:shadow-glow-lg transition-all font-medium gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      Get Started
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Toggle */}
@@ -177,7 +200,7 @@ export function Navbar() {
               <div className="container mx-auto px-4 pt-2">
                 <div className="glass-premium rounded-2xl p-4 shadow-elevated">
                   <div className="flex flex-col gap-2">
-                    {navLinks.map((link, index) => {
+                    {visibleLinks.map((link, index) => {
                       const Icon = link.icon;
                       const isActive = location.pathname === link.href;
                       
@@ -209,19 +232,32 @@ export function Navbar() {
                     <motion.div
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: navLinks.length * 0.05 }}
+                      transition={{ delay: visibleLinks.length * 0.05 }}
                       className="grid grid-cols-2 gap-2"
                     >
-                      <Link to="/login">
-                        <Button variant="outline" className="w-full">
-                          Sign In
+                      {isAuthenticated ? (
+                        <Button
+                          variant="outline"
+                          className="w-full col-span-2 gap-2"
+                          onClick={() => void logout()}
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Sign Out
                         </Button>
-                      </Link>
-                      <Link to="/signup">
-                        <Button className="w-full gradient-primary text-white">
-                          Get Started
-                        </Button>
-                      </Link>
+                      ) : (
+                        <>
+                          <Link to="/login">
+                            <Button variant="outline" className="w-full">
+                              Sign In
+                            </Button>
+                          </Link>
+                          <Link to="/signup">
+                            <Button className="w-full gradient-primary text-white">
+                              Get Started
+                            </Button>
+                          </Link>
+                        </>
+                      )}
                     </motion.div>
                   </div>
                 </div>

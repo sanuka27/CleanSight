@@ -13,7 +13,6 @@ export const CTASection = memo(function CTASection() {
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4, ease: "easeOut" }}
-          style={{ willChange: "auto" }}
           className="relative rounded-3xl gradient-primary p-8 md:p-12 lg:p-16 overflow-hidden"
         >
           {/* Background Elements */}

@@ -18,6 +18,17 @@ const MapView = lazy(() => import("./pages/MapView"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Volunteer = lazy(() => import("./pages/Volunteer"));
 const Signup = lazy(() => import("./pages/Signup"));
+const About = lazy(() => import("./pages/About"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Help = lazy(() => import("./pages/Help"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+
+// Role-based dashboards
+const DashboardRouter = lazy(() => import("./routes/DashboardRouter"));
+const CitizenDashboard = lazy(() => import("./pages/dashboard/CitizenDashboard"));
+const VolunteerDashboard = lazy(() => import("./pages/dashboard/VolunteerDashboard"));
+const StaffDashboard = lazy(() => import("./pages/dashboard/StaffDashboard"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,10 +58,44 @@ const AnimatedRoutes = () => {
           <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
           <Route path="/signup" element={<PageTransition><Signup /></PageTransition>} />
           <Route path="/register" element={<Navigate to="/signup" replace />} />
+          {/* /dashboard → role-based router */}
           <Route 
             path="/dashboard" 
             element={
               <ProtectedRoute>
+                <PageTransition><DashboardRouter /></PageTransition>
+              </ProtectedRoute>
+            } 
+          />
+          {/* Role-specific dashboard routes */}
+          <Route 
+            path="/dashboard/citizen" 
+            element={
+              <ProtectedRoute allowedRoles={["citizen", "admin", "staff"]}>
+                <PageTransition><CitizenDashboard /></PageTransition>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard/volunteer" 
+            element={
+              <ProtectedRoute allowedRoles={["volunteer", "admin", "staff"]}>
+                <PageTransition><VolunteerDashboard /></PageTransition>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard/staff" 
+            element={
+              <ProtectedRoute allowedRoles={["staff", "admin"]}>
+                <PageTransition><StaffDashboard /></PageTransition>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/dashboard/admin" 
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
                 <PageTransition><Dashboard /></PageTransition>
               </ProtectedRoute>
             } 
@@ -72,6 +117,11 @@ const AnimatedRoutes = () => {
             } 
           />
           <Route path="/volunteer" element={<PageTransition><Volunteer /></PageTransition>} />
+          <Route path="/about" element={<PageTransition><About /></PageTransition>} />
+          <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
+          <Route path="/help" element={<PageTransition><Help /></PageTransition>} />
+          <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />
+          <Route path="/terms" element={<PageTransition><Terms /></PageTransition>} />
           <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
         </Routes>
       </Suspense>

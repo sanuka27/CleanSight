@@ -22,7 +22,7 @@ export const HeroSection = memo(function HeroSection() {
       {/* Noise texture overlay */}
       <div className="absolute inset-0 noise pointer-events-none" />
 
-      <div className="container mx-auto px-4 pt-28 pb-20 relative z-10">
+      <div className="container mx-auto px-4 pt-24 pb-20 relative z-10">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           {/* Left Content */}
           <motion.div

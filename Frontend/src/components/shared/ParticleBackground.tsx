@@ -1,5 +1,4 @@
-import { motion } from "framer-motion";
-import { useEffect, useState, memo } from "react";
+import { useMemo, memo } from "react";
 
 interface Particle {
   id: number;
@@ -15,13 +14,15 @@ interface ParticleBackgroundProps {
   className?: string;
 }
 
+/**
+ * Particles use pure CSS animations instead of JS-driven Framer Motion loops.
+ * This eliminates 20+ independent JS animation ticks per frame.
+ */
 export const ParticleBackground = memo(function ParticleBackground({ count = 20, className = "" }: ParticleBackgroundProps) {
-  const [particles, setParticles] = useState<Particle[]>([]);
-
-  useEffect(() => {
-    const newParticles: Particle[] = [];
+  const particles = useMemo<Particle[]>(() => {
+    const result: Particle[] = [];
     for (let i = 0; i < count; i++) {
-      newParticles.push({
+      result.push({
         id: i,
         x: Math.random() * 100,
         y: Math.random() * 100,
@@ -30,13 +31,13 @@ export const ParticleBackground = memo(function ParticleBackground({ count = 20,
         delay: Math.random() * 3,
       });
     }
-    setParticles(newParticles);
+    return result;
   }, [count]);
 
   return (
     <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
       {particles.map((particle) => (
-        <motion.div
+        <div
           key={particle.id}
           className="absolute rounded-full bg-primary/15"
           style={{
@@ -44,16 +45,9 @@ export const ParticleBackground = memo(function ParticleBackground({ count = 20,
             top: `${particle.y}%`,
             width: particle.size,
             height: particle.size,
-          }}
-          animate={{
-            y: [0, -20, 0],
-            opacity: [0.2, 0.5, 0.2],
-          }}
-          transition={{
-            duration: particle.duration,
-            delay: particle.delay,
-            repeat: Infinity,
-            ease: "linear",
+            animation: `particle-css-float ${particle.duration}s ${particle.delay}s linear infinite`,
+            willChange: "transform, opacity",
+            contain: "strict",
           }}
         />
       ))}

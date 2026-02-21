@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, memo } from "react";
+import { useEffect, useState, useRef, memo, useMemo } from "react";
 import { motion, useMotionValue, useSpring, useInView } from "framer-motion";
 
 interface AnimatedCounterProps {
@@ -82,7 +82,7 @@ export const FloatingCard = memo(function FloatingCard({ children, className = "
         delay, 
         ease: "easeOut"
       }}
-      style={{ willChange: "auto" }}
+      style={{ willChange: "transform, opacity" }}
       className={`glass-premium rounded-2xl p-4 shadow-elevated hover:shadow-glow-lg transition-shadow duration-300 ${className}`}
     >
       {children}
@@ -156,7 +156,7 @@ export const RevealOnScroll = memo(function RevealOnScroll({
         delay, 
         ease: [0.25, 0.1, 0.25, 1]
       }}
-      style={{ willChange: "auto" }}
+      style={{ willChange: isInView ? "auto" : "transform, opacity" }}
       className={className}
     >
       {children}

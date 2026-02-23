@@ -34,6 +34,7 @@ import {
 } from 'recharts';
 import { motion } from "framer-motion";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAdminDashboard } from "@/hooks/useDashboard";
 import { useAuth } from "@/context/AuthContext";
 import { defaultParams, fromPreset, PRESETS } from "@/lib/dateRange";
 import { getUserRole, canViewVolunteerAnalytics } from "@/lib/role";
@@ -73,13 +74,7 @@ const FALLBACK_STATS = [
   { label: "Avg. Response Time", value: 0, suffix: "h", change: "--", trend: "down" as const, icon: Clock, color: "warning" },
 ];
 
-const recentActivity = [
-  { type: "report", message: "New waste report in Central Park", time: "5 min ago", status: "pending" },
-  { type: "cleanup", message: "Cleanup completed at Main Street", time: "15 min ago", status: "completed" },
-  { type: "assignment", message: "Task assigned to Volunteer Team A", time: "1 hour ago", status: "assigned" },
-  { type: "report", message: "New hazardous waste report - Oak Avenue", time: "2 hours ago", status: "urgent" },
-  { type: "cleanup", message: "Beach cleanup verified and approved", time: "3 hours ago", status: "completed" },
-];
+/* recentActivity is now loaded from /api/dashboard/admin endpoint */
 
 const Dashboard = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -96,6 +91,8 @@ const Dashboard = () => {
       fetchPerformance,
       fetchVolunteers,
     } = useAnalytics();
+
+    const { data: adminData, fetch: fetchAdmin } = useAdminDashboard();
 
     // Fetch on mount and when preset changes
     useEffect(() => {
@@ -114,15 +111,17 @@ const Dashboard = () => {
 
     // Fetch volunteer analytics only for staff/admin (gated server-side too)
     useEffect(() => {
-      // Attempt the fetch — server returns 403 for non-staff, which the
-      // hook catches gracefully as an error; no UI break.
       if (canViewVolunteerAnalytics("staff")) {
-        // Only attempt if we have summary (i.e. user is authenticated)
         if (summary) {
           fetchVolunteers(fromPreset(preset));
         }
       }
     }, [summary, preset, fetchVolunteers]);
+
+    // Fetch admin dashboard payload for recent activity
+    useEffect(() => {
+      fetchAdmin();
+    }, [fetchAdmin]);
 
     /* ── Derived display data (falls back to zeros while loading) ── */
 
@@ -387,21 +386,35 @@ const Dashboard = () => {
                                     <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">View All</Button>
                                 </div>
                                 <div className="space-y-6">
-                                    {recentActivity.map((activity, i) => (
-                                        <div key={i} className="flex items-start gap-4">
+                                    {(adminData?.recentReports ?? []).map((report, i) => {
+                                        const statusMap: Record<string, string> = {
+                                          resolved: 'completed',
+                                          pending: 'pending',
+                                          assigned: 'assigned',
+                                        };
+                                        const displayStatus = statusMap[report.status] || report.status;
+                                        const timeAgo = new Date(report.createdAt).toLocaleDateString('en-US', {
+                                          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                                        });
+                                        return (
+                                        <div key={report._id || i} className="flex items-start gap-4">
                                             <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center border-4 border-background shrink-0
-                                                ${activity.status === 'completed' ? 'bg-success/10 text-success' : 
-                                                  activity.status === 'urgent' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}
+                                                ${displayStatus === 'completed' ? 'bg-success/10 text-success' : 
+                                                  report.urgency === 'high' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}
                                             `}>
-                                                {activity.status === 'completed' ? <CheckCircle className="w-5 h-5"/> : 
-                                                 activity.status === 'urgent' ? <AlertCircle className="w-5 h-5"/> : <Clock className="w-5 h-5"/>}
+                                                {displayStatus === 'completed' ? <CheckCircle className="w-5 h-5"/> : 
+                                                 report.urgency === 'high' ? <AlertCircle className="w-5 h-5"/> : <Clock className="w-5 h-5"/>}
                                             </div>
                                             <div className="flex-1 pt-1 pb-6 border-b border-border/50 last:border-0 last:pb-0">
-                                                <p className="font-medium text-sm">{activity.message}</p>
-                                                <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
+                                                <p className="font-medium text-sm">{report.description || `${report.wasteType} report — ${report.status}`}</p>
+                                                <p className="text-xs text-muted-foreground mt-1">{timeAgo}</p>
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
+                                    {(!adminData?.recentReports || adminData.recentReports.length === 0) && (
+                                      <p className="text-center text-muted-foreground py-4">No recent activity</p>
+                                    )}
                                 </div>
                             </Card>
                         </RevealOnScroll>

@@ -5,6 +5,13 @@ import type {
   PerformanceResponse,
   VolunteerAnalyticsResponse,
 } from "@/types/analytics";
+import type {
+  CitizenDashboardResponse,
+  VolunteerDashboardResponse,
+  StaffDashboardResponse,
+  AdminDashboardResponse,
+  DashboardMeResponse,
+} from "@/types/dashboard";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -194,6 +201,43 @@ class ApiClient {
       `/api/analytics/volunteers${this.buildAnalyticsQuery(params)}`,
       { method: "GET", requiresAuth: true }
     );
+  }
+
+  // ── Dashboard endpoints ────────────────────────────────────────────
+
+  async getDashboardMe(): Promise<DashboardMeResponse> {
+    return this.request("/api/dashboard/me", {
+      method: "GET",
+      requiresAuth: true,
+    });
+  }
+
+  async getCitizenDashboard(): Promise<CitizenDashboardResponse> {
+    return this.request("/api/dashboard/citizen", {
+      method: "GET",
+      requiresAuth: true,
+    });
+  }
+
+  async getVolunteerDashboard(): Promise<VolunteerDashboardResponse> {
+    return this.request("/api/dashboard/volunteer", {
+      method: "GET",
+      requiresAuth: true,
+    });
+  }
+
+  async getStaffDashboard(): Promise<StaffDashboardResponse> {
+    return this.request("/api/dashboard/staff", {
+      method: "GET",
+      requiresAuth: true,
+    });
+  }
+
+  async getAdminDashboard(): Promise<AdminDashboardResponse> {
+    return this.request("/api/dashboard/admin", {
+      method: "GET",
+      requiresAuth: true,
+    });
   }
 }
 

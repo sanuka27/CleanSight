@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    include: ['react-map-gl', 'mapbox-gl', 'framer-motion'],
+    include: ['maplibre-gl', 'framer-motion'],
     exclude: ['@tanstack/react-query'],
   },
   build: {
@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => ({
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'ui-vendor': ['framer-motion', 'lucide-react'],
-          'map-vendor': ['react-map-gl', 'mapbox-gl'],
+          'map-vendor': ['maplibre-gl'],
         },
       },
     },

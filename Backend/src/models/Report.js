@@ -6,6 +6,11 @@ const reportSchema = new mongoose.Schema({
     required: [true, 'Firebase UID is required'],
     index: true
   },
+  title: {
+    type: String,
+    maxlength: [120, 'Title cannot be more than 120 characters'],
+    default: null
+  },
   imageUrl: {
     type: String,
     required: [true, 'Image URL is required']
@@ -15,14 +20,25 @@ const reportSchema = new mongoose.Schema({
     required: [true, 'Description is required'],
     maxlength: [500, 'Description cannot be more than 500 characters']
   },
+  // GeoJSON Point for geospatial queries
   location: {
-    lat: {
-      type: Number,
-      required: [true, 'Latitude is required']
+    type: {
+      type: String,
+      enum: ['Point'],
+      required: true,
+      default: 'Point'
     },
-    lng: {
-      type: Number,
-      required: [true, 'Longitude is required']
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      required: [true, 'Coordinates are required'],
+      validate: {
+        validator: function (v) {
+          return v.length === 2 &&
+            v[0] >= -180 && v[0] <= 180 &&
+            v[1] >= -90 && v[1] <= 90;
+        },
+        message: 'Coordinates must be [longitude, latitude] with valid ranges'
+      }
     }
   },
   wasteType: {
@@ -47,6 +63,9 @@ const reportSchema = new mongoose.Schema({
 }, {
   timestamps: true  // auto-manages createdAt + updatedAt
 });
+
+// 2dsphere index for geospatial queries (near, within bbox)
+reportSchema.index({ location: '2dsphere' });
 
 // Indexes for faster analytics queries
 reportSchema.index({ status: 1 });

@@ -22,7 +22,7 @@ const router = express.Router();
 router.post('/', verifyToken, async (req, res) => {
   try {
     const { firebaseUid } = req.user;
-    const { imageUrl, description, location, wasteType, urgency } = req.body;
+    const { imageUrl, description, location, wasteType, urgency, title } = req.body;
 
     // Validate required fields
     if (!imageUrl) {
@@ -37,9 +37,13 @@ router.post('/', verifyToken, async (req, res) => {
 
     const report = await Report.create({
       firebaseUid,
+      title: title || null,
       imageUrl,
       description,
-      location: { lat: location.lat, lng: location.lng },
+      location: {
+        type: 'Point',
+        coordinates: [location.lng, location.lat]  // GeoJSON: [lng, lat]
+      },
       wasteType: wasteType || 'general',
       urgency: urgency || 'medium',
       status: 'pending'
@@ -88,8 +92,30 @@ router.get('/my', verifyToken, async (req, res) => {
   }
 });
 
+// @route   GET /api/reports/:id
+// @desc    Get a single report by ID (full details)
+// @access  Private
+router.get('/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid report ID' });
+    }
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ success: false, message: 'Report not found' });
+    }
+
+    res.json({ success: true, data: report });
+  } catch (error) {
+    console.error('Get report error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   GET /api/reports
-// @desc    Get reports (citizens see own, volunteer/staff/admin see all)
+// @desc    Get reports with map-ready filters (status, bbox, near, mine)
 // @access  Private
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -100,14 +126,60 @@ router.get('/', verifyToken, async (req, res) => {
     const role = user?.role || 'citizen';
 
     let query = {};
-    if (role === 'citizen') {
-      // Citizens can only see their own reports
-      query = { firebaseUid };
-    }
-    // volunteer, staff, admin see all reports
 
+    // "mine" filter: citizen sees only own reports when mine=true or by default
+    if (req.query.mine === 'true' || role === 'citizen') {
+      query.firebaseUid = firebaseUid;
+    }
+    // volunteer, staff, admin see all reports (unless mine=true was explicitly set)
+
+    // Status filter: ?status=pending,assigned  (comma-separated)
+    if (req.query.status) {
+      const statuses = req.query.status.split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length > 0) {
+        query.status = { $in: statuses };
+      }
+    }
+
+    // Bounding box filter: ?bbox=west,south,east,north
+    if (req.query.bbox) {
+      const parts = req.query.bbox.split(',').map(Number);
+      if (parts.length === 4 && parts.every(n => !isNaN(n))) {
+        const [west, south, east, north] = parts;
+        query.location = {
+          ...query.location,
+          $geoWithin: {
+            $box: [
+              [west, south],
+              [east, north]
+            ]
+          }
+        };
+      }
+    }
+
+    // Near filter: ?near=lat,lng,radiusKm
+    if (req.query.near) {
+      const parts = req.query.near.split(',').map(Number);
+      if (parts.length === 3 && parts.every(n => !isNaN(n))) {
+        const [lat, lng, radiusKm] = parts;
+        query.location = {
+          $nearSphere: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [lng, lat]
+            },
+            $maxDistance: radiusKm * 1000  // convert km to meters
+          }
+        };
+      }
+    }
+
+    // Select lightweight fields for map (full details via /:id)
     const reports = await Report.find(query)
-      .sort({ createdAt: -1 });
+      .select('title description status wasteType urgency imageUrl location createdAt firebaseUid assignedTo')
+      .sort({ createdAt: -1 })
+      .limit(500);  // safety limit for map
 
     res.json({
       success: true,

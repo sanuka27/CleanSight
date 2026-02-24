@@ -105,18 +105,20 @@ const Signup = () => {
             className="max-w-md"
           >
             {/* Logo */}
-            <motion.div
-              className="w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center shadow-glow-lg mx-auto mb-8"
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <Leaf className="w-10 h-10 text-white" />
-            </motion.div>
+            <Link to="/" className="block cursor-pointer group">
+              <motion.div
+                className="w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center shadow-glow-lg mx-auto mb-8 group-hover:shadow-glow-xl transition-shadow"
+                animate={{ y: [0, -10, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Leaf className="w-10 h-10 text-white" />
+              </motion.div>
 
-            <h2 className="font-display text-3xl font-bold mb-4">
-              Join{" "}
-              <span className="text-gradient">CleanSight</span>
-            </h2>
+              <h2 className="font-display text-3xl font-bold mb-4">
+                Join{" "}
+                <span className="text-gradient">CleanSight</span>
+              </h2>
+            </Link>
             <p className="text-muted-foreground text-lg mb-8">
               Be part of the movement. Report waste, volunteer for cleanups, and help keep your community clean.
             </p>

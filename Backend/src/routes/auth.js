@@ -20,9 +20,15 @@ router.post('/register', verifyToken, async (req, res) => {
       });
     }
 
-    // Validate role input — only citizen and volunteer are self-assignable
+    // Validate role input — role is REQUIRED; only citizen and volunteer are self-assignable
     const allowedRoles = ['citizen', 'volunteer'];
-    if (role && !allowedRoles.includes(role)) {
+    if (!role) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a role to complete registration'
+      });
+    }
+    if (!allowedRoles.includes(role)) {
       console.warn(`Role escalation attempt by UID: ${firebaseUid}, attempted role: ${role}`);
       return res.status(400).json({
         success: false,
@@ -49,13 +55,12 @@ router.post('/register', verifyToken, async (req, res) => {
       });
     }
 
-    // Create user in MongoDB with safe role assignment
-    const safeRole = allowedRoles.includes(role) ? role : 'citizen';
+    // Create user in MongoDB — role has been validated above
     const user = await User.create({
       firebaseUid,
       name,
       email,
-      role: safeRole
+      role
     });
 
     res.status(201).json({

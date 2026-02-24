@@ -1,11 +1,11 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { 
   User, 
   onAuthStateChanged, 
   signOut as firebaseSignOut 
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { AppRole } from "@/lib/role";
 
 /** Backend user profile from /api/auth/me */
@@ -35,6 +35,12 @@ interface AuthContextType {
   needsOnboarding: boolean;
   logout: () => Promise<void>;
   refreshAppUser: () => Promise<void>;
+  /**
+   * Call BEFORE a Firebase sign-in / sign-up method so that the concurrent
+   * onAuthStateChanged → fetchAppUser flow does not auto-sign-out the user
+   * when /me returns 404 (profile not yet created).
+   */
+  markSigningIn: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,6 +64,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isAppUserLoading, setIsAppUserLoading] = useState(false);
   const [appUserError, setAppUserError] = useState<string | null>(null);
 
+  /**
+   * When true, a sign-in / sign-up handler is actively running.
+   * Prevents fetchAppUser from auto-signing-out on 404 during the
+   * brief window between Firebase auth and backend profile creation.
+   */
+  const signingInRef = useRef(false);
+
+  const markSigningIn = useCallback(() => {
+    signingInRef.current = true;
+    // Safety: auto-clear after 60 s so a crashed flow can't leave the flag stuck.
+    setTimeout(() => { signingInRef.current = false; }, 60_000);
+  }, []);
+
   /** Fetch backend profile from /api/auth/me */
   const fetchAppUser = useCallback(async () => {
     setIsAppUserLoading(true);
@@ -66,22 +85,32 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const res = await api.getMe();
       if (res.success && res.data?.user) {
         setAppUser(res.data.user as AppUser);
+        // Profile found — any in-progress sign-in flow is complete.
+        signingInRef.current = false;
       } else {
         // Profile not found — user may not have completed registration yet.
         // This is normal during signup (register hasn't been called yet).
         setAppUser(null);
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to fetch profile";
-      // 404 "User profile not found" is expected during signup before register()
-      // completes. Only set error for unexpected failures.
-      const is404 = message.toLowerCase().includes("not found") ||
-                     message.toLowerCase().includes("complete registration");
-      if (!is404) {
+      // 404 means the backend has no profile for this Firebase user.
+      if (err instanceof ApiError && err.status === 404) {
+        if (signingInRef.current) {
+          // A sign-in handler is running (Google onboarding / email signup)
+          // — keep the Firebase session so the user can finish onboarding.
+          setAppUser(null);
+        } else {
+          // No active sign-in → stale Firebase session whose backend
+          // profile was deleted.  Sign out to return to guest mode.
+          setAppUser(null);
+          await firebaseSignOut(auth);
+        }
+      } else {
+        const message = err instanceof Error ? err.message : "Failed to fetch profile";
         console.error("Failed to fetch app user:", message);
         setAppUserError(message);
+        setAppUser(null);
       }
-      setAppUser(null);
     } finally {
       setIsAppUserLoading(false);
     }
@@ -139,6 +168,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     needsOnboarding,
     logout,
     refreshAppUser,
+    markSigningIn,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

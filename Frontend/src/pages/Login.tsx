@@ -87,13 +87,15 @@ const Login = () => {
             className="max-w-md"
           >
             {/* Logo */}
-            <motion.div 
-              className="w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center shadow-glow-lg mx-auto mb-8"
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <Leaf className="w-10 h-10 text-white" />
-            </motion.div>
+            <Link to="/" className="inline-block cursor-pointer group mx-auto">
+              <motion.div 
+                className="w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center shadow-glow-lg mx-auto mb-8 group-hover:shadow-glow-xl transition-shadow"
+                animate={{ y: [0, -10, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Leaf className="w-10 h-10 text-white" />
+              </motion.div>
+            </Link>
 
             <h2 className="font-display text-3xl font-bold mb-4">
               Welcome to{" "}

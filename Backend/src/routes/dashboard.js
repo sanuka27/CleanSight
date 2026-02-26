@@ -122,20 +122,13 @@ router.get(
 
       const myTotals = totalResult || { total: 0, pending: 0, assigned: 0, resolved: 0 };
 
-      // Recent reports (last 50 for client-side filtering)
-      const rawReports = await Report.find({ firebaseUid })
+      // Recent reports (last 50 for client-side search/filter)
+      // Note: consider adding a compound index on { firebaseUid: 1, createdAt: -1 } for perf
+      const recentReports = await Report.find({ firebaseUid })
         .sort({ createdAt: -1 })
         .limit(50)
         .select('_id title status wasteType urgency createdAt updatedAt imageUrl location description')
         .lean();
-
-      // Transform GeoJSON location to { lat, lng } for the frontend
-      const recentReports = rawReports.map((r) => {
-        const loc = r.location?.coordinates
-          ? { lat: r.location.coordinates[1], lng: r.location.coordinates[0] }
-          : null;
-        return { ...r, location: loc };
-      });
 
       res.json({
         success: true,

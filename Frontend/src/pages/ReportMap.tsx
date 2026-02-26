@@ -349,7 +349,7 @@ const ReportMap = () => {
               </div>
               <h2 className="font-display text-2xl font-bold mb-2">Interactive Map</h2>
               <p className="text-muted-foreground max-w-md">
-                Connect Lovable Cloud to enable the interactive map with real-time waste report markers.
+                Connect your map provider to enable the interactive map with real-time waste report markers.
               </p>
               <Button variant="hero" className="mt-6">
                 Enable Map Integration

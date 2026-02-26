@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -10,22 +11,24 @@ import {
   Camera, 
   MapPin, 
   Upload, 
-  Sparkles, 
   CheckCircle, 
-  AlertCircle,
   Trash2,
   Leaf,
   Building2,
   Recycle,
   ArrowRight,
   ArrowLeft,
-  Loader2
+  Loader2,
+  LocateFixed,
+  Map as MapIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useReports } from "@/hooks/useReports";
 import { useAuth } from "@/context/AuthContext";
 import { MeshGradient } from "@/components/shared/MeshGradient";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
+import { CleanSightMap } from "@/components/maps/CleanSightMap";
+import type { LatLng } from "@/types/map";
 
 const wasteTypes = [
   { id: "general", label: "General Waste", icon: Trash2, color: "text-gray-500", bg: "bg-gray-500/10" },
@@ -46,6 +49,8 @@ const steps = [
   { id: 3, title: "Location", desc: "Pin the spot" },
 ];
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 const ReportWaste = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -53,42 +58,98 @@ const ReportWaste = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [description, setDescription] = useState("");
-  const [location, setLocation] = useState<{ lat: number; lng: number }>({ lat: 40.7128, lng: -74.006 });
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<{ detected: boolean; confidence: number } | null>(null);
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { createReport } = useReports();
   const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  // Auto-detect location on mount
+  useEffect(() => {
+    detectLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setIsLocating(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setIsLocating(false);
+      },
+      (err) => {
+        setLocationError(
+          err.code === 1
+            ? "Location permission denied. Please allow location access or enter coordinates manually."
+            : "Unable to detect location. Please enter coordinates manually."
+        );
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setImagePreview(event.target?.result as string);
-        simulateAIAnalysis();
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast({ title: "File Too Large", description: "Maximum file size is 10 MB. Please choose a smaller image.", variant: "destructive" });
+      return;
     }
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid File", description: "Please upload an image file (JPG, PNG, etc.).", variant: "destructive" });
+      return;
+    }
+
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreview(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
-  const simulateAIAnalysis = () => {
-    setIsAnalyzing(true);
-    setAnalysisResult(null);
-    
-    // Simulate AI analysis
-    setTimeout(() => {
-      setIsAnalyzing(false);
-      setAnalysisResult({
-        detected: true,
-        confidence: 0.94,
-      });
-      // Auto advance after analysis
-      setTimeout(() => setCurrentStep(2), 1000);
-    }, 2000);
+  /** Validate per-step before advancing */
+  const canAdvance = (): boolean => {
+    if (currentStep === 1) {
+      if (!imageFile) {
+        toast({ title: "Image Required", description: "Please upload a photo before continuing.", variant: "destructive" });
+        return false;
+      }
+      return true;
+    }
+    if (currentStep === 2) {
+      if (!selectedType) {
+        toast({ title: "Waste Type Required", description: "Please select a waste type.", variant: "destructive" });
+        return false;
+      }
+      if (!selectedUrgency) {
+        toast({ title: "Urgency Required", description: "Please select an urgency level.", variant: "destructive" });
+        return false;
+      }
+      if (!description.trim()) {
+        toast({ title: "Description Required", description: "Please provide a description of the waste.", variant: "destructive" });
+        return false;
+      }
+      return true;
+    }
+    return true;
   };
+
+  const nextStep = () => {
+    if (canAdvance()) setCurrentStep((prev) => Math.min(prev + 1, 3));
+  };
+  const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,6 +166,10 @@ const ReportWaste = () => {
       toast({ title: "Description Required", description: "Please provide a description.", variant: "destructive" });
       return;
     }
+    if (!location) {
+      toast({ title: "Location Required", description: "Please allow location access or enter coordinates.", variant: "destructive" });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -119,14 +184,8 @@ const ReportWaste = () => {
         title: "Report Submitted!",
         description: "Your waste report has been submitted and will be reviewed shortly.",
       });
-      // Reset form
-      setCurrentStep(1);
-      setImagePreview(null);
-      setImageFile(null);
-      setSelectedType(null);
-      setSelectedUrgency(null);
-      setDescription("");
-      setAnalysisResult(null);
+      // Navigate to dashboard after successful submission
+      navigate("/dashboard");
     } catch (err: unknown) {
       toast({
         title: "Submission Failed",
@@ -137,9 +196,6 @@ const ReportWaste = () => {
       setIsSubmitting(false);
     }
   };
-
-  const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, 3));
-  const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -237,57 +293,17 @@ const ReportWaste = () => {
                               alt="Uploaded preview"
                               className="w-full h-full object-cover"
                             />
-                            {/* AI Analysis Overlay */}
-                            <AnimatePresence>
-                              {isAnalyzing && (
-                                <motion.div 
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  className="absolute inset-0 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center"
-                                >
-                                  <div className="relative">
-                                    <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" />
-                                    <Sparkles className="w-12 h-12 text-primary animate-spin-slow relative z-10" />
-                                  </div>
-                                  <p className="text-lg font-medium mt-4 animate-pulse">Analyzing waste type...</p>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-
-                            {analysisResult && (
-                              <motion.div 
-                                initial={{ y: 50, opacity: 0 }}
-                                animate={{ y: 0, opacity: 1 }}
-                                className="absolute bottom-4 left-4 right-4"
-                              >
-                                <div className={`glass-strong rounded-xl p-4 flex items-center gap-4 ${analysisResult.detected ? "border-success/50" : "border-destructive/50"} border`}>
-                                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${analysisResult.detected ? "bg-success/20" : "bg-destructive/20"}`}>
-                                    {analysisResult.detected ? (
-                                      <CheckCircle className="w-6 h-6 text-success" />
-                                    ) : (
-                                      <AlertCircle className="w-6 h-6 text-destructive" />
-                                    )}
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className="text-lg font-bold">
-                                      {analysisResult.detected ? "Waste Detected" : "No Waste Detected"}
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                                        <div 
-                                          className="h-full bg-primary rounded-full"
-                                          style={{ width: `${analysisResult.confidence * 100}%` }}
-                                        />
-                                      </div>
-                                      <p className="text-sm font-mono text-muted-foreground">
-                                        {Math.round(analysisResult.confidence * 100)}%
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </motion.div>
-                            )}
+                            {/* Success badge */}
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="absolute top-4 right-4"
+                            >
+                              <div className="flex items-center gap-2 glass-strong rounded-full px-4 py-2 border border-success/50">
+                                <CheckCircle className="w-5 h-5 text-success" />
+                                <span className="text-sm font-medium text-success">Photo ready</span>
+                              </div>
+                            </motion.div>
                           </div>
                         ) : (
                           <div className="h-full flex flex-col items-center justify-center p-8 text-center">
@@ -404,39 +420,152 @@ const ReportWaste = () => {
                   >
                     <div className="text-center mb-8">
                       <h2 className="text-2xl font-bold font-display">Confirm Location</h2>
-                      <p className="text-muted-foreground">Pinpoint the exact spot</p>
+                      <p className="text-muted-foreground">Use GPS or pick a spot on the map</p>
                     </div>
 
-                    <div className="aspect-video rounded-2xl bg-muted/30 border border-border/50 relative overflow-hidden group">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 animate-bounce">
-                            <MapPin className="w-8 h-8 text-primary" />
-                          </div>
-                          <p className="text-muted-foreground">Map interactive preview</p>
-                        </div>
-                      </div>
-                      
-                      {/* Fake Map Grid */}
-                      <div className="absolute inset-0 opacity-10" 
-                        style={{
-                           backgroundImage: 'linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)',
-                           backgroundSize: '40px 40px'
-                        }}
-                      />
-                    </div>
-
-                    <div className="bg-card rounded-xl p-4 border border-border flex items-center gap-4 shadow-sm">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <MapPin className="w-5 h-5 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                         <p className="font-medium">Detected Location</p>
-                         <p className="text-sm text-muted-foreground font-mono">40.7128° N, 74.0060° W</p>
-                      </div>
-                      <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
-                        Adjust
+                    {/* Method toggle */}
+                    <div className="flex gap-2 justify-center">
+                      <Button
+                        type="button"
+                        variant={!showMapPicker ? "default" : "outline"}
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setShowMapPicker(false)}
+                      >
+                        <LocateFixed className="w-4 h-4" />
+                        GPS / Manual
                       </Button>
+                      <Button
+                        type="button"
+                        variant={showMapPicker ? "default" : "outline"}
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setShowMapPicker(true)}
+                      >
+                        <MapIcon className="w-4 h-4" />
+                        Pick on Map
+                      </Button>
+                    </div>
+
+                    {showMapPicker ? (
+                      /* ── Map Picker ── */
+                      <div className="space-y-3">
+                        <div className="rounded-xl overflow-hidden border border-border shadow-sm h-[350px]">
+                          <CleanSightMap
+                            mode="pick"
+                            pickedLocation={location as LatLng | undefined}
+                            onPickLocation={(ll) => setLocation({ lat: ll.lat, lng: ll.lng })}
+                            showUserLocation
+                            className="h-full w-full"
+                          />
+                        </div>
+                        {location ? (
+                          <div className="flex items-center gap-3 bg-card rounded-lg p-3 border border-border">
+                            <MapPin className="w-5 h-5 text-success flex-shrink-0" />
+                            <p className="text-sm font-mono text-muted-foreground">
+                              {location.lat.toFixed(6)}° {location.lat >= 0 ? "N" : "S"},{" "}
+                              {Math.abs(location.lng).toFixed(6)}° {location.lng >= 0 ? "E" : "W"}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center">
+                            Click anywhere on the map to place a pin
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      /* ── GPS / Manual entry ── */
+                      <div className="bg-card rounded-xl p-6 border border-border shadow-sm space-y-4">
+                        {isLocating ? (
+                          <div className="flex items-center gap-4 justify-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                            <p className="text-muted-foreground">Detecting your location...</p>
+                          </div>
+                        ) : location ? (
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
+                              <MapPin className="w-6 h-6 text-success" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-success">Location Detected</p>
+                              <p className="text-sm text-muted-foreground font-mono">
+                                {location.lat.toFixed(6)}° {location.lat >= 0 ? "N" : "S"},{" "}
+                                {Math.abs(location.lng).toFixed(6)}° {location.lng >= 0 ? "E" : "W"}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-primary hover:text-primary/80 gap-1"
+                              onClick={detectLocation}
+                            >
+                              <LocateFixed className="w-4 h-4" />
+                              Refresh
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {locationError && (
+                              <p className="text-sm text-destructive">{locationError}</p>
+                            )}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={detectLocation}
+                              className="gap-2"
+                            >
+                              <LocateFixed className="w-4 h-4" />
+                              Detect My Location
+                            </Button>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <Label htmlFor="lat" className="text-xs">Latitude</Label>
+                                <Input
+                                  id="lat"
+                                  type="number"
+                                  step="any"
+                                  placeholder="e.g. 6.9271"
+                                  onChange={(e) => {
+                                    const lat = parseFloat(e.target.value);
+                                    if (!isNaN(lat)) setLocation((prev) => ({ lat, lng: prev?.lng ?? 0 }));
+                                  }}
+                                  className="font-mono text-sm"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label htmlFor="lng" className="text-xs">Longitude</Label>
+                                <Input
+                                  id="lng"
+                                  type="number"
+                                  step="any"
+                                  placeholder="e.g. 79.8612"
+                                  onChange={(e) => {
+                                    const lng = parseFloat(e.target.value);
+                                    if (!isNaN(lng)) setLocation((prev) => ({ lat: prev?.lat ?? 0, lng }));
+                                  }}
+                                  className="font-mono text-sm"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Report Summary */}
+                    <div className="bg-muted/30 rounded-xl p-6 border border-border/50 space-y-3">
+                      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Report Summary</h3>
+                      <div className="grid grid-cols-2 gap-y-2 text-sm">
+                        <span className="text-muted-foreground">Waste Type</span>
+                        <span className="font-medium capitalize">{selectedType || "—"}</span>
+                        <span className="text-muted-foreground">Urgency</span>
+                        <span className="font-medium capitalize">{selectedUrgency || "—"}</span>
+                        <span className="text-muted-foreground">Photo</span>
+                        <span className="font-medium">{imageFile ? imageFile.name : "—"}</span>
+                        <span className="text-muted-foreground">Description</span>
+                        <span className="font-medium truncate">{description || "—"}</span>
+                      </div>
                     </div>
                   </motion.div>
                 )}

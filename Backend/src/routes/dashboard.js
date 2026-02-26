@@ -122,11 +122,12 @@ router.get(
 
       const myTotals = totalResult || { total: 0, pending: 0, assigned: 0, resolved: 0 };
 
-      // Recent reports (last 10)
+      // Recent reports (last 50 for client-side search/filter)
+      // Note: consider adding a compound index on { firebaseUid: 1, createdAt: -1 } for perf
       const recentReports = await Report.find({ firebaseUid })
         .sort({ createdAt: -1 })
-        .limit(10)
-        .select('_id status wasteType urgency createdAt imageUrl location description')
+        .limit(50)
+        .select('_id title status wasteType urgency createdAt updatedAt imageUrl location description')
         .lean();
 
       res.json({

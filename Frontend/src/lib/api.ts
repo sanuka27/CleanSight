@@ -12,8 +12,23 @@ import type {
   AdminDashboardResponse,
   DashboardMeResponse,
 } from "@/types/dashboard";
+import type { MapReportQueryParams, MapReportMarker, BBox } from "@/types/map";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
+/**
+ * Custom error thrown by ApiClient when a request returns a non-2xx status.
+ * Exposes the HTTP `status` so callers can branch on status codes (e.g. 404)
+ * instead of fragile string matching on `message`.
+ */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 interface RequestOptions extends RequestInit {
   requiresAuth?: boolean;
@@ -70,7 +85,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         message: response.statusText,
       }));
-      throw new Error(error.message || "API request failed");
+      throw new ApiError(error.message || "API request failed", response.status);
     }
 
     return response.json();
@@ -128,6 +143,44 @@ class ApiClient {
 
   async getReports(): Promise<any> {
     return this.request("/api/reports", {
+      method: "GET",
+      requiresAuth: true,
+    });
+  }
+
+  /**
+   * List reports with map-ready filters: status, bbox, near, mine.
+   */
+  async listReportsForMap(params?: MapReportQueryParams): Promise<{
+    success: boolean;
+    count: number;
+    data: MapReportMarker[];
+  }> {
+    const qs = new URLSearchParams();
+    if (params?.status && params.status.length > 0) {
+      qs.set("status", params.status.join(","));
+    }
+    if (params?.bbox) {
+      qs.set("bbox", params.bbox.join(","));
+    }
+    if (params?.near) {
+      qs.set("near", `${params.near.lat},${params.near.lng},${params.near.radiusKm}`);
+    }
+    if (params?.mine) {
+      qs.set("mine", "true");
+    }
+    const queryStr = qs.toString();
+    return this.request(`/api/reports${queryStr ? `?${queryStr}` : ""}`, {
+      method: "GET",
+      requiresAuth: true,
+    });
+  }
+
+  /**
+   * Get a single report by ID (full details).
+   */
+  async getReportById(id: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/api/reports/${id}`, {
       method: "GET",
       requiresAuth: true,
     });

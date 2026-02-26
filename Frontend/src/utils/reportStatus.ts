@@ -71,3 +71,22 @@ export const URGENCY_LABELS: Record<string, string> = {
   medium: "Medium",
   high: "High",
 };
+
+/* ── GeoJSON location helper ─────────────────────────────────────── */
+
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+/**
+ * Extract { lat, lng } from a GeoJSON Point object.
+ * The backend stores/returns location as `{ type: "Point", coordinates: [lng, lat] }`.
+ * Returns null if the location is missing or malformed.
+ */
+export function getLatLng(
+  location?: { type?: string; coordinates?: [number, number] }
+): LatLng | null {
+  if (!location?.coordinates || location.coordinates.length < 2) return null;
+  return { lat: location.coordinates[1], lng: location.coordinates[0] };
+}

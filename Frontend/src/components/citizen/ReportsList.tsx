@@ -25,7 +25,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
-import { getStatusConfig, WASTE_TYPE_LABELS, URGENCY_LABELS } from "@/utils/reportStatus";
+import { getStatusConfig, WASTE_TYPE_LABELS, URGENCY_LABELS, getLatLng } from "@/utils/reportStatus";
 import type { DashboardReport } from "@/types/dashboard";
 import { useNavigate } from "react-router-dom";
 
@@ -196,8 +196,9 @@ export function ReportsList({ reports, isLoading }: ReportsListProps) {
                     formatTime={formatTime}
                     onView={() => {
                       // Navigate to the map centered on this report if location exists
-                      if (report.location) {
-                        navigate(`/map?lat=${report.location.lat}&lng=${report.location.lng}`);
+                      const loc = getLatLng(report.location);
+                      if (loc) {
+                        navigate(`/map?lat=${loc.lat}&lng=${loc.lng}`);
                       }
                     }}
                   />
@@ -223,6 +224,7 @@ interface ReportCardProps {
 
 function ReportCard({ report, index, formatDate, formatTime, onView }: ReportCardProps) {
   const statusConfig = getStatusConfig(report.status);
+  const loc = getLatLng(report.location);
 
   return (
     <motion.div
@@ -287,10 +289,10 @@ function ReportCard({ report, index, formatDate, formatTime, onView }: ReportCar
             <Clock className="w-3 h-3" />
             {formatDate(report.createdAt)} at {formatTime(report.createdAt)}
           </span>
-          {report.location && (
+          {loc && (
             <span className="flex items-center gap-1">
               <MapPin className="w-3 h-3" />
-              {report.location.lat.toFixed(4)}, {report.location.lng.toFixed(4)}
+              {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
             </span>
           )}
         </div>
@@ -298,7 +300,7 @@ function ReportCard({ report, index, formatDate, formatTime, onView }: ReportCar
 
       {/* Actions */}
       <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        {report.location && (
+        {loc && (
           <Button
             variant="ghost"
             size="icon"

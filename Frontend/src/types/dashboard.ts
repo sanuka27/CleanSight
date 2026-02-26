@@ -6,6 +6,11 @@ import type { DateRange, StatusTotals, Rates, SeriesBucket, WasteTypeCount, Urge
 
 /* ── Shared ──────────────────────────────────────────────────────── */
 
+export interface GeoJSONPoint {
+  type: "Point";
+  coordinates: [number, number]; // [lng, lat]
+}
+
 export interface DashboardReport {
   _id: string;
   title?: string;
@@ -16,7 +21,7 @@ export interface DashboardReport {
   updatedAt?: string;
   imageUrl?: string;
   description?: string;
-  location?: { lat: number; lng: number } | null;
+  location?: GeoJSONPoint;
   firebaseUid?: string;
   assignedTo?: string | null;
 }

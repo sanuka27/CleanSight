@@ -11,6 +11,7 @@ export const STATUS_CONFIG: Record<
     markerColor: string;
     ringColor: string;
     glowColor: string;
+    borderColor: string;
   }
 > = {
   pending: {
@@ -20,6 +21,7 @@ export const STATUS_CONFIG: Record<
     markerColor: "text-amber-500",
     ringColor: "ring-amber-400/40",
     glowColor: "shadow-amber-400/30",
+    borderColor: "border-amber-400",
   },
   assigned: {
     label: "Assigned",
@@ -28,6 +30,7 @@ export const STATUS_CONFIG: Record<
     markerColor: "text-sky-500",
     ringColor: "ring-sky-400/40",
     glowColor: "shadow-sky-400/30",
+    borderColor: "border-sky-400",
   },
   resolved: {
     label: "Resolved",
@@ -36,6 +39,7 @@ export const STATUS_CONFIG: Record<
     markerColor: "text-emerald-500",
     ringColor: "ring-emerald-400/40",
     glowColor: "shadow-emerald-400/30",
+    borderColor: "border-emerald-400",
   },
 };
 

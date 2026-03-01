@@ -55,7 +55,7 @@ export function ReportMapMarker({
             absolute -inset-1.5 rounded-full border-2 transition-all duration-200
             ${
               isSelected
-                ? `border-emerald-400 ${cfg.glowColor} shadow-lg`
+                ? `${cfg.borderColor} ${cfg.glowColor} shadow-lg`
                 : `border-transparent`
             }
           `}

@@ -27,7 +27,7 @@ export function StepWasteDetails({
       </div>
 
       {/* Category grid (2×2 / 4-col) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Waste type">
         {wasteTypes.map((type) => {
           const Icon = type.icon;
           const isSelected = selectedType === type.id;
@@ -35,6 +35,8 @@ export function StepWasteDetails({
             <button
               key={type.id}
               type="button"
+              role="radio"
+              aria-checked={isSelected}
               onClick={() => onSelectType(type.id)}
               className={`relative p-3 rounded-xl border-2 text-center transition-all duration-200 ${
                 isSelected
@@ -62,13 +64,15 @@ export function StepWasteDetails({
       {/* Urgency — segmented buttons */}
       <div className="space-y-1.5">
         <Label className="text-sm font-semibold">Urgency Level</Label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Urgency level">
           {urgencyLevels.map((level) => {
             const isSelected = selectedUrgency === level.id;
             return (
               <button
                 key={level.id}
                 type="button"
+                role="radio"
+                aria-checked={isSelected}
                 onClick={() => onSelectUrgency(level.id)}
                 className={`p-2.5 rounded-lg border-2 text-center transition-all duration-200 ${
                   isSelected ? level.color : "border-border hover:border-primary/30"

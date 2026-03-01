@@ -13,23 +13,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Navigation } from "lucide-react";
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from "@/constants/map";
+import { STATUS_CONFIG } from "@/constants/mapUi";
 import { fromGeoJSONPoint, reportsToFeatureCollection } from "@/utils/geo";
+import { ReportMapMarker } from "@/components/map/MapMarker";
 import type { LatLng, MapReportMarker } from "@/types/map";
 import type MapLibreGL from "maplibre-gl";
 
 // ── Status colour mapping ──────────────────────────────────────────
 
-const statusBadgeClass: Record<string, string> = {
-  pending: "bg-warning/10 text-warning border-warning/30",
-  assigned: "bg-info/10 text-info border-info/30",
-  resolved: "bg-success/10 text-success border-success/30",
-};
 
-const statusMarkerColor: Record<string, string> = {
-  pending: "text-warning",
-  assigned: "text-blue-400",
-  resolved: "text-success",
-};
 
 // ── Props ──────────────────────────────────────────────────────────
 
@@ -197,40 +189,26 @@ export function CleanSightMap({
               onClick={() => handleMarkerClick(report)}
             >
               <MarkerContent>
-                <div className="relative">
-                  {/* Selection ring */}
-                  {selectedId === report._id && (
-                    <span className="absolute -inset-2 rounded-full border-2 border-primary bg-primary/10 animate-pulse" />
-                  )}
-                  <MapPin
-                    className={`${
-                      selectedId === report._id ? "w-9 h-9" : "w-7 h-7"
-                    } ${
-                      statusMarkerColor[report.status] ?? "text-muted-foreground"
-                    } drop-shadow-md cursor-pointer hover:scale-110 transition-all duration-200`}
-                  />
-                  {report.urgency === "high" && (
-                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive" />
-                    </span>
-                  )}
-                </div>
+                <ReportMapMarker
+                  status={report.status}
+                  urgency={report.urgency}
+                  isSelected={selectedId === report._id}
+                />
               </MarkerContent>
 
               {/* Popup shows on marker click via MapLibre toggle */}
               <MarkerPopup closeButton>
-                <div className="min-w-[200px] space-y-2">
+                <div className="min-w-[220px] space-y-2.5 p-1">
                   <div className="flex items-center justify-between gap-2">
                     <Badge
                       variant="outline"
-                      className={`uppercase text-[10px] tracking-wider ${
-                        statusBadgeClass[report.status] ?? ""
+                      className={`text-[10px] font-medium rounded-full px-2 ${
+                        STATUS_CONFIG[report.status]?.badgeClass ?? ""
                       }`}
                     >
-                      {report.status}
+                      {STATUS_CONFIG[report.status]?.label ?? report.status}
                     </Badge>
-                    <span className="text-xs text-muted-foreground capitalize">
+                    <span className="text-xs text-muted-foreground capitalize font-medium">
                       {report.wasteType}
                     </span>
                   </div>
@@ -238,15 +216,15 @@ export function CleanSightMap({
                     <img
                       src={report.imageUrl}
                       alt="Report"
-                      className="w-full h-24 object-cover rounded"
+                      className="w-full h-28 object-cover rounded-xl ring-1 ring-black/5"
                     />
                   )}
-                  <p className="text-xs text-muted-foreground line-clamp-2">
+                  <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
                     {report.description}
                   </p>
                   <Button
                     size="sm"
-                    className="w-full h-7 text-xs gradient-primary text-white"
+                    className="w-full h-8 text-xs rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-200/40 hover:shadow-lg"
                     onClick={() => onSelectReport?.(report)}
                   >
                     <Navigation className="w-3 h-3 mr-1" />

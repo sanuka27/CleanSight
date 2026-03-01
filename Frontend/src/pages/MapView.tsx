@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { Layers, Route, X, MapPin } from "lucide-react";
@@ -14,7 +15,6 @@ import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import type { MapReportMarker, LatLng, MapViewport } from "@/types/map";
 import { LiveReportsPanel } from "@/components/map/LiveReportsPanel";
-import { scrollReportIntoView } from "@/utils/mapSelection";
 
 // ── Map Legend (shown when sidebar is closed) ────────────────────
 
@@ -191,8 +191,6 @@ const MapView = () => {
   const handleMarkerSelect = useCallback(
     (report: MapReportMarker) => {
       setSelectedId(report._id);
-      // Scroll list to this item
-      scrollReportIntoView(report._id);
     },
     []
   );
@@ -237,9 +235,11 @@ const MapView = () => {
     );
   }, [toast]);
 
+  const navigate = useNavigate();
+
   const handleReportIssue = useCallback(() => {
-    window.location.href = "/report";
-  }, []);
+    navigate("/report");
+  }, [navigate]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">

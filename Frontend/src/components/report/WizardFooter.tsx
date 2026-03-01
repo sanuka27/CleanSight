@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Upload, Loader2 } from "lucide-react";
+import { steps } from "./constants";
 
 interface WizardFooterProps {
   currentStep: number;
@@ -32,7 +33,7 @@ export function WizardFooter({
         Back
       </Button>
 
-      {currentStep < 3 ? (
+      {currentStep < steps[steps.length - 1].id ? (
         <Button
           type="button"
           size="sm"

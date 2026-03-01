@@ -21,7 +21,8 @@ export function viewportForReport(
  * Scroll a list item into view by report ID (smooth behavior).
  */
 export function scrollReportIntoView(reportId: string) {
-  const element = document.querySelector(`[data-report-id="${reportId}"]`);
+  const escapedId = CSS.escape(reportId);
+  const element = document.querySelector(`[data-report-id="${escapedId}"]`);
   if (element) {
     element.scrollIntoView({
       behavior: "smooth",

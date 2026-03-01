@@ -5,7 +5,6 @@ import {
   Crosshair,
   AlertTriangle,
   X,
-  Minimize2,
   MapPin,
   Info,
   SearchX,
@@ -88,7 +87,8 @@ export function LiveReportsPanel({
   // Auto-scroll to selected report when it changes via map marker click
   useEffect(() => {
     if (selectedId && listRef.current) {
-      const el = listRef.current.querySelector(`[data-report-id="${selectedId}"]`);
+      const escapedId = CSS.escape(selectedId);
+      const el = listRef.current.querySelector(`[data-report-id="${escapedId}"]`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }

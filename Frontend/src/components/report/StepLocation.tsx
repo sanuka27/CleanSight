@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,8 @@ export function StepLocation({
   selectedType,
   selectedUrgency,
 }: StepLocationProps) {
+  const [manualLat, setManualLat] = useState("");
+  const [manualLng, setManualLng] = useState("");
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between">
@@ -168,13 +171,17 @@ export function StepLocation({
                     step="any"
                     placeholder="e.g. 6.9271"
                     className="font-mono text-xs h-8"
+                    value={manualLat}
                     onChange={(e) => {
-                      const lat = parseFloat(e.target.value);
-                      if (!isNaN(lat))
-                        onLocationChange((prev) => ({
-                          lat,
-                          lng: prev?.lng ?? 0,
-                        }));
+                      const value = e.target.value;
+                      setManualLat(value);
+                      const lat = parseFloat(value);
+                      const lng = parseFloat(manualLng);
+                      if (!isNaN(lat) && !isNaN(lng)) {
+                        onLocationChange({ lat, lng });
+                      } else {
+                        onLocationChange(null);
+                      }
                     }}
                   />
                 </div>
@@ -188,13 +195,17 @@ export function StepLocation({
                     step="any"
                     placeholder="e.g. 79.8612"
                     className="font-mono text-xs h-8"
+                    value={manualLng}
                     onChange={(e) => {
-                      const lng = parseFloat(e.target.value);
-                      if (!isNaN(lng))
-                        onLocationChange((prev) => ({
-                          lat: prev?.lat ?? 0,
-                          lng,
-                        }));
+                      const value = e.target.value;
+                      setManualLng(value);
+                      const lat = parseFloat(manualLat);
+                      const lng = parseFloat(value);
+                      if (!isNaN(lat) && !isNaN(lng)) {
+                        onLocationChange({ lat, lng });
+                      } else {
+                        onLocationChange(null);
+                      }
                     }}
                   />
                 </div>

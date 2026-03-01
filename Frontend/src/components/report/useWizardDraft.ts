@@ -28,7 +28,11 @@ export function loadDraft(): WizardDraftState | null {
 }
 
 export function clearDraft(): void {
-  sessionStorage.removeItem(DRAFT_KEY);
+  try {
+    sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* storage unavailable — silently ignore */
+  }
 }
 
 /* ── Thumbnail generator ────────────────────────────────────────── */
@@ -69,13 +73,26 @@ export function createThumbnail(
  */
 export function useAutoSaveDraft(state: WizardDraftState): void {
   const timer = useRef<ReturnType<typeof setTimeout>>();
-  const serialized = JSON.stringify(state);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const {
+    currentStep,
+    selectedType,
+    selectedUrgency,
+    description,
+    imageThumbnail,
+    imageFileName,
+    showMapPicker,
+  } = state;
+  const lat = state.location?.lat ?? null;
+  const lng = state.location?.lng ?? null;
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       try {
-        sessionStorage.setItem(DRAFT_KEY, serialized);
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify(stateRef.current));
       } catch {
         /* quota exceeded — silently ignore */
       }
@@ -83,5 +100,5 @@ export function useAutoSaveDraft(state: WizardDraftState): void {
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [serialized]);
+  }, [currentStep, selectedType, selectedUrgency, description, imageThumbnail, imageFileName, lat, lng, showMapPicker]);
 }

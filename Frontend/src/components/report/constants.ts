@@ -33,7 +33,7 @@ export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 /** Format a lat/lng pair into a human-readable coordinate string. */
 export const fmtCoord = (loc: { lat: number; lng: number }) =>
-  `${loc.lat.toFixed(5)}° ${loc.lat >= 0 ? "N" : "S"}, ${Math.abs(loc.lng).toFixed(5)}° ${loc.lng >= 0 ? "E" : "W"}`;
+  `${Math.abs(loc.lat).toFixed(5)}° ${loc.lat >= 0 ? "N" : "S"}, ${Math.abs(loc.lng).toFixed(5)}° ${loc.lng >= 0 ? "E" : "W"}`;
 
 /** Validate lat/lng ranges. Returns `{ valid, error }`. */
 export const isLocationInRange = (

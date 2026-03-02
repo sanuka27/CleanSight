@@ -8,11 +8,22 @@ import {
   Camera,
   Navigation,
   ArrowRight,
+  Clock,
+  Download,
 } from "lucide-react";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
+import type { DashboardReport } from "@/types/dashboard";
+import { exportReportsCsv } from "@/utils/exportCsv";
 
-export function QuickActions() {
+interface QuickActionsProps {
+  reports?: DashboardReport[];
+  onFilterPending?: () => void;
+}
+
+export function QuickActions({ reports = [], onFilterPending }: QuickActionsProps) {
   const navigate = useNavigate();
+
+  const pendingCount = reports.filter((r) => r.status === "pending").length;
 
   const actions = [
     {
@@ -29,6 +40,32 @@ export function QuickActions() {
       onClick: () => navigate("/map"),
       variant: "secondary" as const,
     },
+    ...(pendingCount > 0 && onFilterPending
+      ? [
+          {
+            label: `Pending Reports (${pendingCount})`,
+            description: "View reports awaiting review",
+            icon: Clock,
+            onClick: onFilterPending,
+            variant: "secondary" as const,
+          },
+        ]
+      : []),
+    ...(reports.length > 0
+      ? [
+          {
+            label: "Export My Reports",
+            description: "Download as CSV",
+            icon: Download,
+            onClick: () =>
+              exportReportsCsv(
+                reports,
+                `cleansight-reports-${new Date().toISOString().slice(0, 10)}.csv`
+              ),
+            variant: "secondary" as const,
+          },
+        ]
+      : []),
   ];
 
   const tips = [

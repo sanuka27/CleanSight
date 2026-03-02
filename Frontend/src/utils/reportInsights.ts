@@ -42,8 +42,9 @@ export function formatDuration(hours: number): string {
   if (hours < 24) {
     return `${Math.round(hours)}h`;
   }
-  const days = Math.floor(hours / 24);
-  const remainingHours = Math.round(hours % 24);
+  const totalHours = Math.round(hours);
+  const days = Math.floor(totalHours / 24);
+  const remainingHours = totalHours % 24;
   if (remainingHours === 0) return `${days}d`;
   return `${days}d ${remainingHours}h`;
 }

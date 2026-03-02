@@ -24,36 +24,43 @@ function reportsToCsv(reports: DashboardReport[]): string {
 
   const rows = reports.map((r) => {
     const loc = getLatLng(r.location);
-    return [
-      r._id,
-      escapeCsvField(r.title || ""),
-      escapeCsvField(r.description || ""),
-      r.status,
-      WASTE_TYPE_LABELS[r.wasteType] || r.wasteType,
-      URGENCY_LABELS[r.urgency] || r.urgency,
+    const fields = [
+      r._id ?? "",
+      r.title ?? "",
+      r.description ?? "",
+      r.status ?? "",
+      WASTE_TYPE_LABELS[r.wasteType] || r.wasteType || "",
+      URGENCY_LABELS[r.urgency] || r.urgency || "",
       loc ? loc.lat.toFixed(6) : "",
       loc ? loc.lng.toFixed(6) : "",
       r.createdAt ? new Date(r.createdAt).toISOString() : "",
       r.updatedAt ? new Date(r.updatedAt).toISOString() : "",
-    ].join(",");
+    ];
+    return fields.map((value) => escapeCsvField(String(value))).join(",");
   });
 
-  return [headers.join(","), ...rows].join("\n");
+  const headerLine = headers.map((h) => escapeCsvField(h)).join(",");
+  return [headerLine, ...rows].join("\n");
 }
 
 /**
  * Escape a CSV field value (wrap in quotes if it contains commas, quotes, or newlines).
  */
 function escapeCsvField(value: string): string {
-  if (
-    value.includes(",") ||
-    value.includes('"') ||
-    value.includes("\n") ||
-    value.includes("\r")
-  ) {
-    return `"${value.replace(/"/g, '""')}"`;
+  // Mitigate CSV formula injection for user-controlled fields
+  let safe = value;
+  if (/^[=+\-@\t\r]/.test(safe)) {
+    safe = `'${safe}`;
   }
-  return value;
+  if (
+    safe.includes(",") ||
+    safe.includes('"') ||
+    safe.includes("\n") ||
+    safe.includes("\r")
+  ) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
 }
 
 /**

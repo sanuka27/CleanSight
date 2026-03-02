@@ -23,7 +23,7 @@ const CitizenDashboard = () => {
 
   // Ref for scrolling to reports section & auto-filtering
   const reportsRef = useRef<HTMLDivElement>(null);
-  const [pendingFilterTrigger, setPendingFilterTrigger] = useState(0);
+  const [pendingFilterActive, setPendingFilterActive] = useState(false);
 
   useEffect(() => {
     fetch();
@@ -53,8 +53,8 @@ const CitizenDashboard = () => {
   );
 
   const handleFilterPending = useCallback(() => {
-    // Scroll to reports section and trigger pending filter
-    setPendingFilterTrigger((c) => c + 1);
+    // Scroll to reports section and apply pending filter
+    setPendingFilterActive(true);
     reportsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
@@ -110,7 +110,8 @@ const CitizenDashboard = () => {
               reports={reports}
               isLoading={isLoading}
               onViewDetails={handleViewDetails}
-              key={pendingFilterTrigger} // re-mount to reset filters when triggered
+              initialStatusFilter={pendingFilterActive ? "pending" : "all"}
+              key={pendingFilterActive ? "pending" : "all"}
             />
 
             {/* Right sidebar — desktop stacked, mobile below */}

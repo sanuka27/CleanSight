@@ -111,8 +111,28 @@ export function InsightCards({ totals, reports, isLoading, onReportClick }: Insi
                 ? () => onReportClick(insight.reportId!)
                 : undefined
             }
+            onKeyDown={
+              insight.clickable && insight.reportId && onReportClick
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onReportClick(insight.reportId!);
+                    }
+                  }
+                : undefined
+            }
+            role={
+              insight.clickable && insight.reportId && onReportClick
+                ? "button"
+                : undefined
+            }
+            tabIndex={
+              insight.clickable && insight.reportId && onReportClick
+                ? 0
+                : -1
+            }
             className={`glass-premium rounded-xl border border-white/10 p-4 relative overflow-hidden group ${
-              insight.clickable ? "cursor-pointer" : "cursor-default"
+              insight.clickable ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-1" : "cursor-default"
             }`}
           >
             {/* Loading skeleton */}

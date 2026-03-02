@@ -48,6 +48,7 @@ interface MyReportsTableProps {
   reports: DashboardReport[];
   isLoading: boolean;
   onViewDetails: (report: DashboardReport) => void;
+  initialStatusFilter?: StatusFilter;
 }
 
 type SortOrder = "newest" | "oldest" | "recently-updated";
@@ -64,9 +65,9 @@ const urgencyIcon: Record<string, React.ReactNode> = {
 
 /* ── Main Component ──────────────────────────────────────────────── */
 
-export function MyReportsTable({ reports, isLoading, onViewDetails }: MyReportsTableProps) {
+export function MyReportsTable({ reports, isLoading, onViewDetails, initialStatusFilter = "all" }: MyReportsTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
   const [wasteTypeFilter, setWasteTypeFilter] = useState<WasteTypeFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -341,8 +342,16 @@ function ReportRow({ report, index, onViewDetails, onViewOnMap }: ReportRowProps
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.25, delay: index * 0.03 }}
-      className="flex items-start gap-3 sm:gap-4 p-4 sm:p-5 hover:bg-primary/[0.03] transition-all duration-200 group cursor-pointer"
+      className="flex items-start gap-3 sm:gap-4 p-4 sm:p-5 hover:bg-primary/[0.03] transition-all duration-200 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-1"
       onClick={onViewDetails}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onViewDetails();
+        }
+      }}
+      role="button"
+      tabIndex={0}
     >
       {/* Image thumbnail */}
       {report.imageUrl ? (

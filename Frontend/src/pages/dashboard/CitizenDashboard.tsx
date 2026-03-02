@@ -1,18 +1,29 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useCitizenDashboard } from "@/hooks/useDashboard";
 import { DashboardHeader } from "@/components/citizen/DashboardHeader";
 import { StatsCards } from "@/components/citizen/StatsCards";
-import { ReportsList } from "@/components/citizen/ReportsList";
+import { InsightCards } from "@/components/citizen/InsightCards";
+import { MyReportsTable } from "@/components/citizen/MyReportsTable";
 import { QuickActions } from "@/components/citizen/QuickActions";
-import { ActivityTimeline } from "@/components/citizen/ActivityTimeline";
+import { RecentActivityPanel } from "@/components/citizen/RecentActivityPanel";
+import { ReportDetailsModal } from "@/components/citizen/ReportDetailsModal";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import type { DashboardReport } from "@/types/dashboard";
 
 const CitizenDashboard = () => {
   const { data, isLoading, error, fetch } = useCitizenDashboard();
+
+  // Report details modal state
+  const [selectedReport, setSelectedReport] = useState<DashboardReport | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // Ref for scrolling to reports section & auto-filtering
+  const reportsRef = useRef<HTMLDivElement>(null);
+  const [pendingFilterTrigger, setPendingFilterTrigger] = useState(0);
 
   useEffect(() => {
     fetch();
@@ -25,6 +36,27 @@ const CitizenDashboard = () => {
     resolved: 0,
   };
   const reports = data?.recentReports ?? [];
+
+  const handleViewDetails = useCallback((report: DashboardReport) => {
+    setSelectedReport(report);
+    setDetailsOpen(true);
+  }, []);
+
+  const handleReportClickFromInsight = useCallback(
+    (reportId: string) => {
+      const report = reports.find((r) => r._id === reportId);
+      if (report) {
+        handleViewDetails(report);
+      }
+    },
+    [reports, handleViewDetails]
+  );
+
+  const handleFilterPending = useCallback(() => {
+    // Scroll to reports section and trigger pending filter
+    setPendingFilterTrigger((c) => c + 1);
+    reportsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -63,21 +95,47 @@ const CitizenDashboard = () => {
           {/* Stats cards row */}
           <StatsCards totals={totals} isLoading={isLoading} />
 
+          {/* Insight cards — computed metrics */}
+          <InsightCards
+            totals={totals}
+            reports={reports}
+            isLoading={isLoading}
+            onReportClick={handleReportClickFromInsight}
+          />
+
           {/* Main content: Reports list + Sidebar */}
-          <div className="grid lg:grid-cols-[1fr_280px] gap-6">
+          <div className="grid lg:grid-cols-[1fr_300px] gap-6" ref={reportsRef}>
             {/* Reports list — main panel */}
-            <ReportsList reports={reports} isLoading={isLoading} />
+            <MyReportsTable
+              reports={reports}
+              isLoading={isLoading}
+              onViewDetails={handleViewDetails}
+              key={pendingFilterTrigger} // re-mount to reset filters when triggered
+            />
 
             {/* Right sidebar — desktop stacked, mobile below */}
             <div className="space-y-4">
-              <QuickActions />
-              <ActivityTimeline reports={reports} />
+              <QuickActions
+                reports={reports}
+                onFilterPending={handleFilterPending}
+              />
+              <RecentActivityPanel
+                reports={reports}
+                onReportClick={handleViewDetails}
+              />
             </div>
           </div>
         </div>
       </main>
 
       <Footer />
+
+      {/* Report Details Modal */}
+      <ReportDetailsModal
+        report={selectedReport}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+      />
     </div>
   );
 };

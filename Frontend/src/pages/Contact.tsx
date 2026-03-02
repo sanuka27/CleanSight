@@ -3,8 +3,10 @@ import { Footer } from "@/components/layout/Footer";
 import { MeshGradient } from "@/components/shared/MeshGradient";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Send, MapPin, Clock } from "lucide-react";
+import { Mail, Send, MapPin, Clock, Loader2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
+import { submitContactMessage } from "@/services/contactApi";
+import { ApiError } from "@/lib/api";
 
 interface FormState {
   name: string;
@@ -41,6 +43,7 @@ const Contact = () => {
   const [form, setForm] = useState<FormState>({ name: "", email: "", message: "" });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     document.title = "Contact — CleanSight";
@@ -57,7 +60,7 @@ const Contact = () => {
     }
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const validationErrors = validate(form);
 
@@ -66,14 +69,41 @@ const Contact = () => {
       return;
     }
 
-    // No backend — show success feedback
-    setSubmitted(true);
-    toast({
-      title: "Message Sent",
-      description: "Thanks for reaching out! We'll get back to you soon.",
-    });
-    setForm({ name: "", email: "", message: "" });
-    setErrors({});
+    setLoading(true);
+    try {
+      await submitContactMessage({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        message: form.message.trim(),
+      });
+
+      setSubmitted(true);
+      toast({
+        title: "Message Sent",
+        description: "Thanks for reaching out! We'll get back to you soon.",
+      });
+      setForm({ name: "", email: "", message: "" });
+      setErrors({});
+    } catch (err) {
+      // Server-side validation errors
+      if (err instanceof ApiError && (err as any).errors) {
+        setErrors((err as any).errors);
+      } else if (err instanceof ApiError && err.status === 429) {
+        toast({
+          title: "Too many requests",
+          description: "Please wait a few minutes before sending again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Something went wrong",
+          description: "Could not send your message. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -221,10 +251,20 @@ const Contact = () => {
 
                       <button
                         type="submit"
-                        className="w-full flex items-center justify-center gap-2 gradient-primary text-white rounded-xl px-6 py-3 font-semibold shadow-glow hover:shadow-glow-lg transition-all hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        disabled={loading}
+                        className="w-full flex items-center justify-center gap-2 gradient-primary text-white rounded-xl px-6 py-3 font-semibold shadow-glow hover:shadow-glow-lg transition-all hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
                       >
-                        <Send className="w-4 h-4" />
-                        Send Message
+                        {loading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Sending…
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4" />
+                            Send Message
+                          </>
+                        )}
                       </button>
                     </form>
                   )}

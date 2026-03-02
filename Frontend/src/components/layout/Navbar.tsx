@@ -59,10 +59,9 @@ export function Navbar() {
           <motion.nav 
             className={`relative flex items-center justify-between px-6 py-3 rounded-2xl transition-all duration-500 ${
               scrolled 
-                ? "glass-premium shadow-elevated" 
-                : "bg-transparent"
+                ? "bg-background border border-border shadow-lg" 
+                : "bg-background border border-border shadow-md"
             }`}
-            style={scrolled ? {} : { backgroundColor: "transparent" }}
           >
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3 group">
@@ -83,7 +82,7 @@ export function Navbar() {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden lg:flex items-center gap-1 bg-card/50 rounded-xl p-1.5 backdrop-blur-sm">
+            <div className="hidden lg:flex items-center gap-1 bg-muted rounded-xl p-1.5">
               {visibleLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive = location.pathname === link.href;
@@ -91,22 +90,14 @@ export function Navbar() {
                 return (
                   <Link key={link.href} to={link.href}>
                     <motion.div
-                      className={`relative px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                      className={`relative px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${
                         isActive 
-                          ? "text-primary" 
-                          : "text-muted-foreground hover:text-foreground"
+                          ? "text-white gradient-primary rounded-lg shadow-glow" 
+                          : "text-foreground hover:text-primary"
                       }`}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
-                      {isActive && (
-                        <motion.div
-                          layoutId="navbar-active"
-                          className="absolute inset-0 gradient-primary rounded-lg opacity-10"
-                          initial={false}
-                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                        />
-                      )}
                       <span className="relative z-10 flex items-center gap-2">
                         <Icon className="w-4 h-4" />
                         {link.label}
@@ -198,7 +189,7 @@ export function Navbar() {
               className="lg:hidden overflow-hidden"
             >
               <div className="container mx-auto px-4 pt-2">
-                <div className="glass-premium rounded-2xl p-4 shadow-elevated">
+                <div className="bg-background border border-border rounded-2xl p-4 shadow-lg">
                   <div className="flex flex-col gap-2">
                     {visibleLinks.map((link, index) => {
                       const Icon = link.icon;

@@ -84,7 +84,15 @@ export function RecentActivityPanel({
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.4 + i * 0.06 }}
                 onClick={() => onReportClick(activity.report)}
-                className="flex items-start gap-3 pl-0 py-2 relative cursor-pointer group hover:bg-primary/[0.02] rounded-lg px-1 -mx-1 transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onReportClick(activity.report);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                className="flex items-start gap-3 pl-0 py-2 relative cursor-pointer group hover:bg-primary/[0.02] rounded-lg px-1 -mx-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-1"
               >
                 {/* Dot */}
                 <div

@@ -153,7 +153,7 @@ export function InsightCards({ totals, reports, isLoading, onReportClick }: Insi
                 <p className="text-xs font-medium text-muted-foreground">
                   {insight.label}
                 </p>
-                <p className="text-[11px] text-muted-foreground/60 truncate">
+                <p className="text-xs text-muted-foreground truncate">
                   {insight.subtext}
                 </p>
               </div>

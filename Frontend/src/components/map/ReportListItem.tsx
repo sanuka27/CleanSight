@@ -86,19 +86,19 @@ export function ReportListItem({
             </div>
             <Badge
               variant="outline"
-              className={`text-[10px] h-5 px-2 flex-shrink-0 rounded-full font-medium ${statusCfg.badgeClass}`}
+              className={`text-[10px] h-5 px-2 flex-shrink-0 rounded-full font-semibold ${statusCfg.badgeClass}`}
             >
               {statusCfg.label}
             </Badge>
           </div>
 
           {/* Description */}
-          <p className="text-xs text-muted-foreground/80 line-clamp-1 mb-1.5">
+          <p className="text-xs text-muted-foreground line-clamp-1 mb-1.5">
             {report.description || "No description provided"}
           </p>
 
           {/* Meta row */}
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground/60">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {timeAgo(report.createdAt)}

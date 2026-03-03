@@ -111,7 +111,7 @@ export function QuickActions({ reports = [], onFilterPending }: QuickActionsProp
                   <div className="text-left flex-1">
                     <span className="text-sm font-medium">{action.label}</span>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 opacity-40" />
+                  <ArrowRight className="w-3.5 h-3.5 opacity-60" />
                 </Button>
               </motion.div>
             ))}

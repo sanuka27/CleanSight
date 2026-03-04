@@ -88,7 +88,7 @@ export function StepPhotoEvidence({
             <Camera className="w-7 h-7 text-primary" />
           </div>
           <p className="font-display font-bold text-base">Click to Upload Photo</p>
-          <p className="text-muted-foreground text-xs mt-1">Supports JPG, PNG (Max 10 MB)</p>
+          <p className="text-muted-foreground text-sm mt-1">Supports JPG, PNG (Max 10 MB)</p>
         </label>
       )}
     </div>

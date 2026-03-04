@@ -315,7 +315,7 @@ const ReportWaste = () => {
                     >
                       {isCompleted ? <CheckCircle className="w-3.5 h-3.5" /> : step.id}
                     </div>
-                    <span className={`text-[11px] font-medium leading-none hidden sm:block ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                    <span className={`text-xs font-medium leading-none hidden sm:block ${isActive ? "text-primary" : "text-muted-foreground"}`}>
                       {step.title}
                     </span>
                   </div>

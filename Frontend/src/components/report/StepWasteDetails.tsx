@@ -79,7 +79,7 @@ export function StepWasteDetails({
                 }`}
               >
                 <span className="text-sm font-bold block">{level.label}</span>
-                <span className="text-[10px] opacity-80 leading-none">{level.desc}</span>
+                <span className="text-xs text-muted-foreground leading-none">{level.desc}</span>
               </button>
             );
           })}

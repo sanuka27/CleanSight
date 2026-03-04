@@ -304,7 +304,7 @@ const Login = () => {
 
           {/* Terms */}
           <motion.p 
-            className="text-center text-xs text-muted-foreground mt-4"
+            className="text-center text-sm text-muted-foreground mt-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}

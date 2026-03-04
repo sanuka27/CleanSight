@@ -219,7 +219,7 @@ export function CleanSightMap({
                       className="w-full h-28 object-cover rounded-xl ring-1 ring-black/5"
                     />
                   )}
-                  <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
+                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                     {report.description}
                   </p>
                   <Button

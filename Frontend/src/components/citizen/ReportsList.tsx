@@ -247,7 +247,7 @@ function ReportCard({ report, index, formatDate, formatTime, onView }: ReportCar
         </div>
       ) : (
         <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-muted/10 flex items-center justify-center flex-shrink-0 ring-1 ring-white/10">
-          <Image className="w-5 h-5 text-muted-foreground/40" />
+          <Image className="w-5 h-5 text-muted-foreground" />
         </div>
       )}
 
@@ -257,16 +257,16 @@ function ReportCard({ report, index, formatDate, formatTime, onView }: ReportCar
         <div className="flex items-center gap-2 flex-wrap">
           <Badge
             variant="outline"
-            className={`${statusConfig.badgeClass} text-[11px] font-medium px-2 py-0.5`}
+            className={`${statusConfig.badgeClass} text-xs font-medium px-2 py-0.5`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotClass} mr-1.5 inline-block`} />
             {statusConfig.label}
           </Badge>
-          <Badge variant="outline" className="text-[11px] border-border/50 text-muted-foreground">
+          <Badge variant="outline" className="text-xs border-border/50 text-muted-foreground">
             {WASTE_TYPE_LABELS[report.wasteType] || report.wasteType}
           </Badge>
           {report.urgency && (
-            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
               {urgencyIcon[report.urgency]}
               {URGENCY_LABELS[report.urgency] || report.urgency}
             </span>
@@ -284,7 +284,7 @@ function ReportCard({ report, index, formatDate, formatTime, onView }: ReportCar
         </p>
 
         {/* Meta row */}
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground/70">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             {formatDate(report.createdAt)} at {formatTime(report.createdAt)}

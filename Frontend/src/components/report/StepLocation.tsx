@@ -162,7 +162,7 @@ export function StepLocation({
               </Button>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-0.5">
-                  <Label htmlFor="lat" className="text-[11px]">
+                  <Label htmlFor="lat" className="text-xs">
                     Latitude
                   </Label>
                   <Input
@@ -186,7 +186,7 @@ export function StepLocation({
                   />
                 </div>
                 <div className="space-y-0.5">
-                  <Label htmlFor="lng" className="text-[11px]">
+                  <Label htmlFor="lng" className="text-xs">
                     Longitude
                   </Label>
                   <Input
@@ -222,7 +222,7 @@ export function StepLocation({
 
       {/* ── Report summary (compact) ── */}
       <div className="bg-muted/30 rounded-lg p-3 border border-border/50 space-y-1.5">
-        <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Summary
         </h3>
         <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">

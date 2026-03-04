@@ -117,14 +117,14 @@ export function RecentActivityPanel({
                     </span>
                   </p>
                   {activity.description && (
-                    <p className="text-[11px] text-muted-foreground/60 truncate mt-0.5 group-hover:text-muted-foreground transition-colors">
+                    <p className="text-xs text-muted-foreground truncate mt-0.5 group-hover:text-foreground transition-colors">
                       {activity.description}
                     </p>
                   )}
                 </div>
 
                 {/* Time */}
-                <span className="text-[11px] text-muted-foreground/50 flex-shrink-0 whitespace-nowrap">
+                <span className="text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap">
                   {activity.timeAgo}
                 </span>
               </motion.div>

@@ -71,7 +71,7 @@ export function DashboardHeader({ isLoading, error, totalReports }: DashboardHea
             </p>
 
             {appUser?.email && (
-              <p className="text-xs text-muted-foreground/60">
+              <p className="text-xs text-muted-foreground">
                 Signed in as {appUser.email}
               </p>
             )}

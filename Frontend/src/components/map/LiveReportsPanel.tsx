@@ -140,7 +140,7 @@ export function LiveReportsPanel({
                   </motion.span>
                 )}
               </div>
-              <p className="text-[11px] text-muted-foreground/60">
+              <p className="text-xs text-muted-foreground">
                 Real-time waste monitoring
               </p>
             </div>
@@ -149,7 +149,7 @@ export function LiveReportsPanel({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-xl text-muted-foreground/60 hover:text-muted-foreground hover:bg-gray-100/80"
+              className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-gray-100/80"
               onClick={onClose}
               title="Close panel"
             >
@@ -229,7 +229,7 @@ export function LiveReportsPanel({
             <p className="text-sm font-medium text-gray-700 mb-1">
               Failed to load reports
             </p>
-            <p className="text-xs text-muted-foreground/60">{error}</p>
+            <p className="text-xs text-muted-foreground">{error}</p>
           </motion.div>
         )}
 
@@ -248,7 +248,7 @@ export function LiveReportsPanel({
                 <p className="text-sm font-medium text-gray-600 mb-1">
                   No results for "{searchQuery}"
                 </p>
-                <p className="text-xs text-muted-foreground/50">
+                <p className="text-xs text-muted-foreground">
                   Try adjusting your search or filters
                 </p>
               </>
@@ -260,7 +260,7 @@ export function LiveReportsPanel({
                 <p className="text-sm font-medium text-gray-600 mb-1">
                   No {statusFilter} reports
                 </p>
-                <p className="text-xs text-muted-foreground/50">
+                <p className="text-xs text-muted-foreground">
                   Try selecting "All" to see every report
                 </p>
               </>
@@ -272,7 +272,7 @@ export function LiveReportsPanel({
                 <p className="text-sm font-medium text-gray-600 mb-1">
                   No reports in this area
                 </p>
-                <p className="text-xs text-muted-foreground/50">
+                <p className="text-xs text-muted-foreground">
                   Zoom out or report a new issue!
                 </p>
               </>
@@ -301,7 +301,7 @@ export function LiveReportsPanel({
 
       {/* ── Footer: Legend + CTA ────────────────────────────────── */}
       <div className="flex-shrink-0 px-5 pb-4 pt-3 border-t border-gray-100/80">
-        <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground/50 mb-3">
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground mb-3">
           {LEGEND_ITEMS.map((item) => (
             <span key={item.status} className="flex items-center gap-1">
               <MapPin className={`w-3 h-3 ${item.color}`} />

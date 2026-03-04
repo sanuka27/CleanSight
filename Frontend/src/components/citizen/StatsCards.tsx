@@ -109,7 +109,7 @@ export function StatsCards({ totals, isLoading }: StatsCardsProps) {
                   </div>
 
                   {/* Subtle description */}
-                  <p className="text-[11px] text-muted-foreground/60 hidden sm:block">
+                  <p className="text-xs text-muted-foreground hidden sm:block">
                     {stat.description}
                   </p>
                 </div>

@@ -337,7 +337,7 @@ const MapView = () => {
         )}
 
         {/* Attribution */}
-        <div className="absolute bottom-1 right-1 z-10 text-[9px] text-gray-500/70 bg-white/60 rounded px-1">
+        <div className="absolute bottom-1 right-1 z-10 text-[10px] text-gray-600 bg-white/70 rounded px-1">
           © <a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer" className="hover:underline">OpenFreeMap</a>
           {" · "}
           <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:underline">OpenStreetMap</a>

@@ -264,7 +264,7 @@ const Signup = () => {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Must be at least 6 characters
               </p>
             </div>
@@ -347,7 +347,7 @@ const Signup = () => {
 
           {/* Terms */}
           <motion.p
-            className="text-center text-xs text-muted-foreground mt-3"
+            className="text-center text-sm text-muted-foreground mt-3"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}

@@ -69,8 +69,8 @@ export function MyTasksBoard({
   );
 
   const filtered = useMemo(
-    () => applyTaskFilters(source, filters),
-    [source, filters]
+    () => applyTaskFilters(source, filters, userLat, userLng),
+    [source, filters, userLat, userLng]
   );
 
   const tabs: { key: TaskTab; label: string; count: number; icon: React.ComponentType<{className?: string}> }[] = [

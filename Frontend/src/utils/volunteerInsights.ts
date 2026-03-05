@@ -5,6 +5,7 @@
  */
 
 import type { DashboardReport } from "@/types/dashboard";
+import { distanceKm } from "./geo";
 
 /** Returns age label from a createdAt ISO string */
 export function reportAge(createdAt: string): string {
@@ -22,8 +23,9 @@ export function reportAge(createdAt: string): string {
 /** Average task age in hours for a list of reports */
 export function avgAgeHours(reports: DashboardReport[]): number | null {
   if (reports.length === 0) return null;
+  const now = Date.now();
   const totalMs = reports.reduce(
-    (sum, r) => sum + (Date.now() - new Date(r.createdAt).getTime()),
+    (sum, r) => sum + (now - new Date(r.createdAt).getTime()),
     0
   );
   return Math.round(totalMs / reports.length / 3_600_000);
@@ -54,22 +56,6 @@ export function getGreeting(): string {
   return "Good evening";
 }
 
-/** Compute distance in km between two lat/lng points (Haversine) */
-export function haversineKm(
-  lat1: number, lng1: number,
-  lat2: number, lng2: number
-): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 /** Get distance label for a report given user location */
 export function distanceLabel(
   report: DashboardReport,
@@ -80,6 +66,6 @@ export function distanceLabel(
   const coords = report.location?.coordinates;
   if (!coords) return null;
   const [lng, lat] = coords;
-  const km = haversineKm(userLat, userLng, lat, lng);
+  const km = distanceKm({ lat: userLat, lng: userLng }, { lat, lng });
   return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)} km`;
 }

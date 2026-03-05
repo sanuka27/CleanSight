@@ -47,6 +47,7 @@ export interface VolunteerMyStats {
 
 export interface VolunteerDashboardData {
   assignedToMe: DashboardReport[];
+  resolvedByMe: DashboardReport[];
   pendingNearby: DashboardReport[];
   myStats: VolunteerMyStats;
 }

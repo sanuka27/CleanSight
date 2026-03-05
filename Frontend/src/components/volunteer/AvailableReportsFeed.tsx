@@ -16,6 +16,7 @@ import {
   type ReportFilters,
   type SortOption,
 } from "@/utils/volunteerFilters";
+import { DEFAULT_NEAR_RADIUS_KM } from "@/constants/map";
 
 type FeedChip = "all" | "high" | "nearby";
 
@@ -168,7 +169,7 @@ export function AvailableReportsFeed({
               <Inbox className="w-10 h-10 mb-3 opacity-30" />
               <p className="text-sm font-medium">
                 {chip === "nearby"
-                  ? "No pending reports within 10 km of your location"
+                  ? `No pending reports within ${DEFAULT_NEAR_RADIUS_KM} km of your location`
                   : chip === "high"
                   ? "No high urgency reports at the moment"
                   : "No available reports right now"}

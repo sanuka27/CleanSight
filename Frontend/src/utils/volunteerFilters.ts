@@ -4,7 +4,8 @@
  */
 
 import type { DashboardReport } from "@/types/dashboard";
-import { haversineKm } from "./volunteerInsights";
+import { distanceKm } from "./geo";
+import { DEFAULT_NEAR_RADIUS_KM } from "@/constants/map";
 
 export type SortOption = "newest" | "oldest" | "urgent" | "nearest";
 export type UrgencyLevel = "low" | "medium" | "high";
@@ -42,7 +43,9 @@ function byOldest(a: DashboardReport, b: DashboardReport): number {
 
 export function applyTaskFilters(
   reports: DashboardReport[],
-  filters: TaskFilters
+  filters: TaskFilters,
+  userLat?: number,
+  userLng?: number
 ): DashboardReport[] {
   let result = [...reports];
 
@@ -69,6 +72,16 @@ export function applyTaskFilters(
   if (filters.sort === "newest") result.sort(byNewest);
   else if (filters.sort === "oldest") result.sort(byOldest);
   else if (filters.sort === "urgent") result.sort(byUrgency);
+  else if (filters.sort === "nearest" && userLat != null && userLng != null) {
+    result.sort((a, b) => {
+      const ca = a.location?.coordinates;
+      const cb = b.location?.coordinates;
+      if (!ca || !cb) return 0;
+      const da = distanceKm({ lat: userLat, lng: userLng }, { lat: ca[1], lng: ca[0] });
+      const db = distanceKm({ lat: userLat, lng: userLng }, { lat: cb[1], lng: cb[0] });
+      return da - db;
+    });
+  }
 
   return result;
 }
@@ -96,7 +109,7 @@ export function applyReportFilters(
       const coords = r.location?.coordinates;
       if (!coords) return false;
       const [lng, lat] = coords;
-      return haversineKm(userLat, userLng, lat, lng) <= 10;
+      return distanceKm({ lat: userLat, lng: userLng }, { lat, lng }) <= DEFAULT_NEAR_RADIUS_KM;
     });
   }
 
@@ -108,8 +121,8 @@ export function applyReportFilters(
       const ca = a.location?.coordinates;
       const cb = b.location?.coordinates;
       if (!ca || !cb) return 0;
-      const da = haversineKm(userLat, userLng, ca[1], ca[0]);
-      const db = haversineKm(userLat, userLng, cb[1], cb[0]);
+      const da = distanceKm({ lat: userLat, lng: userLng }, { lat: ca[1], lng: ca[0] });
+      const db = distanceKm({ lat: userLat, lng: userLng }, { lat: cb[1], lng: cb[0] });
       return da - db;
     });
   }

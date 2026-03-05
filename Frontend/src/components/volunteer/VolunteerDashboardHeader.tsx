@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { MapPin, RefreshCw, Clock, MapIcon, Leaf } from "lucide-react";
+import { MapPin, RefreshCw, Clock, Leaf } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getGreeting } from "@/utils/volunteerInsights";

@@ -156,21 +156,31 @@ router.get(
     try {
       const { firebaseUid } = req.user;
 
-      // Tasks assigned to me
+      // Tasks assigned to me (active)
       const assignedToMe = await Report.find({
         assignedTo: firebaseUid,
         status: 'assigned',
       })
         .sort({ createdAt: -1 })
-        .limit(20)
-        .select('_id status wasteType urgency createdAt imageUrl location description')
+        .limit(30)
+        .select('_id title status wasteType urgency createdAt updatedAt imageUrl location description assignedTo')
+        .lean();
+
+      // Tasks resolved by me (history)
+      const resolvedByMe = await Report.find({
+        assignedTo: firebaseUid,
+        status: 'resolved',
+      })
+        .sort({ updatedAt: -1 })
+        .limit(30)
+        .select('_id title status wasteType urgency createdAt updatedAt imageUrl location description assignedTo')
         .lean();
 
       // Pending reports (available to pick up)
       const pendingNearby = await Report.find({ status: 'pending' })
         .sort({ createdAt: -1 })
-        .limit(20)
-        .select('_id status wasteType urgency createdAt imageUrl location description')
+        .limit(30)
+        .select('_id title status wasteType urgency createdAt updatedAt imageUrl location description assignedTo')
         .lean();
 
       // My stats (last 7 days)
@@ -201,6 +211,7 @@ router.get(
         success: true,
         data: {
           assignedToMe,
+          resolvedByMe,
           pendingNearby,
           myStats: {
             assignedCount: myStats.assignedCount,

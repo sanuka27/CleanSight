@@ -62,9 +62,10 @@ router.get('/reports', async (req, res) => {
       if (to)   filter.createdAt.$lte = new Date(String(to));
     }
 
-    // Text search on description + title (case-insensitive)
+    // Text search on description + title (case-insensitive, injection-safe)
     if (search && String(search).trim()) {
-      const rx = new RegExp(String(search).trim(), 'i');
+      const escaped = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(escaped, 'i');
       filter.$or = [{ title: rx }, { description: rx }];
     }
 
@@ -174,13 +175,19 @@ router.patch('/reports/:id/status', async (req, res) => {
       });
     }
 
-    const update = { status };
+    const $set = { status };
+    const $unset = {};
     if (status === 'rejected') {
-      update.rejectionReason = rejectionReason || 'No reason provided';
+      $set.rejectionReason = rejectionReason || 'No reason provided';
+    } else {
+      $unset.rejectionReason = '';
     }
     if (status === 'resolved') {
-      update.resolvedAt = new Date();
+      $set.resolvedAt = new Date();
+    } else {
+      $unset.resolvedAt = '';
     }
+    const update = Object.keys($unset).length ? { $set, $unset } : { $set };
 
     const report = await Report.findByIdAndUpdate(id, update, { new: true }).lean();
     if (!report) return res.status(404).json({ success: false, message: 'Report not found' });
@@ -324,7 +331,8 @@ router.get('/volunteers', async (req, res) => {
     // Users with role=volunteer
     const userFilter = { role: 'volunteer' };
     if (search && String(search).trim()) {
-      const rx = new RegExp(String(search).trim(), 'i');
+      const escaped = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(escaped, 'i');
       userFilter.$or = [{ name: rx }, { email: rx }];
     }
 
@@ -381,14 +389,15 @@ router.get('/volunteers', async (req, res) => {
       ? enriched.filter(v => v.isActive === (isActive === 'true'))
       : enriched;
 
+    const effectiveTotal = isActive !== undefined ? filtered.length : total;
     res.json({
       success: true,
       data: filtered,
       pagination: {
         page: Number(page),
         limit: Number(limit),
-        total,
-        pages: Math.ceil(total / Number(limit)),
+        total: effectiveTotal,
+        pages: Math.ceil(effectiveTotal / Number(limit)),
       },
     });
   } catch (err) {
@@ -473,18 +482,19 @@ router.get('/analytics/overview', async (req, res) => {
         ]),
         // New users in range
         User.countDocuments({ createdAt: { $gte: start, $lte: end } }),
-        // Avg resolution time (createdAt → resolvedAt)
+        // Avg resolution time (createdAt → resolvedAt, fallback to updatedAt)
         Report.aggregate([
           {
             $match: {
               status: 'resolved',
-              resolvedAt: { $ne: null },
               createdAt: { $gte: start, $lte: end },
             },
           },
           {
             $project: {
-              resolutionMs: { $subtract: ['$resolvedAt', '$createdAt'] },
+              resolutionMs: {
+                $subtract: [{ $ifNull: ['$resolvedAt', '$updatedAt'] }, '$createdAt'],
+              },
             },
           },
           {
@@ -520,7 +530,7 @@ router.get('/analytics/overview', async (req, res) => {
             ? Math.round(((statusMap.resolved || 0) / total) * 100)
             : 0,
           assignmentRate: total > 0
-            ? Math.round(((statusMap.assigned || 0 + (statusMap.in_progress || 0)) / total) * 100)
+            ? Math.round((((statusMap.assigned || 0) + (statusMap.in_progress || 0)) / total) * 100)
             : 0,
         },
         wasteTypes: wasteTypes.map(w => ({ wasteType: w._id, count: w.count })),
@@ -722,10 +732,11 @@ router.delete('/documents/:id', async (req, res) => {
  */
 router.get('/settings', async (req, res) => {
   try {
-    let settings = await Settings.findOne({ key: 'system' }).lean();
-    if (!settings) {
-      settings = await Settings.create({ key: 'system' });
-    }
+    const settings = await Settings.findOneAndUpdate(
+      { key: 'system' },
+      { $setOnInsert: { key: 'system' } },
+      { new: true, upsert: true }
+    ).lean();
     res.json({ success: true, data: settings });
   } catch (err) {
     console.error('Admin get settings error:', err);

@@ -122,6 +122,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           if (isDev) {
             console.log(`[AuthContext] Auth error ${err.status}, forcing logout`);
           }
+          // Clear both user states immediately so needsOnboarding never
+          // becomes true during the sign-out transition (before
+          // onAuthStateChanged fires in response to firebaseSignOut).
+          setUser(null);
           setAppUser(null);
           prevRoleRef.current = null;
           await firebaseSignOut(auth);

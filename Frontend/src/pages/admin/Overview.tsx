@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AdminTopbar } from "@/components/admin/Topbar";
+import { RANGE_LABELS } from "@/components/admin/Topbar";
 import { StatsGrid } from "@/components/admin/StatsGrid";
 import { ActivityChart } from "@/components/admin/Charts/ActivityChart";
 import { WasteTypeChart } from "@/components/admin/Charts/WasteTypeChart";
@@ -39,6 +40,7 @@ export default function AdminOverview() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [range, setRange] = useState<DateRange>("7d");
+  const [customDates, setCustomDates] = useState({ from: "", to: "" });
   const [overview, setOverview] = useState<AdminAnalyticsOverview | null>(null);
   const [trends, setTrends] = useState<TrendDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,9 +49,11 @@ export default function AdminOverview() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const from = customDates.from || undefined;
+      const to = customDates.to || undefined;
       const [ovRes, trRes] = await Promise.all([
-        getAdminOverview(range),
-        getAdminTrends(range),
+        getAdminOverview(range, from, to),
+        getAdminTrends(range, from, to),
       ]);
       setOverview(ovRes.data);
       setTrends(trRes.data);
@@ -64,7 +68,7 @@ export default function AdminOverview() {
     } finally {
       setLoading(false);
     }
-  }, [range, toast]);
+  }, [range, customDates, toast]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -121,6 +125,7 @@ export default function AdminOverview() {
         subtitle="Here's what's happening across your area."
         range={range}
         onRangeChange={setRange}
+        onCustomDatesChange={(from, to) => setCustomDates({ from, to })}
         onExport={() => {
           if (!overview) return;
           exportToCsv(
@@ -141,7 +146,7 @@ export default function AdminOverview() {
         {/* Refresh */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {loading ? "Loading data…" : `Showing data for the last ${range === "7d" ? "7 days" : range === "30d" ? "30 days" : "90 days"}`}
+            {loading ? "Loading data…" : `Showing data: ${RANGE_LABELS[range]}`}
           </p>
           <Button variant="ghost" size="sm" onClick={loadData} disabled={loading} className="gap-1.5">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />

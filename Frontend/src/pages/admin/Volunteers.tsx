@@ -39,8 +39,7 @@ export default function AdminVolunteers() {
   }, [toast]);
 
   useEffect(() => {
-    const t = setTimeout(() => load(search), 350);
-    return () => clearTimeout(t);
+    load(search);
   }, [search, load]);
 
   async function toggleExpand(uid: string) {

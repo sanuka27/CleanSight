@@ -3,6 +3,7 @@ import { RefreshCw, TrendingUp, Users, Clock, BarChart2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AdminTopbar } from "@/components/admin/Topbar";
+import { RANGE_LABELS } from "@/components/admin/Topbar";
 import { ActivityChart } from "@/components/admin/Charts/ActivityChart";
 import { WasteTypeChart } from "@/components/admin/Charts/WasteTypeChart";
 import { VolunteerChart } from "@/components/admin/Charts/VolunteerChart";
@@ -22,6 +23,7 @@ import type {
 export default function AdminAnalytics() {
   const { toast } = useToast();
   const [range, setRange] = useState<DateRange>("30d");
+  const [customDates, setCustomDates] = useState({ from: "", to: "" });
   const [overview, setOverview] = useState<AdminAnalyticsOverview | null>(null);
   const [trends, setTrends] = useState<TrendDataPoint[]>([]);
   const [volPerf, setVolPerf] = useState<VolunteerPerformance[]>([]);
@@ -30,9 +32,11 @@ export default function AdminAnalytics() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const from = customDates.from || undefined;
+      const to = customDates.to || undefined;
       const [ovRes, trRes, vpRes] = await Promise.all([
-        getAdminOverview(range),
-        getAdminTrends(range),
+        getAdminOverview(range, from, to),
+        getAdminTrends(range, from, to),
         getVolunteerPerformance(range),
       ]);
       setOverview(ovRes.data);
@@ -44,7 +48,7 @@ export default function AdminAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, [range, toast]);
+  }, [range, customDates, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -55,12 +59,13 @@ export default function AdminAnalytics() {
         subtitle="Deep insights into system performance and activity"
         range={range}
         onRangeChange={setRange}
+        onCustomDatesChange={(from, to) => setCustomDates({ from, to })}
       />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {loading ? "Loading…" : `Data for the past ${range === "7d" ? "7 days" : range === "30d" ? "30 days" : "90 days"}`}
+            {loading ? "Loading…" : `Showing data: ${RANGE_LABELS[range]}`}
           </p>
           <Button variant="ghost" size="sm" onClick={load} disabled={loading} className="gap-1.5">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />

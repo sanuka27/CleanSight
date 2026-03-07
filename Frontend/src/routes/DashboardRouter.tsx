@@ -3,6 +3,8 @@ import { useAuth } from "@/context/AuthContext";
 import { getUserRole } from "@/lib/role";
 import { dashboardRouteForRole, ONBOARDING_ROUTE } from "@/constants/roles";
 
+const isDev = import.meta.env.DEV;
+
 /**
  * DashboardRouter — reads appUser.role from AuthContext
  * and redirects to the correct role-based dashboard.
@@ -35,8 +37,16 @@ const DashboardRouter = () => {
     return <Navigate to={ONBOARDING_ROUTE} replace />;
   }
 
-  const role = getUserRole(appUser);
-  return <Navigate to={dashboardRouteForRole(role)} replace />;
+  // At this point appUser is guaranteed non-null: needsOnboarding (which is
+  // true iff isAuthenticated && appUser === null) already redirected above.
+  const role = getUserRole(appUser!);
+  const targetRoute = dashboardRouteForRole(role);
+  
+  if (isDev) {
+    console.log(`[DashboardRouter] Routing user with role="${role}" to ${targetRoute}`);
+  }
+  
+  return <Navigate to={targetRoute} replace />;
 };
 
 export default DashboardRouter;

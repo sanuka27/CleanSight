@@ -64,6 +64,34 @@ function escapeCsvField(value: string): string {
 }
 
 /**
+ * Generic CSV export from any array of objects.
+ * Column names are derived from the first object's keys.
+ */
+export function exportToCsv(
+  data: Record<string, unknown>[],
+  filename = "export"
+): void {
+  if (!data.length) return;
+  const headers = Object.keys(data[0]);
+  const rows = data.map((row) =>
+    headers.map((h) => escapeCsvField(String(row[h] ?? ""))).join(",")
+  );
+  const csv = [headers.map(escapeCsvField).join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filename}.csv`;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 100);
+}
+
+/**
  * Trigger a CSV download in the browser from report data.
  */
 export function exportReportsCsv(

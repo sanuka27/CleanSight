@@ -19,9 +19,10 @@ interface TopbarProps {
   onSearch?: (q: string) => void;
   onExport?: () => void;
   exportLabel?: string;
+  onCustomDatesChange?: (from: string, to: string) => void;
 }
 
-const RANGE_LABELS: Record<DateRange, string> = {
+export const RANGE_LABELS: Record<DateRange, string> = {
   "7d": "This Week",
   "30d": "This Month",
   "90d": "Last 90 Days",
@@ -36,9 +37,12 @@ export function AdminTopbar({
   onSearch,
   onExport,
   exportLabel = "Export",
+  onCustomDatesChange,
 }: TopbarProps) {
   const { appUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   useEffect(() => {
@@ -93,6 +97,32 @@ export function AdminTopbar({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Custom date range inputs */}
+          {range === "custom" && (
+            <div className="flex items-center gap-1">
+              <input
+                type="date"
+                className="h-9 text-xs px-2 rounded-md border border-input bg-background w-32"
+                value={customFrom}
+                onChange={(e) => {
+                  setCustomFrom(e.target.value);
+                  if (e.target.value && customTo) onCustomDatesChange?.(e.target.value, customTo);
+                }}
+              />
+              <span className="text-xs text-muted-foreground">–</span>
+              <input
+                type="date"
+                className="h-9 text-xs px-2 rounded-md border border-input bg-background w-32"
+                value={customTo}
+                min={customFrom}
+                onChange={(e) => {
+                  setCustomTo(e.target.value);
+                  if (customFrom && e.target.value) onCustomDatesChange?.(customFrom, e.target.value);
+                }}
+              />
+            </div>
+          )}
 
           {/* Export */}
           {onExport && (

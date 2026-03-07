@@ -37,15 +37,9 @@ const DashboardRouter = () => {
     return <Navigate to={ONBOARDING_ROUTE} replace />;
   }
 
-  // Defensive: ensure appUser exists before calling getUserRole
-  if (!appUser) {
-    if (isDev) {
-      console.warn("[DashboardRouter] appUser is null despite checks, redirecting to login");
-    }
-    return <Navigate to="/login" replace />;
-  }
-
-  const role = getUserRole(appUser);
+  // At this point appUser is guaranteed non-null: needsOnboarding (which is
+  // true iff isAuthenticated && appUser === null) already redirected above.
+  const role = getUserRole(appUser!);
   const targetRoute = dashboardRouteForRole(role);
   
   if (isDev) {

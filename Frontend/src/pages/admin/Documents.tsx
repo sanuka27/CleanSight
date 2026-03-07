@@ -270,12 +270,30 @@ function UploadDocumentDialog({
         const storageRef = ref(storage, storagePath);
         await uploadBytes(storageRef, file);
         url = await getDownloadURL(storageRef);
-        fileType = ["pdf", "doc", "docx", "xlsx", "csv"].includes(ext) ? ext : "other";
+        fileType = ["pdf", "doc", "docx", "xlsx", "csv"].includes(ext)
+          ? ext
+          : ["png", "jpg", "jpeg", "gif", "webp"].includes(ext)
+          ? "image"
+          : "other";
         fileSize = file.size;
       }
 
       if (!url) {
         toast({ title: "Please provide a file or URL", variant: "destructive" });
+        setUploading(false);
+        return;
+      }
+
+      // Validate URL scheme (prevent javascript: / data: XSS)
+      try {
+        const parsed = new URL(url);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          toast({ title: "Invalid URL", description: "Only http and https URLs are allowed.", variant: "destructive" });
+          setUploading(false);
+          return;
+        }
+      } catch {
+        toast({ title: "Invalid URL", description: "Enter a valid URL.", variant: "destructive" });
         setUploading(false);
         return;
       }

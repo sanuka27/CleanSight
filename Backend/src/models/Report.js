@@ -53,11 +53,25 @@ const reportSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'assigned', 'resolved'],
+    enum: ['pending', 'verified', 'assigned', 'in_progress', 'resolved', 'rejected'],
     default: 'pending'
   },
   assignedTo: {
     type: String,
+    default: null
+  },
+  adminNote: {
+    type: String,
+    default: null,
+    maxlength: [1000, 'Admin note cannot exceed 1000 characters']
+  },
+  rejectionReason: {
+    type: String,
+    default: null,
+    maxlength: [500, 'Rejection reason cannot exceed 500 characters']
+  },
+  resolvedAt: {
+    type: Date,
     default: null
   },
 }, {

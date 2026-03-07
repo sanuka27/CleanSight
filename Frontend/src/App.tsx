@@ -73,7 +73,7 @@ const AnimatedRoutes = () => {
           <Route 
             path="/dashboard/citizen" 
             element={
-              <ProtectedRoute allowedRoles={["citizen", "admin", "staff"]}>
+              <ProtectedRoute expectedRole="citizen">
                 <PageTransition><CitizenDashboard /></PageTransition>
               </ProtectedRoute>
             } 
@@ -81,7 +81,7 @@ const AnimatedRoutes = () => {
           <Route 
             path="/dashboard/volunteer" 
             element={
-              <ProtectedRoute allowedRoles={["volunteer", "admin", "staff"]}>
+              <ProtectedRoute expectedRole="volunteer">
                 <PageTransition><VolunteerDashboard /></PageTransition>
               </ProtectedRoute>
             } 
@@ -89,7 +89,7 @@ const AnimatedRoutes = () => {
           <Route 
             path="/dashboard/staff" 
             element={
-              <ProtectedRoute allowedRoles={["staff", "admin"]}>
+              <ProtectedRoute expectedRole="staff">
                 <PageTransition><StaffDashboard /></PageTransition>
               </ProtectedRoute>
             } 
@@ -97,7 +97,7 @@ const AnimatedRoutes = () => {
           <Route 
             path="/dashboard/admin" 
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute expectedRole="admin">
                 <PageTransition><Dashboard /></PageTransition>
               </ProtectedRoute>
             } 

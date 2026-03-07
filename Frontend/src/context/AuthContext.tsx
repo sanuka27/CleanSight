@@ -8,6 +8,8 @@ import { auth } from "@/lib/firebase";
 import { api, ApiError } from "@/lib/api";
 import type { AppRole } from "@/lib/role";
 
+const isDev = import.meta.env.DEV;
+
 /** Backend user profile from /api/auth/me */
 export interface AppUser {
   id: string;
@@ -71,6 +73,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
    */
   const signingInRef = useRef(false);
 
+  /**
+   * Timestamp of last profile refresh (for throttling).
+   */
+  const lastRefreshRef = useRef<number>(0);
+
+  /**
+   * Previous role for dev logging.
+   */
+  const prevRoleRef = useRef<AppRole | null>(null);
+
   const markSigningIn = useCallback(() => {
     signingInRef.current = true;
     // Safety: auto-clear after 60 s so a crashed flow can't leave the flag stuck.
@@ -84,33 +96,65 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const res = await api.getMe();
       if (res.success && res.data?.user) {
-        setAppUser(res.data.user as AppUser);
+        const newUser = res.data.user as AppUser;
+        
+        // Dev-only: Log role changes
+        if (isDev && prevRoleRef.current && prevRoleRef.current !== newUser.role) {
+          console.log(`[AuthContext] Role changed: ${prevRoleRef.current} → ${newUser.role}`);
+        }
+        
+        setAppUser(newUser);
+        prevRoleRef.current = newUser.role;
+        
         // Profile found — any in-progress sign-in flow is complete.
         signingInRef.current = false;
       } else {
         // Profile not found — user may not have completed registration yet.
         // This is normal during signup (register hasn't been called yet).
         setAppUser(null);
+        prevRoleRef.current = null;
       }
     } catch (err: unknown) {
-      // 404 means the backend has no profile for this Firebase user.
-      if (err instanceof ApiError && err.status === 404) {
-        if (signingInRef.current) {
-          // A sign-in handler is running (Google onboarding / email signup)
-          // — keep the Firebase session so the user can finish onboarding.
+      // Handle auth errors (token expired, forbidden, etc.)
+      if (err instanceof ApiError) {
+        // 401 = Unauthorized (token expired), 403 = Forbidden
+        if (err.status === 401 || err.status === 403) {
+          if (isDev) {
+            console.log(`[AuthContext] Auth error ${err.status}, forcing logout`);
+          }
           setAppUser(null);
-        } else {
-          // No active sign-in → stale Firebase session whose backend
-          // profile was deleted.  Sign out to return to guest mode.
-          setAppUser(null);
+          prevRoleRef.current = null;
           await firebaseSignOut(auth);
+          return;
         }
-      } else {
-        const message = err instanceof Error ? err.message : "Failed to fetch profile";
-        console.error("Failed to fetch app user:", message);
-        setAppUserError(message);
-        setAppUser(null);
+        
+        // 404 means the backend has no profile for this Firebase user.
+        if (err.status === 404) {
+          if (signingInRef.current) {
+            // A sign-in handler is running (Google onboarding / email signup)
+            // — keep the Firebase session so the user can finish onboarding.
+            setAppUser(null);
+            prevRoleRef.current = null;
+          } else {
+            // No active sign-in → stale Firebase session whose backend
+            // profile was deleted.  Sign out to return to guest mode.
+            if (isDev) {
+              console.log(`[AuthContext] Profile not found (404), forcing logout`);
+            }
+            setAppUser(null);
+            prevRoleRef.current = null;
+            await firebaseSignOut(auth);
+          }
+          return;
+        }
       }
+      
+      // Other errors
+      const message = err instanceof Error ? err.message : "Failed to fetch profile";
+      console.error("Failed to fetch app user:", message);
+      setAppUserError(message);
+      setAppUser(null);
+      prevRoleRef.current = null;
     } finally {
       setIsAppUserLoading(false);
     }
@@ -141,6 +185,41 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [fetchAppUser]);
+
+  // Refresh backend profile when window regains focus/visibility to detect MongoDB role changes
+  useEffect(() => {
+    const THROTTLE_MS = 30_000; // Throttle to max 1 refresh per 30 seconds
+
+    const handleVisibilityChange = () => {
+      // Only refresh if:
+      // 1. User is authenticated
+      // 2. Not currently loading
+      // 3. Document is now visible
+      // 4. Enough time has passed since last refresh (throttle)
+      if (
+        auth.currentUser &&
+        !isAppUserLoading &&
+        !isLoading &&
+        document.visibilityState === "visible"
+      ) {
+        const now = Date.now();
+        const timeSinceLastRefresh = now - lastRefreshRef.current;
+        
+        if (timeSinceLastRefresh >= THROTTLE_MS) {
+          if (isDev) {
+            console.log(`[AuthContext] Visibility change detected, refreshing profile (last refresh: ${Math.round(timeSinceLastRefresh / 1000)}s ago)`);
+          }
+          lastRefreshRef.current = now;
+          fetchAppUser();
+        } else if (isDev) {
+          console.log(`[AuthContext] Visibility change throttled (${Math.round((THROTTLE_MS - timeSinceLastRefresh) / 1000)}s until next refresh allowed)`);
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [fetchAppUser, isAppUserLoading, isLoading]);
 
   const logout = async () => {
     try {

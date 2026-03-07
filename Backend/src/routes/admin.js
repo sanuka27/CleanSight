@@ -223,7 +223,10 @@ router.patch('/reports/:id/assign', async (req, res) => {
 
     const report = await Report.findByIdAndUpdate(
       id,
-      { assignedTo: volunteerUid, status: 'assigned' },
+      {
+        $set: { assignedTo: volunteerUid, status: 'assigned' },
+        $unset: { rejectionReason: '', resolvedAt: '' },
+      },
       { new: true }
     ).lean();
 
@@ -691,6 +694,16 @@ router.post('/documents', async (req, res) => {
 
     if (!title || !url) {
       return res.status(400).json({ success: false, message: 'title and url are required' });
+    }
+
+    // Validate URL scheme to prevent XSS via javascript: or data: URLs
+    try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return res.status(400).json({ success: false, message: 'URL must use http or https' });
+      }
+    } catch {
+      return res.status(400).json({ success: false, message: 'Invalid URL format' });
     }
 
     const uploadedBy = req.adminUser?.firebaseUid || 'system';

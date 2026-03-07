@@ -14,9 +14,20 @@ import { exportToCsv } from "@/utils/exportCsv";
 
 const PAGE_SIZE = 20;
 
+function rangeToFromTo(r: DateRange, custom: { from: string; to: string }) {
+  if (r === "custom") return { from: custom.from || undefined, to: custom.to || undefined };
+  const now = new Date();
+  const days = r === "7d" ? 7 : r === "30d" ? 30 : 90;
+  return {
+    from: new Date(now.getTime() - days * 86400000).toISOString(),
+    to: now.toISOString(),
+  };
+}
+
 export default function AdminReports() {
   const { toast } = useToast();
   const [range, setRange] = useState<DateRange>("30d");
+  const [customDates, setCustomDates] = useState({ from: "", to: "" });
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -34,6 +45,7 @@ export default function AdminReports() {
     setLoading(true);
     try {
       const currentPage = opts.pg ?? page;
+      const dates = rangeToFromTo(range, customDates);
       const res = await listAdminReports({
         page: currentPage,
         limit: PAGE_SIZE,
@@ -43,6 +55,8 @@ export default function AdminReports() {
         urgency: urgencyFilter,
         sortBy,
         sortOrder,
+        from: dates.from,
+        to: dates.to,
         ...opts,
       });
       setReports(res.data);
@@ -53,7 +67,7 @@ export default function AdminReports() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, wasteTypeFilter, urgencyFilter, sortBy, sortOrder, toast]);
+  }, [page, search, statusFilter, wasteTypeFilter, urgencyFilter, sortBy, sortOrder, range, customDates, toast]);
 
   // Load volunteers for assignment dropdown
   useEffect(() => {
@@ -116,6 +130,7 @@ export default function AdminReports() {
         subtitle="View, filter, and manage all waste reports"
         range={range}
         onRangeChange={setRange}
+        onCustomDatesChange={(from, to) => setCustomDates({ from, to })}
         onSearch={setSearch}
         onExport={handleExport}
         exportLabel="Export CSV"

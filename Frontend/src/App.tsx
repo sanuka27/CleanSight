@@ -31,6 +31,15 @@ const CitizenDashboard = lazy(() => import("./pages/dashboard/CitizenDashboard")
 const VolunteerDashboard = lazy(() => import("./pages/dashboard/VolunteerDashboard"));
 const StaffDashboard = lazy(() => import("./pages/dashboard/StaffDashboard"));
 
+// Admin dashboard
+const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
+const AdminOverview = lazy(() => import("./pages/admin/Overview"));
+const AdminReports = lazy(() => import("./pages/admin/Reports"));
+const AdminVolunteers = lazy(() => import("./pages/admin/Volunteers"));
+const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
+const AdminDocuments = lazy(() => import("./pages/admin/Documents"));
+const AdminSettings = lazy(() => import("./pages/admin/Settings"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -50,11 +59,15 @@ const PageLoader = () => (
 // Animated Routes Wrapper
 const AnimatedRoutes = () => {
   const location = useLocation();
+  // Keep admin sub-routes under the same key so AdminLayout stays mounted
+  const routeKey = location.pathname.startsWith("/dashboard/admin")
+    ? "/dashboard/admin"
+    : location.pathname;
 
   return (
     <AnimatePresence mode="wait">
       <Suspense fallback={<PageLoader />}>
-        <Routes location={location} key={location.pathname}>
+        <Routes location={location} key={routeKey}>
           <Route path="/" element={<PageTransition><Landing /></PageTransition>} />
           <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
           <Route path="/signup" element={<PageTransition><Signup /></PageTransition>} />
@@ -94,14 +107,22 @@ const AnimatedRoutes = () => {
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/dashboard/admin" 
+          <Route
+            path="/dashboard/admin"
             element={
               <ProtectedRoute expectedRole="admin">
-                <PageTransition><Dashboard /></PageTransition>
+                <AdminLayout />
               </ProtectedRoute>
-            } 
-          />
+            }
+          >
+            <Route index element={<AdminOverview />} />
+            <Route path="overview" element={<AdminOverview />} />
+            <Route path="reports" element={<AdminReports />} />
+            <Route path="volunteers" element={<AdminVolunteers />} />
+            <Route path="analytics" element={<AdminAnalytics />} />
+            <Route path="documents" element={<AdminDocuments />} />
+            <Route path="settings" element={<AdminSettings />} />
+          </Route>
           <Route 
             path="/report" 
             element={

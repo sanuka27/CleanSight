@@ -21,6 +21,7 @@ export default function AdminLayout() {
           onClick={toggle}
           className="absolute -right-3.5 top-[84px] z-50 w-7 h-7 rounded-full bg-background border border-border shadow-md flex items-center justify-center hover:bg-muted transition-colors"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? (
             <ChevronRight className="w-3.5 h-3.5" />

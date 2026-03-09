@@ -8,6 +8,7 @@ import {
   FileText,
   Settings,
   LogOut,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { path: "/dashboard/admin/volunteers", label: "Volunteers", icon: Users },
   { path: "/dashboard/admin/analytics", label: "Analytics", icon: PieChart },
   { path: "/dashboard/admin/documents", label: "Documents", icon: FileText },
+  { path: "/dashboard/admin/audit-log", label: "Audit Log", icon: ClipboardList },
   { path: "/dashboard/admin/settings", label: "Settings", icon: Settings },
 ];
 

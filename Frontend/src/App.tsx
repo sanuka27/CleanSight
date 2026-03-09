@@ -39,6 +39,7 @@ const AdminVolunteers = lazy(() => import("./pages/admin/Volunteers"));
 const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
 const AdminDocuments = lazy(() => import("./pages/admin/Documents"));
 const AdminSettings = lazy(() => import("./pages/admin/Settings"));
+const AdminAuditLog = lazy(() => import("./pages/admin/AuditLog"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -121,6 +122,7 @@ const AnimatedRoutes = () => {
             <Route path="volunteers" element={<AdminVolunteers />} />
             <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="documents" element={<AdminDocuments />} />
+            <Route path="audit-log" element={<AdminAuditLog />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
           <Route 

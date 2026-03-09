@@ -6,6 +6,8 @@ import User from '../models/User.js';
 import Volunteer from '../models/Volunteer.js';
 import Document from '../models/Document.js';
 import Settings from '../models/Settings.js';
+import AuditLog from '../models/AuditLog.js';
+import { logAdminAction } from '../services/auditLogService.js';
 
 const router = express.Router();
 
@@ -175,6 +177,10 @@ router.patch('/reports/:id/status', async (req, res) => {
       });
     }
 
+    // Fetch old status for metadata before updating
+    const oldReport = await Report.findById(id).lean();
+    const statusFrom = oldReport?.status || null;
+
     const $set = { status };
     const $unset = {};
     if (status === 'rejected') {
@@ -191,6 +197,19 @@ router.patch('/reports/:id/status', async (req, res) => {
 
     const report = await Report.findByIdAndUpdate(id, update, { new: true }).lean();
     if (!report) return res.status(404).json({ success: false, message: 'Report not found' });
+
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'REPORT_STATUS_CHANGED',
+      entityType: 'report',
+      entityId: id,
+      metadata: {
+        statusFrom,
+        statusTo: status,
+        ...(status === 'rejected' && { rejectionReason: $set.rejectionReason }),
+      },
+    });
 
     res.json({ success: true, data: report });
   } catch (err) {
@@ -232,6 +251,19 @@ router.patch('/reports/:id/assign', async (req, res) => {
 
     if (!report) return res.status(404).json({ success: false, message: 'Report not found' });
 
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'REPORT_ASSIGNED',
+      entityType: 'report',
+      entityId: id,
+      metadata: {
+        assignedToUid:   volunteerUid,
+        assignedToEmail: volunteer.email || null,
+        assignedToName:  volunteer.name  || null,
+      },
+    });
+
     res.json({ success: true, data: report });
   } catch (err) {
     console.error('Admin assign report error:', err);
@@ -259,6 +291,15 @@ router.post('/reports/:id/note', async (req, res) => {
     ).lean();
 
     if (!report) return res.status(404).json({ success: false, message: 'Report not found' });
+
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'REPORT_NOTE_ADDED',
+      entityType: 'report',
+      entityId: id,
+      metadata: { noteLength: (note || '').length },
+    });
 
     res.json({ success: true, data: report });
   } catch (err) {
@@ -709,6 +750,15 @@ router.post('/documents', async (req, res) => {
     const uploadedBy = req.adminUser?.firebaseUid || 'system';
     const doc = await Document.create({ title, url, fileType, fileSize, category, description, uploadedBy });
 
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'DOCUMENT_UPLOADED',
+      entityType: 'document',
+      entityId: String(doc._id),
+      metadata: { title, url, category, fileType, fileSize: fileSize || 0 },
+    });
+
     res.status(201).json({ success: true, data: doc });
   } catch (err) {
     console.error('Admin create document error:', err);
@@ -728,6 +778,15 @@ router.delete('/documents/:id', async (req, res) => {
 
     const doc = await Document.findByIdAndDelete(id);
     if (!doc) return res.status(404).json({ success: false, message: 'Document not found' });
+
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'DOCUMENT_DELETED',
+      entityType: 'document',
+      entityId: id,
+      metadata: { title: doc.title, url: doc.url, category: doc.category },
+    });
 
     res.json({ success: true, message: 'Document deleted' });
   } catch (err) {
@@ -778,11 +837,29 @@ router.put('/settings', async (req, res) => {
       }
     }
 
+    // Capture old values before update for meaningful metadata
+    const oldSettings = await Settings.findOne({ key: 'system' }).lean();
+    const oldValues = {};
+    const newValues = {};
+    for (const field of Object.keys(update)) {
+      oldValues[field] = oldSettings?.[field] ?? null;
+      newValues[field] = update[field];
+    }
+
     const settings = await Settings.findOneAndUpdate(
       { key: 'system' },
       { $set: update },
       { new: true, upsert: true }
     ).lean();
+
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'SETTINGS_UPDATED',
+      entityType: 'settings',
+      entityId: 'system',
+      metadata: { oldValues, newValues },
+    });
 
     res.json({ success: true, data: settings });
   } catch (err) {
@@ -822,6 +899,100 @@ router.get('/users', async (req, res) => {
     });
   } catch (err) {
     console.error('Admin get users error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUDIT LOG
+═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * GET /api/admin/audit-logs
+ * Query: page, limit, action, actorUid, entityType, dateFrom, dateTo, search
+ */
+router.get('/audit-logs', async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 30,
+      action,
+      actorUid,
+      entityType,
+      dateFrom,
+      dateTo,
+      search,
+    } = req.query;
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const filter = {};
+
+    if (action)     filter.action     = String(action);
+    if (actorUid)   filter.actorUid   = String(actorUid);
+    if (entityType) filter.entityType = String(entityType);
+
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) filter.createdAt.$gte = new Date(String(dateFrom));
+      if (dateTo) {
+        const toStr = String(dateTo);
+        // If dateTo is a date-only string (e.g. "2024-01-15"), interpret it as end-of-day UTC
+        filter.createdAt.$lte = toStr.length === 10 && !toStr.includes('T')
+          ? new Date(toStr + 'T23:59:59.999Z')
+          : new Date(toStr);
+      }
+    }
+
+    if (search && String(search).trim()) {
+      const escaped = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(escaped, 'i');
+      filter.$or = [
+        { actorEmail: rx },
+        { entityId:   rx },
+        { 'metadata.assignedToEmail': rx },
+        { 'metadata.title': rx },
+      ];
+    }
+
+    const [logs, total] = await Promise.all([
+      AuditLog.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      AuditLog.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      data: logs,
+      pagination: {
+        page:  Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (err) {
+    console.error('Admin audit logs error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/audit-logs/:id
+ */
+router.get('/audit-logs/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid audit log ID' });
+    }
+    const log = await AuditLog.findById(id).lean();
+    if (!log) return res.status(404).json({ success: false, message: 'Audit log not found' });
+    res.json({ success: true, data: log });
+  } catch (err) {
+    console.error('Admin audit log detail error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

@@ -215,3 +215,17 @@ export async function listAdminUsers(params: {
   });
   return adminFetch(`/users?${q.toString()}`);
 }
+
+// ── Audit Log ────────────────────────────────────────────────────────
+
+export async function listAuditLogs(filters: import("@/types/admin").AuditLogFilters = {}): Promise<PaginatedResponse<import("@/types/admin").AuditLog>> {
+  const q = new URLSearchParams();
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
+  });
+  return adminFetch(`/audit-logs?${q.toString()}`);
+}
+
+export async function getAuditLog(id: string): Promise<{ success: boolean; data: import("@/types/admin").AuditLog }> {
+  return adminFetch(`/audit-logs/${id}`);
+}

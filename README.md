@@ -171,6 +171,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
     <strong>Built with 💚 for cleaner communities</strong>
   </p>
   <p>
-    <sub>CleanSight &copy; 2026 Sanuka. All rights reserved.</sub>
+    <sub>CleanSight &copy; 2026 Sanuka Marasinghe. All rights reserved.</sub>
   </p>
 </div>

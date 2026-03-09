@@ -196,3 +196,43 @@ export interface ReportFilters {
 }
 
 export type DateRange = '7d' | '30d' | '90d' | 'custom';
+
+// ── Audit Log ────────────────────────────────────────────────────────
+
+export type AuditAction =
+  | 'REPORT_STATUS_CHANGED'
+  | 'REPORT_ASSIGNED'
+  | 'REPORT_NOTE_ADDED'
+  | 'DOCUMENT_UPLOADED'
+  | 'DOCUMENT_DELETED'
+  | 'SETTINGS_UPDATED'
+  | 'USER_ROLE_CHANGED'
+  | 'USER_SUSPENDED';
+
+export type AuditEntityType = 'report' | 'document' | 'settings' | 'user';
+
+export interface AuditLog {
+  _id: string;
+  actorUid: string;
+  actorEmail: string | null;
+  actorRole: 'admin' | 'staff' | 'system';
+  action: AuditAction;
+  entityType: AuditEntityType;
+  entityId: string;
+  metadata: Record<string, unknown>;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuditLogFilters {
+  page?: number;
+  limit?: number;
+  action?: AuditAction | '';
+  actorUid?: string;
+  entityType?: AuditEntityType | '';
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+}

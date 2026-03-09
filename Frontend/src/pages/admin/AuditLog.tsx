@@ -29,7 +29,6 @@ import type {
   AuditAction,
   AuditEntityType,
   AuditLogFilters,
-  DateRange,
 } from "@/types/admin";
 
 // ── Constants ───────────────────────────────────────────────────────
@@ -110,7 +109,6 @@ function metadataSummary(action: AuditAction, meta: Record<string, unknown>): st
 
 export default function AdminAuditLog() {
   const { toast } = useToast();
-  const [range, setRange] = useState<DateRange>("30d");
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -161,13 +159,14 @@ export default function AdminAuditLog() {
   }, [debouncedSearch, actionFilter, entityFilter, dateFrom, dateTo, toast]);
 
   // Reset to page 1 when filters change
+  const prevPage = useRef(page);
   useEffect(() => {
+    prevPage.current = 1;
     setPage(1);
     load(1);
   }, [debouncedSearch, actionFilter, entityFilter, dateFrom, dateTo, load]);
 
-  // Reload when page changes
-  const prevPage = useRef(page);
+  // Reload when page changes (but not when filters already reset to 1)
   useEffect(() => {
     if (prevPage.current !== page) {
       prevPage.current = page;
@@ -180,8 +179,6 @@ export default function AdminAuditLog() {
       <AdminTopbar
         title="Audit Log"
         subtitle="Every admin action recorded in real-time"
-        range={range}
-        onRangeChange={setRange}
       />
 
       <div className="flex-1 p-6 space-y-4">

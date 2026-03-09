@@ -934,7 +934,13 @@ router.get('/audit-logs', async (req, res) => {
     if (dateFrom || dateTo) {
       filter.createdAt = {};
       if (dateFrom) filter.createdAt.$gte = new Date(String(dateFrom));
-      if (dateTo)   filter.createdAt.$lte = new Date(String(dateTo));
+      if (dateTo) {
+        const toStr = String(dateTo);
+        // If dateTo is a date-only string (e.g. "2024-01-15"), interpret it as end-of-day UTC
+        filter.createdAt.$lte = toStr.length === 10 && !toStr.includes('T')
+          ? new Date(toStr + 'T23:59:59.999Z')
+          : new Date(toStr);
+      }
     }
 
     if (search && String(search).trim()) {

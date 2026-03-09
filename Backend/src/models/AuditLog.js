@@ -5,7 +5,6 @@ const AuditLogSchema = new mongoose.Schema(
     actorUid: {
       type: String,
       required: true,
-      index: true,
     },
     actorEmail: {
       type: String,
@@ -29,13 +28,11 @@ const AuditLogSchema = new mongoose.Schema(
         'USER_ROLE_CHANGED',
         'USER_SUSPENDED',
       ],
-      index: true,
     },
     entityType: {
       type: String,
       required: true,
       enum: ['report', 'document', 'settings', 'user'],
-      index: true,
     },
     entityId: {
       type: String,

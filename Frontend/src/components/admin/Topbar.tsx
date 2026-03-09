@@ -14,8 +14,8 @@ import type { DateRange } from "@/types/admin";
 interface TopbarProps {
   title: string;
   subtitle?: string;
-  range: DateRange;
-  onRangeChange: (r: DateRange) => void;
+  range?: DateRange;
+  onRangeChange?: (r: DateRange) => void;
   onSearch?: (q: string) => void;
   onExport?: () => void;
   exportLabel?: string;
@@ -81,6 +81,7 @@ export function AdminTopbar({
           )}
 
           {/* Date range */}
+          {range !== undefined && onRangeChange !== undefined && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5 h-9">
@@ -97,6 +98,7 @@ export function AdminTopbar({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
 
           {/* Custom date range inputs */}
           {range === "custom" && (

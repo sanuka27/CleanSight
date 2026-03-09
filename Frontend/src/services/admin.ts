@@ -11,6 +11,8 @@ import type {
   PaginatedResponse,
   ReportStatus,
   DateRange,
+  AuditLog,
+  AuditLogFilters,
 } from "@/types/admin";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -218,7 +220,7 @@ export async function listAdminUsers(params: {
 
 // ── Audit Log ────────────────────────────────────────────────────────
 
-export async function listAuditLogs(filters: import("@/types/admin").AuditLogFilters = {}): Promise<PaginatedResponse<import("@/types/admin").AuditLog>> {
+export async function listAuditLogs(filters: AuditLogFilters = {}): Promise<PaginatedResponse<AuditLog>> {
   const q = new URLSearchParams();
   Object.entries(filters).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
@@ -226,6 +228,6 @@ export async function listAuditLogs(filters: import("@/types/admin").AuditLogFil
   return adminFetch(`/audit-logs?${q.toString()}`);
 }
 
-export async function getAuditLog(id: string): Promise<{ success: boolean; data: import("@/types/admin").AuditLog }> {
+export async function getAuditLog(id: string): Promise<{ success: boolean; data: AuditLog }> {
   return adminFetch(`/audit-logs/${id}`);
 }

@@ -17,6 +17,8 @@ import type {
   AdminUserDetail,
   UserFilters,
   AppRole,
+  BulkActionResult,
+  BulkExportFilters,
 } from "@/types/admin";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -277,4 +279,77 @@ export async function getAdminUserTasks(
   limit = 20
 ): Promise<PaginatedResponse<AdminReport>> {
   return adminFetch(`/users/${id}/tasks?page=${page}&limit=${limit}`);
+}
+
+// ── Bulk Report Actions ─────────────────────────────────────────────
+
+export async function bulkAssignReports(
+  reportIds: string[],
+  volunteerUid: string,
+  note?: string
+): Promise<BulkActionResult> {
+  return adminFetch("/reports/bulk/assign", {
+    method: "POST",
+    body: JSON.stringify({ reportIds, volunteerUid, note }),
+  });
+}
+
+export async function bulkUpdateReportStatus(
+  reportIds: string[],
+  status: ReportStatus
+): Promise<BulkActionResult> {
+  return adminFetch("/reports/bulk/status", {
+    method: "POST",
+    body: JSON.stringify({ reportIds, status }),
+  });
+}
+
+export async function bulkRejectReports(
+  reportIds: string[],
+  reason: string
+): Promise<BulkActionResult> {
+  return adminFetch("/reports/bulk/reject", {
+    method: "POST",
+    body: JSON.stringify({ reportIds, reason }),
+  });
+}
+
+/**
+ * Bulk export reports to CSV and trigger browser download.
+ * Pass either reportIds (for selected) or filters (for current filter set).
+ */
+export async function bulkExportReports(
+  payload: { reportIds: string[] } | { filters: BulkExportFilters }
+): Promise<void> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error("Not authenticated");
+
+  const res = await fetch(`${API_BASE}/api/admin/reports/bulk/export`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message || `Export failed ${res.status}`);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  a.download = match?.[1] ?? `reports-export-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
 }

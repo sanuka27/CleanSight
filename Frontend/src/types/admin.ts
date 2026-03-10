@@ -203,11 +203,32 @@ export type AuditAction =
   | 'REPORT_STATUS_CHANGED'
   | 'REPORT_ASSIGNED'
   | 'REPORT_NOTE_ADDED'
+  | 'REPORTS_BULK_ASSIGNED'
+  | 'REPORTS_BULK_STATUS_UPDATED'
+  | 'REPORTS_BULK_REJECTED'
+  | 'REPORTS_BULK_EXPORTED'
   | 'DOCUMENT_UPLOADED'
   | 'DOCUMENT_DELETED'
   | 'SETTINGS_UPDATED'
   | 'USER_ROLE_CHANGED'
   | 'USER_SUSPENDED';
+
+// ── Bulk Actions ─────────────────────────────────────────────────────
+
+export interface BulkActionResult {
+  success: boolean;
+  updatedCount: number;
+  failed: { id: string; reason: string }[];
+}
+
+export interface BulkExportFilters {
+  status?: string;
+  wasteType?: string;
+  urgency?: string;
+  q?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
 
 export type AuditEntityType = 'report' | 'document' | 'settings' | 'user';
 

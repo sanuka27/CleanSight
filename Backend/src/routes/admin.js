@@ -128,18 +128,24 @@ router.get('/reports', async (req, res) => {
 const MAX_BULK = 200;
 const VALID_STATUSES_BULK = ['pending', 'verified', 'assigned', 'in_progress', 'resolved', 'rejected'];
 
+/**
+ * Validate and deduplicate an array of report IDs.
+ * Returns { error } on failure or { ids } with the unique de-duped list on success.
+ */
 function validateBulkIds(reportIds) {
   if (!Array.isArray(reportIds) || reportIds.length === 0) {
-    return 'reportIds must be a non-empty array';
+    return { error: 'reportIds must be a non-empty array' };
   }
-  if (reportIds.length > MAX_BULK) {
-    return `reportIds must not exceed ${MAX_BULK} items`;
+  // Deduplicate while preserving order
+  const unique = [...new Set(reportIds.map(String))];
+  if (unique.length > MAX_BULK) {
+    return { error: `reportIds must not exceed ${MAX_BULK} unique items` };
   }
-  const invalid = reportIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+  const invalid = unique.filter(id => !mongoose.Types.ObjectId.isValid(id));
   if (invalid.length > 0) {
-    return `Invalid report IDs: ${invalid.slice(0, 5).join(', ')}`;
+    return { error: `Invalid report IDs: ${invalid.slice(0, 5).join(', ')}` };
   }
-  return null;
+  return { ids: unique };
 }
 
 /**
@@ -150,7 +156,7 @@ router.post('/reports/bulk/assign', async (req, res) => {
   try {
     const { reportIds, volunteerUid, note } = req.body;
 
-    const idErr = validateBulkIds(reportIds);
+    const { error: idErr, ids: uniqueIds } = validateBulkIds(reportIds);
     if (idErr) return res.status(400).json({ success: false, message: idErr });
     if (!volunteerUid || typeof volunteerUid !== 'string') {
       return res.status(400).json({ success: false, message: 'volunteerUid is required' });
@@ -161,7 +167,7 @@ router.post('/reports/bulk/assign', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Volunteer not found or not a volunteer role' });
     }
 
-    const objectIds = reportIds.map(id => new mongoose.Types.ObjectId(id));
+    const objectIds = uniqueIds.map(id => new mongoose.Types.ObjectId(id));
     const existing = await Report.find({ _id: { $in: objectIds } }).select('_id status').lean();
     const existingMap = Object.fromEntries(existing.map(r => [r._id.toString(), r]));
 
@@ -169,7 +175,7 @@ router.post('/reports/bulk/assign', async (req, res) => {
     const failed = [];
 
     const bulkOps = [];
-    for (const id of reportIds) {
+    for (const id of uniqueIds) {
       const report = existingMap[id];
       if (!report) {
         failed.push({ id, reason: 'Report not found' });
@@ -196,12 +202,12 @@ router.post('/reports/bulk/assign', async (req, res) => {
       entityType: 'report',
       entityId: 'bulk',
       metadata: {
-        countRequested: reportIds.length,
+        countRequested: uniqueIds.length,
         countSucceeded: succeeded.length,
         countFailed: failed.length,
         volunteerUid,
         volunteerName: volunteer.name || null,
-        firstNReportIds: reportIds.slice(0, 20),
+        firstNReportIds: uniqueIds.slice(0, 20),
       },
     });
 
@@ -220,7 +226,7 @@ router.post('/reports/bulk/status', async (req, res) => {
   try {
     const { reportIds, status } = req.body;
 
-    const idErr = validateBulkIds(reportIds);
+    const { error: idErr, ids: uniqueIds } = validateBulkIds(reportIds);
     if (idErr) return res.status(400).json({ success: false, message: idErr });
     if (!status || !VALID_STATUSES_BULK.includes(status)) {
       return res.status(400).json({
@@ -229,17 +235,14 @@ router.post('/reports/bulk/status', async (req, res) => {
       });
     }
 
-    // Allowed transitions: prevent jumping from resolved/rejected to in-progress states arbitrarily
-    const BLOCKED_FROM = {
-      pending:     [],
-      verified:    [],
-      assigned:    [],
-      in_progress: [],
-      resolved:    ['pending', 'verified'],   // resolved → active re-open blocked
-      rejected:    [],
+    // Keyed by CURRENT status: lists of target statuses that are NOT allowed.
+    // Prevents re-opening resolved/rejected reports into active workflow states.
+    const BLOCKED_TRANSITIONS = {
+      resolved: ['pending', 'verified', 'assigned', 'in_progress'],
+      rejected: ['pending', 'verified', 'assigned', 'in_progress'],
     };
 
-    const objectIds = reportIds.map(id => new mongoose.Types.ObjectId(id));
+    const objectIds = uniqueIds.map(id => new mongoose.Types.ObjectId(id));
     const existing = await Report.find({ _id: { $in: objectIds } }).select('_id status').lean();
     const existingMap = Object.fromEntries(existing.map(r => [r._id.toString(), r]));
 
@@ -247,7 +250,7 @@ router.post('/reports/bulk/status', async (req, res) => {
     const failed = [];
     const bulkOps = [];
 
-    for (const id of reportIds) {
+    for (const id of uniqueIds) {
       const report = existingMap[id];
       if (!report) {
         failed.push({ id, reason: 'Report not found' });
@@ -258,8 +261,8 @@ router.post('/reports/bulk/status', async (req, res) => {
         succeeded.push(id);
         continue;
       }
-      const blocked = BLOCKED_FROM[status] || [];
-      if (blocked.includes(report.status)) {
+      const blockedTargets = BLOCKED_TRANSITIONS[report.status] || [];
+      if (blockedTargets.includes(status)) {
         failed.push({ id, reason: `Transition from '${report.status}' to '${status}' is not allowed` });
         continue;
       }
@@ -286,11 +289,11 @@ router.post('/reports/bulk/status', async (req, res) => {
       entityType: 'report',
       entityId: 'bulk',
       metadata: {
-        countRequested: reportIds.length,
+        countRequested: uniqueIds.length,
         countSucceeded: succeeded.length,
         countFailed: failed.length,
         status,
-        firstNReportIds: reportIds.slice(0, 20),
+        firstNReportIds: uniqueIds.slice(0, 20),
       },
     });
 
@@ -309,15 +312,14 @@ router.post('/reports/bulk/reject', async (req, res) => {
   try {
     const { reportIds, reason } = req.body;
 
-    const idErr = validateBulkIds(reportIds);
+    const { error: idErr, ids: uniqueIds } = validateBulkIds(reportIds);
     if (idErr) return res.status(400).json({ success: false, message: idErr });
     if (!reason || typeof reason !== 'string' || reason.trim().length < 5) {
       return res.status(400).json({ success: false, message: 'reason is required (min 5 characters)' });
     }
 
     const safeReason = reason.trim().slice(0, 500);
-
-    const objectIds = reportIds.map(id => new mongoose.Types.ObjectId(id));
+    const objectIds = uniqueIds.map(id => new mongoose.Types.ObjectId(id));
     const existing = await Report.find({ _id: { $in: objectIds } }).select('_id status').lean();
     const existingMap = Object.fromEntries(existing.map(r => [r._id.toString(), r]));
 
@@ -325,14 +327,7 @@ router.post('/reports/bulk/reject', async (req, res) => {
     const failed = [];
     const bulkOps = [];
 
-    for (const id of reportIds) {
-      const report = existingMap[id];
-      if (!report) {
-        failed.push({ id, reason: 'Report not found' });
-        continue;
-      }
-      if (report.status === 'resolved') {
-        failed.push({ id, reason: 'Cannot reject an already resolved report' });
+    for (const id of uniqueIds) {
         continue;
       }
       bulkOps.push({
@@ -358,11 +353,11 @@ router.post('/reports/bulk/reject', async (req, res) => {
       entityType: 'report',
       entityId: 'bulk',
       metadata: {
-        countRequested: reportIds.length,
+        countRequested: uniqueIds.length,
         countSucceeded: succeeded.length,
         countFailed: failed.length,
         reason: safeReason.slice(0, 100),
-        firstNReportIds: reportIds.slice(0, 20),
+        firstNReportIds: uniqueIds.slice(0, 20),
       },
     });
 
@@ -385,10 +380,10 @@ router.post('/reports/bulk/export', async (req, res) => {
     let reports;
 
     if (Array.isArray(reportIds) && reportIds.length > 0) {
-      // Validate IDs
-      const idErr = validateBulkIds(reportIds);
+      // Validate and deduplicate IDs
+      const { error: idErr, ids: uniqueIds } = validateBulkIds(reportIds);
       if (idErr) return res.status(400).json({ success: false, message: idErr });
-      const objectIds = reportIds.map(id => new mongoose.Types.ObjectId(id));
+      const objectIds = uniqueIds.map(id => new mongoose.Types.ObjectId(id));
       reports = await Report.find({ _id: { $in: objectIds } }).sort({ createdAt: -1 }).lean();
     } else if (filters && typeof filters === 'object') {
       const filter = {};
@@ -405,9 +400,24 @@ router.post('/reports/bulk/export', async (req, res) => {
         if (urgencies.length) filter.urgency = { $in: urgencies };
       }
       if (filters.dateFrom || filters.dateTo) {
-        filter.createdAt = {};
-        if (filters.dateFrom) filter.createdAt.$gte = new Date(String(filters.dateFrom));
-        if (filters.dateTo)   filter.createdAt.$lte = new Date(String(filters.dateTo));
+        const createdAtFilter = {};
+        if (filters.dateFrom) {
+          const fromDate = new Date(String(filters.dateFrom));
+          if (isNaN(fromDate.getTime())) {
+            return res.status(400).json({ success: false, message: 'Invalid dateFrom filter' });
+          }
+          createdAtFilter.$gte = fromDate;
+        }
+        if (filters.dateTo) {
+          const toDate = new Date(String(filters.dateTo));
+          if (isNaN(toDate.getTime())) {
+            return res.status(400).json({ success: false, message: 'Invalid dateTo filter' });
+          }
+          createdAtFilter.$lte = toDate;
+        }
+        if (Object.keys(createdAtFilter).length > 0) {
+          filter.createdAt = createdAtFilter;
+        }
       }
       if (filters.q && String(filters.q).trim()) {
         const escaped = String(filters.q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

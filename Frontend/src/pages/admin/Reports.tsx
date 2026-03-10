@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef, useTransition } from "react";
-import { Download } from "lucide-react";
 import { AdminTopbar } from "@/components/admin/Topbar";
 import { ReportsTable } from "@/components/admin/ReportsTable";
 import { ReportDrawer } from "@/components/admin/ReportDrawer";
@@ -182,7 +181,7 @@ export default function AdminReports() {
       title: `${actionLabel} complete`,
       description: (
         <BulkResultSummary result={result} action={actionLabel} />
-      ) as unknown as string,
+      ),
       variant: result.failed.length > 0 ? "destructive" : "default",
       duration: 6000,
     });
@@ -201,7 +200,22 @@ export default function AdminReports() {
 
   // ── Bulk action handlers ──────────────────────────────────────────
 
+  const MAX_BULK_UI = 200;
+
+  function guardBulkSize(): boolean {
+    if (selectedIds.size > MAX_BULK_UI) {
+      toast({
+        title: "Too many selected",
+        description: `Select at most ${MAX_BULK_UI} reports at a time. Currently ${selectedIds.size} selected.`,
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  }
+
   async function handleBulkAssign(volunteerUid: string, note: string) {
+    if (!guardBulkSize()) return;
     setBulkLoading(true);
     try {
       const ids = Array.from(selectedIds);
@@ -217,6 +231,7 @@ export default function AdminReports() {
   }
 
   async function handleBulkStatus(status: ReportStatus) {
+    if (!guardBulkSize()) return;
     setBulkLoading(true);
     try {
       const ids = Array.from(selectedIds);
@@ -232,6 +247,7 @@ export default function AdminReports() {
   }
 
   async function handleBulkReject(reason: string) {
+    if (!guardBulkSize()) return;
     setBulkLoading(true);
     try {
       const ids = Array.from(selectedIds);
@@ -247,6 +263,7 @@ export default function AdminReports() {
   }
 
   async function handleExportSelected() {
+    if (!guardBulkSize()) return;
     setBulkLoading(true);
     try {
       await bulkExportReports({ reportIds: Array.from(selectedIds) });

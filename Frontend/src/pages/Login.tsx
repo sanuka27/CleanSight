@@ -35,6 +35,10 @@ const Login = () => {
       // Ensure backend profile is loaded before navigating
       await refreshAppUser();
 
+      // A suspended account causes refreshAppUser to force a sign-out (403)
+      // without throwing. Guard against navigating after a forced logout.
+      if (!auth.currentUser) return;
+
       toast.success("Welcome back!");
       navigate("/dashboard");
     } catch (error: unknown) {

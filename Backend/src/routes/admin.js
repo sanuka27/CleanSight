@@ -121,6 +121,370 @@ router.get('/reports', async (req, res) => {
   }
 });
 
+/* ═══════════════════════════════════════════════════════════════════
+   BULK REPORT ACTIONS
+═══════════════════════════════════════════════════════════════════ */
+
+const MAX_BULK = 200;
+const VALID_STATUSES_BULK = ['pending', 'verified', 'assigned', 'in_progress', 'resolved', 'rejected'];
+
+function validateBulkIds(reportIds) {
+  if (!Array.isArray(reportIds) || reportIds.length === 0) {
+    return 'reportIds must be a non-empty array';
+  }
+  if (reportIds.length > MAX_BULK) {
+    return `reportIds must not exceed ${MAX_BULK} items`;
+  }
+  const invalid = reportIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+  if (invalid.length > 0) {
+    return `Invalid report IDs: ${invalid.slice(0, 5).join(', ')}`;
+  }
+  return null;
+}
+
+/**
+ * POST /api/admin/reports/bulk/assign
+ * Bulk assign reports to a volunteer.
+ */
+router.post('/reports/bulk/assign', async (req, res) => {
+  try {
+    const { reportIds, volunteerUid, note } = req.body;
+
+    const idErr = validateBulkIds(reportIds);
+    if (idErr) return res.status(400).json({ success: false, message: idErr });
+    if (!volunteerUid || typeof volunteerUid !== 'string') {
+      return res.status(400).json({ success: false, message: 'volunteerUid is required' });
+    }
+
+    const volunteer = await User.findOne({ firebaseUid: String(volunteerUid), role: 'volunteer' });
+    if (!volunteer) {
+      return res.status(404).json({ success: false, message: 'Volunteer not found or not a volunteer role' });
+    }
+
+    const objectIds = reportIds.map(id => new mongoose.Types.ObjectId(id));
+    const existing = await Report.find({ _id: { $in: objectIds } }).select('_id status').lean();
+    const existingMap = Object.fromEntries(existing.map(r => [r._id.toString(), r]));
+
+    const succeeded = [];
+    const failed = [];
+
+    const bulkOps = [];
+    for (const id of reportIds) {
+      const report = existingMap[id];
+      if (!report) {
+        failed.push({ id, reason: 'Report not found' });
+        continue;
+      }
+      if (report.status === 'resolved' || report.status === 'rejected') {
+        failed.push({ id, reason: `Cannot assign a ${report.status} report` });
+        continue;
+      }
+      const $set = { assignedTo: volunteerUid, status: 'assigned', updatedAt: new Date() };
+      if (note) $set.adminNote = String(note).slice(0, 1000);
+      bulkOps.push({ updateOne: { filter: { _id: new mongoose.Types.ObjectId(id) }, update: { $set, $unset: { rejectionReason: '' } } } });
+      succeeded.push(id);
+    }
+
+    if (bulkOps.length > 0) {
+      await Report.bulkWrite(bulkOps, { ordered: false });
+    }
+
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'REPORTS_BULK_ASSIGNED',
+      entityType: 'report',
+      entityId: 'bulk',
+      metadata: {
+        countRequested: reportIds.length,
+        countSucceeded: succeeded.length,
+        countFailed: failed.length,
+        volunteerUid,
+        volunteerName: volunteer.name || null,
+        firstNReportIds: reportIds.slice(0, 20),
+      },
+    });
+
+    res.json({ success: true, updatedCount: succeeded.length, failed });
+  } catch (err) {
+    console.error('Bulk assign error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/reports/bulk/status
+ * Bulk update report status.
+ */
+router.post('/reports/bulk/status', async (req, res) => {
+  try {
+    const { reportIds, status } = req.body;
+
+    const idErr = validateBulkIds(reportIds);
+    if (idErr) return res.status(400).json({ success: false, message: idErr });
+    if (!status || !VALID_STATUSES_BULK.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `status must be one of: ${VALID_STATUSES_BULK.join(', ')}`,
+      });
+    }
+
+    // Allowed transitions: prevent jumping from resolved/rejected to in-progress states arbitrarily
+    const BLOCKED_FROM = {
+      pending:     [],
+      verified:    [],
+      assigned:    [],
+      in_progress: [],
+      resolved:    ['pending', 'verified'],   // resolved → active re-open blocked
+      rejected:    [],
+    };
+
+    const objectIds = reportIds.map(id => new mongoose.Types.ObjectId(id));
+    const existing = await Report.find({ _id: { $in: objectIds } }).select('_id status').lean();
+    const existingMap = Object.fromEntries(existing.map(r => [r._id.toString(), r]));
+
+    const succeeded = [];
+    const failed = [];
+    const bulkOps = [];
+
+    for (const id of reportIds) {
+      const report = existingMap[id];
+      if (!report) {
+        failed.push({ id, reason: 'Report not found' });
+        continue;
+      }
+      if (report.status === status) {
+        // Already at target status — count as success (idempotent)
+        succeeded.push(id);
+        continue;
+      }
+      const blocked = BLOCKED_FROM[status] || [];
+      if (blocked.includes(report.status)) {
+        failed.push({ id, reason: `Transition from '${report.status}' to '${status}' is not allowed` });
+        continue;
+      }
+
+      const $set = { status, updatedAt: new Date() };
+      const $unset = {};
+      if (status === 'resolved') $set.resolvedAt = new Date();
+      else $unset.resolvedAt = '';
+      if (status !== 'rejected') $unset.rejectionReason = '';
+
+      const update = Object.keys($unset).length ? { $set, $unset } : { $set };
+      bulkOps.push({ updateOne: { filter: { _id: new mongoose.Types.ObjectId(id) }, update } });
+      succeeded.push(id);
+    }
+
+    if (bulkOps.length > 0) {
+      await Report.bulkWrite(bulkOps, { ordered: false });
+    }
+
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'REPORTS_BULK_STATUS_UPDATED',
+      entityType: 'report',
+      entityId: 'bulk',
+      metadata: {
+        countRequested: reportIds.length,
+        countSucceeded: succeeded.length,
+        countFailed: failed.length,
+        status,
+        firstNReportIds: reportIds.slice(0, 20),
+      },
+    });
+
+    res.json({ success: true, updatedCount: succeeded.length, failed });
+  } catch (err) {
+    console.error('Bulk status error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/reports/bulk/reject
+ * Bulk reject reports with a required reason.
+ */
+router.post('/reports/bulk/reject', async (req, res) => {
+  try {
+    const { reportIds, reason } = req.body;
+
+    const idErr = validateBulkIds(reportIds);
+    if (idErr) return res.status(400).json({ success: false, message: idErr });
+    if (!reason || typeof reason !== 'string' || reason.trim().length < 5) {
+      return res.status(400).json({ success: false, message: 'reason is required (min 5 characters)' });
+    }
+
+    const safeReason = reason.trim().slice(0, 500);
+
+    const objectIds = reportIds.map(id => new mongoose.Types.ObjectId(id));
+    const existing = await Report.find({ _id: { $in: objectIds } }).select('_id status').lean();
+    const existingMap = Object.fromEntries(existing.map(r => [r._id.toString(), r]));
+
+    const succeeded = [];
+    const failed = [];
+    const bulkOps = [];
+
+    for (const id of reportIds) {
+      const report = existingMap[id];
+      if (!report) {
+        failed.push({ id, reason: 'Report not found' });
+        continue;
+      }
+      if (report.status === 'resolved') {
+        failed.push({ id, reason: 'Cannot reject an already resolved report' });
+        continue;
+      }
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: new mongoose.Types.ObjectId(id) },
+          update: {
+            $set: { status: 'rejected', rejectionReason: safeReason, updatedAt: new Date() },
+            $unset: { resolvedAt: '' },
+          },
+        },
+      });
+      succeeded.push(id);
+    }
+
+    if (bulkOps.length > 0) {
+      await Report.bulkWrite(bulkOps, { ordered: false });
+    }
+
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'REPORTS_BULK_REJECTED',
+      entityType: 'report',
+      entityId: 'bulk',
+      metadata: {
+        countRequested: reportIds.length,
+        countSucceeded: succeeded.length,
+        countFailed: failed.length,
+        reason: safeReason.slice(0, 100),
+        firstNReportIds: reportIds.slice(0, 20),
+      },
+    });
+
+    res.json({ success: true, updatedCount: succeeded.length, failed });
+  } catch (err) {
+    console.error('Bulk reject error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/reports/bulk/export
+ * Export selected reports as CSV (file download).
+ * Body: { reportIds: [...] } OR { filters: { status, wasteType, urgency, q, dateFrom, dateTo } }
+ */
+router.post('/reports/bulk/export', async (req, res) => {
+  try {
+    const { reportIds, filters } = req.body;
+
+    let reports;
+
+    if (Array.isArray(reportIds) && reportIds.length > 0) {
+      // Validate IDs
+      const idErr = validateBulkIds(reportIds);
+      if (idErr) return res.status(400).json({ success: false, message: idErr });
+      const objectIds = reportIds.map(id => new mongoose.Types.ObjectId(id));
+      reports = await Report.find({ _id: { $in: objectIds } }).sort({ createdAt: -1 }).lean();
+    } else if (filters && typeof filters === 'object') {
+      const filter = {};
+      if (filters.status) {
+        const statuses = String(filters.status).split(',').map(s => s.trim()).filter(Boolean);
+        if (statuses.length) filter.status = { $in: statuses };
+      }
+      if (filters.wasteType) {
+        const types = String(filters.wasteType).split(',').map(s => s.trim()).filter(Boolean);
+        if (types.length) filter.wasteType = { $in: types };
+      }
+      if (filters.urgency) {
+        const urgencies = String(filters.urgency).split(',').map(s => s.trim()).filter(Boolean);
+        if (urgencies.length) filter.urgency = { $in: urgencies };
+      }
+      if (filters.dateFrom || filters.dateTo) {
+        filter.createdAt = {};
+        if (filters.dateFrom) filter.createdAt.$gte = new Date(String(filters.dateFrom));
+        if (filters.dateTo)   filter.createdAt.$lte = new Date(String(filters.dateTo));
+      }
+      if (filters.q && String(filters.q).trim()) {
+        const escaped = String(filters.q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const rx = new RegExp(escaped, 'i');
+        filter.$or = [{ title: rx }, { description: rx }];
+      }
+      reports = await Report.find(filter).sort({ createdAt: -1 }).limit(5000).lean();
+    } else {
+      return res.status(400).json({ success: false, message: 'Provide reportIds or filters' });
+    }
+
+    // Enrich with basic reporter info
+    const uids = [...new Set(reports.map(r => r.firebaseUid))];
+    const users = await User.find({ firebaseUid: { $in: uids } }).select('firebaseUid name email').lean();
+    const userMap = Object.fromEntries(users.map(u => [u.firebaseUid, u]));
+
+    // Build CSV
+    const headers = ['id', 'title', 'description', 'status', 'wasteType', 'urgency',
+      'lat', 'lng', 'reporterName', 'reporterEmail', 'assignedTo', 'rejectionReason',
+      'createdAt', 'updatedAt', 'resolvedAt'];
+
+    function escapeCsv(val) {
+      const str = String(val ?? '');
+      // Mitigate CSV formula injection
+      const safe = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+      if (safe.includes(',') || safe.includes('"') || safe.includes('\n')) {
+        return `"${safe.replace(/"/g, '""')}"`;
+      }
+      return safe;
+    }
+
+    const rows = reports.map(r => {
+      const reporter = userMap[r.firebaseUid] || {};
+      return [
+        r._id.toString(),
+        r.title || '',
+        r.description,
+        r.status,
+        r.wasteType,
+        r.urgency,
+        r.location?.coordinates?.[1] ?? '',
+        r.location?.coordinates?.[0] ?? '',
+        reporter.name || '',
+        reporter.email || '',
+        r.assignedTo || '',
+        r.rejectionReason || '',
+        r.createdAt ? new Date(r.createdAt).toISOString() : '',
+        r.updatedAt ? new Date(r.updatedAt).toISOString() : '',
+        r.resolvedAt ? new Date(r.resolvedAt).toISOString() : '',
+      ].map(escapeCsv).join(',');
+    });
+
+    const csv = [headers.map(escapeCsv).join(','), ...rows].join('\n');
+
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'REPORTS_BULK_EXPORTED',
+      entityType: 'report',
+      entityId: 'bulk',
+      metadata: {
+        countExported: reports.length,
+        exportedByIds: Array.isArray(reportIds) && reportIds.length > 0,
+        firstNReportIds: (reportIds || []).slice(0, 20),
+      },
+    });
+
+    const filename = `reports-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    console.error('Bulk export error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 /**
  * GET /api/admin/reports/:id
  * Full report details with reporter info.

@@ -1,4 +1,5 @@
 import { memo, useCallback } from "react";
+import type { MouseEvent } from "react";
 import {
   MoreHorizontal,
   Eye,
@@ -95,7 +96,7 @@ const ReportRow = memo(function ReportRow({
 }) {
   const handleRowClick = useCallback(() => onView(report), [onView, report]);
   const handleCheckboxClick = useCallback(
-    (e: React.MouseEvent) => { e.stopPropagation(); onToggleSelect(report._id); },
+    (e: MouseEvent) => { e.stopPropagation(); onToggleSelect(report._id); },
     [onToggleSelect, report._id]
   );
   const handleCheckboxChange = useCallback(
@@ -256,8 +257,7 @@ export function ReportsTable({
               <tr className="bg-muted/40 border-b border-border/60">
                 <th className="px-3 py-3 w-10">
                   <Checkbox
-                    checked={allOnPageSelected}
-                    data-indeterminate={someOnPageSelected}
+                    checked={someOnPageSelected ? "indeterminate" : allOnPageSelected}
                     onCheckedChange={onToggleSelectAll}
                     aria-label="Select all on page"
                     className="translate-y-0.5"

@@ -88,6 +88,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const markSigningIn = useCallback(() => {
     signingInRef.current = true;
+    setSuspendedMessage(null);
     // Safety: auto-clear after 60 s so a crashed flow can't leave the flag stuck.
     setTimeout(() => { signingInRef.current = false; }, 60_000);
   }, []);
@@ -108,6 +109,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         setAppUser(newUser);
         prevRoleRef.current = newUser.role;
+        setSuspendedMessage(null);
         
         // Profile found — any in-progress sign-in flow is complete.
         signingInRef.current = false;
@@ -238,6 +240,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setUser(null);
       setAppUser(null);
       setAppUserError(null);
+      setSuspendedMessage(null);
     } catch (error) {
       console.error("Error signing out:", error);
       throw error;

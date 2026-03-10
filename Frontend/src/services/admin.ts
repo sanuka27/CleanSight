@@ -13,6 +13,10 @@ import type {
   DateRange,
   AuditLog,
   AuditLogFilters,
+  AdminUser,
+  AdminUserDetail,
+  UserFilters,
+  AppRole,
 } from "@/types/admin";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -203,21 +207,6 @@ export async function updateSettings(
   });
 }
 
-// ── Users ────────────────────────────────────────────────────────────
-
-export async function listAdminUsers(params: {
-  page?: number;
-  limit?: number;
-  role?: string;
-  search?: string;
-}): Promise<PaginatedResponse<unknown>> {
-  const q = new URLSearchParams();
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
-  });
-  return adminFetch(`/users?${q.toString()}`);
-}
-
 // ── Audit Log ────────────────────────────────────────────────────────
 
 export async function listAuditLogs(filters: AuditLogFilters = {}): Promise<PaginatedResponse<AuditLog>> {
@@ -230,4 +219,62 @@ export async function listAuditLogs(filters: AuditLogFilters = {}): Promise<Pagi
 
 export async function getAuditLog(id: string): Promise<{ success: boolean; data: AuditLog }> {
   return adminFetch(`/audit-logs/${id}`);
+}
+
+// ── User Management ──────────────────────────────────────────────────
+
+export async function listAdminUsers(
+  filters: UserFilters = {}
+): Promise<PaginatedResponse<AdminUser>> {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
+  });
+  return adminFetch(`/users?${params.toString()}`);
+}
+
+export async function getAdminUserDetail(
+  id: string
+): Promise<{ success: boolean; data: AdminUserDetail }> {
+  return adminFetch(`/users/${id}`);
+}
+
+export async function updateUserRole(
+  id: string,
+  role: AppRole
+): Promise<{ success: boolean; data: AdminUser }> {
+  return adminFetch(`/users/${id}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function updateUserSuspension(
+  id: string,
+  isSuspended: boolean,
+  reason?: string
+): Promise<{ success: boolean; data: AdminUser }> {
+  return adminFetch(`/users/${id}/suspend`, {
+    method: "PATCH",
+    body: JSON.stringify({ isSuspended, reason }),
+  });
+}
+
+export async function getAdminUserReports(
+  id: string,
+  page = 1,
+  limit = 20,
+  status?: string
+): Promise<PaginatedResponse<AdminReport>> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (status) params.set("status", status);
+  return adminFetch(`/users/${id}/reports?${params.toString()}`);
+}
+
+export async function getAdminUserTasks(
+  id: string,
+  page = 1,
+  limit = 20
+): Promise<PaginatedResponse<AdminReport>> {
+  return adminFetch(`/users/${id}/tasks?page=${page}&limit=${limit}`);
 }

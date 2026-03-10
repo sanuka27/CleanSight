@@ -869,36 +869,314 @@ router.put('/settings', async (req, res) => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════
-   USERS (admin user list)
+   USER MANAGEMENT (admin-only)
 ═══════════════════════════════════════════════════════════════════ */
+
+// Safe fields projection - never return sensitive internal data
+const USER_SAFE_FIELDS =
+  'firebaseUid name email role avatar phone isVerified isSuspended suspendedReason suspendedAt reportsSubmitted cleanupsCompleted createdAt updatedAt';
+
+const VALID_ROLES = ['citizen', 'volunteer', 'staff', 'admin'];
 
 /**
  * GET /api/admin/users
+ * Query: q (search), role, status (active|suspended), sort (newest|oldest|name), page, limit
  */
 router.get('/users', async (req, res) => {
   try {
-    const { page = 1, limit = 20, role, search } = req.query;
+    const { q, role, status, sort = 'newest', page = 1, limit = 20 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     const filter = {};
 
-    if (role) filter.role = String(role);
-    if (search && String(search).trim()) {
-      const rx = new RegExp(String(search).trim(), 'i');
+    if (role && VALID_ROLES.includes(String(role))) {
+      filter.role = String(role);
+    }
+    if (status === 'suspended') filter.isSuspended = true;
+    if (status === 'active')    filter.isSuspended = { $ne: true };
+
+    if (q && String(q).trim()) {
+      const escaped = String(q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(escaped, 'i');
       filter.$or = [{ name: rx }, { email: rx }];
     }
 
+    const sortMap = {
+      newest: { createdAt: -1 },
+      oldest: { createdAt: 1 },
+      name:   { name: 1 },
+    };
+    const sortKey = sortMap[String(sort)] || sortMap.newest;
+
     const [users, total] = await Promise.all([
-      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+      User.find(filter)
+        .select(USER_SAFE_FIELDS)
+        .sort(sortKey)
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
       User.countDocuments(filter),
     ]);
 
     res.json({
       success: true,
       data: users,
-      pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) },
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (err) {
-    console.error('Admin get users error:', err);
+    console.error('Admin list users error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/users/:id
+ * Returns user profile + stats (reports count, tasks count, last activity)
+ */
+router.get('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(id).select(USER_SAFE_FIELDS).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const [reportsCount, tasksCount, lastReport] = await Promise.all([
+      Report.countDocuments({ firebaseUid: user.firebaseUid }),
+      user.role === 'volunteer'
+        ? Report.countDocuments({ assignedTo: user.firebaseUid, status: 'resolved' })
+        : Promise.resolve(null),
+      Report.findOne({ firebaseUid: user.firebaseUid })
+        .sort({ createdAt: -1 })
+        .select('createdAt')
+        .lean(),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        user,
+        stats: {
+          reportsSubmitted: reportsCount,
+          tasksCompleted: tasksCount,
+          lastActivity: lastReport?.createdAt || user.updatedAt,
+        },
+      },
+    });
+  } catch (err) {
+    console.error('Admin get user error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * PATCH /api/admin/users/:id/role
+ * Body: { role: "citizen"|"volunteer"|"staff"|"admin" }
+ * Prevents self-demotion lockout (last admin cannot demote themselves).
+ */
+router.patch('/users/:id/role', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!role || !VALID_ROLES.includes(String(role))) {
+      return res.status(400).json({ success: false, message: 'Invalid role. Must be one of: ' + VALID_ROLES.join(', ') });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
+    const target = await User.findById(id);
+    if (!target) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Prevent self-demotion lockout: admin trying to remove their own admin role
+    if (
+      target.firebaseUid === req.adminUser.firebaseUid &&
+      target.role === 'admin' &&
+      String(role) !== 'admin'
+    ) {
+      const otherAdminCount = await User.countDocuments({
+        role: 'admin',
+        _id: { $ne: target._id },
+      });
+      if (otherAdminCount === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot demote yourself — you are the only admin. Promote another user first.',
+        });
+      }
+    }
+
+    const oldRole = target.role;
+    target.role = String(role);
+    target.updatedByUid = req.adminUser.firebaseUid;
+    await target.save();
+
+    await logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'USER_ROLE_CHANGED',
+      entityType: 'user',
+      entityId: target._id.toString(),
+      metadata: { targetEmail: target.email, targetUid: target.firebaseUid, oldRole, newRole: String(role) },
+    });
+
+    const safeUser = await User.findById(target._id).select(USER_SAFE_FIELDS).lean();
+    res.json({ success: true, data: safeUser });
+  } catch (err) {
+    console.error('Admin update user role error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * PATCH /api/admin/users/:id/suspend
+ * Body: { isSuspended: boolean, reason?: string }
+ */
+router.patch('/users/:id/suspend', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isSuspended, reason } = req.body;
+
+    if (typeof isSuspended !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'isSuspended must be a boolean' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
+    const target = await User.findById(id);
+    if (!target) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Cannot suspend your own account
+    if (target.firebaseUid === req.adminUser.firebaseUid) {
+      return res.status(400).json({ success: false, message: 'Cannot suspend your own account.' });
+    }
+
+    target.isSuspended    = isSuspended;
+    target.suspendedReason = isSuspended ? (reason ? String(reason).slice(0, 500) : null) : null;
+    target.suspendedAt    = isSuspended ? new Date() : null;
+    target.updatedByUid   = req.adminUser.firebaseUid;
+    await target.save();
+
+    await logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: isSuspended ? 'USER_SUSPENDED' : 'USER_UNSUSPENDED',
+      entityType: 'user',
+      entityId: target._id.toString(),
+      metadata: {
+        targetEmail: target.email,
+        targetUid: target.firebaseUid,
+        isSuspended,
+        reason: reason || null,
+      },
+    });
+
+    const safeUser = await User.findById(target._id).select(USER_SAFE_FIELDS).lean();
+    res.json({ success: true, data: safeUser });
+  } catch (err) {
+    console.error('Admin suspend user error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/users/:id/reports
+ * Paginated report history for a user.
+ */
+router.get('/users/:id/reports', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 20, status } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(id).select('firebaseUid').lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const filter = { firebaseUid: user.firebaseUid };
+    if (status) {
+      const validStatuses = ['pending', 'verified', 'assigned', 'in_progress', 'resolved', 'rejected'];
+      if (validStatuses.includes(String(status))) filter.status = String(status);
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const [reports, total] = await Promise.all([
+      Report.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Report.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      data: reports,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (err) {
+    console.error('Admin get user reports error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/users/:id/tasks
+ * Volunteer task (assigned report) history.
+ */
+router.get('/users/:id/tasks', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(id).select('firebaseUid role').lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (user.role !== 'volunteer') {
+      return res.status(400).json({ success: false, message: 'Task history is only available for volunteers.' });
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const [tasks, total] = await Promise.all([
+      Report.find({ assignedTo: user.firebaseUid })
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Report.countDocuments({ assignedTo: user.firebaseUid }),
+    ]);
+
+    res.json({
+      success: true,
+      data: tasks,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (err) {
+    console.error('Admin get user tasks error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

@@ -35,6 +35,8 @@ interface AuthContextType {
   appUserError: string | null;
   /** True when authenticated but no backend profile exists yet (needs onboarding). */
   needsOnboarding: boolean;
+  /** Set when a forced logout is triggered by account suspension. */
+  suspendedMessage: string | null;
   logout: () => Promise<void>;
   refreshAppUser: () => Promise<void>;
   /**
@@ -65,6 +67,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAppUserLoading, setIsAppUserLoading] = useState(false);
   const [appUserError, setAppUserError] = useState<string | null>(null);
+  const [suspendedMessage, setSuspendedMessage] = useState<string | null>(null);
 
   /**
    * When true, a sign-in / sign-up handler is actively running.
@@ -85,6 +88,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const markSigningIn = useCallback(() => {
     signingInRef.current = true;
+    setSuspendedMessage(null);
     // Safety: auto-clear after 60 s so a crashed flow can't leave the flag stuck.
     setTimeout(() => { signingInRef.current = false; }, 60_000);
   }, []);
@@ -105,6 +109,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         setAppUser(newUser);
         prevRoleRef.current = newUser.role;
+        setSuspendedMessage(null);
         
         // Profile found — any in-progress sign-in flow is complete.
         signingInRef.current = false;
@@ -121,6 +126,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (err.status === 401 || err.status === 403) {
           if (isDev) {
             console.log(`[AuthContext] Auth error ${err.status}, forcing logout`);
+          }
+          // Check for account suspension specifically
+          if (err.status === 403 && err.message?.toLowerCase().includes('suspended')) {
+            setSuspendedMessage('Your account has been suspended. Please contact an administrator.');
           }
           // Clear both user states immediately so needsOnboarding never
           // becomes true during the sign-out transition (before
@@ -231,6 +240,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setUser(null);
       setAppUser(null);
       setAppUserError(null);
+      setSuspendedMessage(null);
     } catch (error) {
       console.error("Error signing out:", error);
       throw error;
@@ -249,6 +259,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     isAppUserLoading,
     appUserError,
     needsOnboarding,
+    suspendedMessage,
     logout,
     refreshAppUser,
     markSigningIn,

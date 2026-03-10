@@ -36,6 +36,7 @@ const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminOverview = lazy(() => import("./pages/admin/Overview"));
 const AdminReports = lazy(() => import("./pages/admin/Reports"));
 const AdminVolunteers = lazy(() => import("./pages/admin/Volunteers"));
+const AdminUsers = lazy(() => import("./pages/admin/Users"));
 const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
 const AdminDocuments = lazy(() => import("./pages/admin/Documents"));
 const AdminSettings = lazy(() => import("./pages/admin/Settings"));
@@ -120,6 +121,7 @@ const AnimatedRoutes = () => {
             <Route path="overview" element={<AdminOverview />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="volunteers" element={<AdminVolunteers />} />
+            <Route path="users" element={<AdminUsers />} />
             <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="documents" element={<AdminDocuments />} />
             <Route path="audit-log" element={<AdminAuditLog />} />

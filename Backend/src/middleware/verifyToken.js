@@ -26,7 +26,16 @@ export const verifyToken = async (req, res, next) => {
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
 
     // Look up the user in the database to check suspension and attach full profile
-    const dbUser = await User.findOne({ firebaseUid: decodedToken.uid }).lean();
+    let dbUser;
+    try {
+      dbUser = await User.findOne({ firebaseUid: decodedToken.uid }).lean();
+    } catch (dbErr) {
+      console.error('Database lookup error in verifyToken:', dbErr);
+      return res.status(500).json({
+        success: false,
+        message: 'Service temporarily unavailable. Please try again.',
+      });
+    }
 
     // If user exists and is suspended, block access
     if (dbUser && dbUser.isSuspended) {

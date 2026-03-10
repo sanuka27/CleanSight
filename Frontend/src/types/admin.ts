@@ -236,3 +236,43 @@ export interface AuditLogFilters {
   dateTo?: string;
   search?: string;
 }
+
+// ── User Management ──────────────────────────────────────────────────
+
+export interface AdminUser {
+  _id: string;
+  firebaseUid: string;
+  name: string;
+  email: string;
+  role: AppRole;
+  avatar: string | null;
+  phone: string | null;
+  isVerified: boolean;
+  isSuspended: boolean;
+  suspendedReason: string | null;
+  suspendedAt: string | null;
+  reportsSubmitted: number;
+  cleanupsCompleted: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminUserStats {
+  reportsSubmitted: number;
+  tasksCompleted: number | null;
+  lastActivity: string | null;
+}
+
+export interface AdminUserDetail {
+  user: AdminUser;
+  stats: AdminUserStats;
+}
+
+export interface UserFilters {
+  q?: string;
+  role?: AppRole | '';
+  status?: 'active' | 'suspended' | '';
+  sort?: 'newest' | 'oldest' | 'name';
+  page?: number;
+  limit?: number;
+}

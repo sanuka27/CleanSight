@@ -23,7 +23,8 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: ['citizen', 'volunteer', 'staff', 'admin'],
-    default: 'citizen'
+    default: 'citizen',
+    index: true
   },
   avatar: {
     type: String,
@@ -36,6 +37,23 @@ const userSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false
+  },
+  isSuspended: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  suspendedReason: {
+    type: String,
+    default: null
+  },
+  suspendedAt: {
+    type: Date,
+    default: null
+  },
+  updatedByUid: {
+    type: String,
+    default: null
   },
   reportsSubmitted: {
     type: Number,

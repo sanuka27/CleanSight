@@ -1,4 +1,5 @@
 import { firebaseAdmin } from '../config/firebaseAdmin.js';
+import User from '../models/User.js';
 
 export const verifyToken = async (req, res, next) => {
   try {
@@ -23,12 +24,24 @@ export const verifyToken = async (req, res, next) => {
 
     // Verify Firebase ID token
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
-    
-    // Attach user info to request
-    req.user = {
-      firebaseUid: decodedToken.uid,
-      email: decodedToken.email,
-    };
+
+    // Look up the user in the database to check suspension and attach full profile
+    const dbUser = await User.findOne({ firebaseUid: decodedToken.uid }).lean();
+
+    // If user exists and is suspended, block access
+    if (dbUser && dbUser.isSuspended) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account suspended',
+        suspended: true,
+      });
+    }
+
+    // Attach user info to request — prefer DB fields but always ensure
+    // firebaseUid and email are present (DB user may not exist yet for /register)
+    req.user = dbUser
+      ? { ...dbUser, firebaseUid: decodedToken.uid, email: decodedToken.email || dbUser.email }
+      : { firebaseUid: decodedToken.uid, email: decodedToken.email };
 
     next();
   } catch (error) {

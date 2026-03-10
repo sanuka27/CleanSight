@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useCallback } from "react";
 import {
   MoreHorizontal,
   Eye,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +44,10 @@ interface ReportsTableProps {
   onStatusFilter: (v: string) => void;
   onWasteTypeFilter: (v: string) => void;
   onUrgencyFilter: (v: string) => void;
+  // Selection
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: () => void;
 }
 
 const STATUS_BADGE: Record<ReportStatus, string> = {
@@ -76,19 +81,125 @@ function SortButton({ field, current, order, onClick }: { field: string; current
   );
 }
 
+// Memoised row to avoid re-rendering the entire table on checkbox toggle
+const ReportRow = memo(function ReportRow({
+  report,
+  isSelected,
+  onToggleSelect,
+  onView,
+}: {
+  report: AdminReport;
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
+  onView: (r: AdminReport) => void;
+}) {
+  const handleRowClick = useCallback(() => onView(report), [onView, report]);
+  const handleCheckboxClick = useCallback(
+    (e: React.MouseEvent) => { e.stopPropagation(); onToggleSelect(report._id); },
+    [onToggleSelect, report._id]
+  );
+  const handleCheckboxChange = useCallback(
+    () => onToggleSelect(report._id),
+    [onToggleSelect, report._id]
+  );
+
+  return (
+    <tr
+      className={cn(
+        "border-b border-border/40 last:border-0 transition-colors cursor-pointer",
+        isSelected ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/30"
+      )}
+      onClick={handleRowClick}
+    >
+      <td className="px-3 py-3" onClick={handleCheckboxClick}>
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={handleCheckboxChange}
+          aria-label={`Select report ${report._id}`}
+          className="translate-y-0.5"
+        />
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3 min-w-0">
+          {report.imageUrl && (
+            <img
+              src={report.imageUrl}
+              alt=""
+              className="w-9 h-9 rounded-lg object-cover shrink-0 border border-border/40"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="font-medium truncate max-w-[200px]">
+              {report.title || report.description.slice(0, 50)}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {report.reporter?.name || report.firebaseUid.slice(0, 8) + "…"}
+            </p>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <Badge className={cn("border font-medium text-xs", STATUS_BADGE[report.status])}>
+          {STATUS_LABELS[report.status]}
+        </Badge>
+      </td>
+      <td className="px-4 py-3">
+        <span className={cn("capitalize text-xs font-medium", WASTE_COLORS[report.wasteType])}>
+          {report.wasteType}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1.5">
+          <div className={cn("w-2 h-2 rounded-full", URGENCY_DOT[report.urgency])} />
+          <span className="text-xs capitalize">{report.urgency}</span>
+        </div>
+      </td>
+      <td className="px-4 py-3 text-xs text-muted-foreground">
+        {new Date(report.createdAt).toLocaleDateString("en-US", {
+          month: "short", day: "numeric",
+        })}
+      </td>
+      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onView(report)}>
+              <Eye className="w-3.5 h-3.5 mr-2" />
+              View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onView(report)}>
+              <UserCheck className="w-3.5 h-3.5 mr-2" />
+              Manage
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </td>
+    </tr>
+  );
+});
+
 export function ReportsTable({
   reports, loading, total, page, pageSize,
   onPageChange, onView,
   sortBy, sortOrder, onSort,
   statusFilter, wasteTypeFilter, urgencyFilter,
   onStatusFilter, onWasteTypeFilter, onUrgencyFilter,
+  selectedIds, onToggleSelect, onToggleSelectAll,
 }: ReportsTableProps) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
+  const allOnPageSelected =
+    reports.length > 0 && reports.every((r) => selectedIds.has(r._id));
+  const someOnPageSelected =
+    reports.some((r) => selectedIds.has(r._id)) && !allOnPageSelected;
 
   return (
     <div className="flex flex-col gap-3">
       {/* Filter bar */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <Select value={statusFilter || "all"} onValueChange={(v) => onStatusFilter(v === "all" ? "" : v)}>
           <SelectTrigger className="h-8 w-36 text-xs">
             <SelectValue placeholder="All Statuses" />
@@ -125,9 +236,16 @@ export function ReportsTable({
           </SelectContent>
         </Select>
 
-        <span className="ml-auto text-xs text-muted-foreground self-center">
-          {total.toLocaleString()} reports
-        </span>
+        <div className="ml-auto flex items-center gap-3">
+          {selectedIds.size > 0 && (
+            <span className="text-xs font-medium text-primary">
+              {selectedIds.size} selected
+            </span>
+          )}
+          <span className="text-xs text-muted-foreground">
+            {total.toLocaleString()} reports
+          </span>
+        </div>
       </div>
 
       {/* Table */}
@@ -136,6 +254,16 @@ export function ReportsTable({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/40 border-b border-border/60">
+                <th className="px-3 py-3 w-10">
+                  <Checkbox
+                    checked={allOnPageSelected}
+                    data-indeterminate={someOnPageSelected}
+                    onCheckedChange={onToggleSelectAll}
+                    aria-label="Select all on page"
+                    className="translate-y-0.5"
+                    disabled={reports.length === 0 || loading}
+                  />
+                </th>
                 <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground w-[35%]">
                   Report
                 </th>
@@ -160,84 +288,26 @@ export function ReportsTable({
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={6} className="text-center py-16">
+                  <td colSpan={7} className="text-center py-16">
                     <div className="inline-block w-7 h-7 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                   </td>
                 </tr>
               )}
               {!loading && reports.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-16 text-muted-foreground text-sm">
+                  <td colSpan={7} className="text-center py-16 text-muted-foreground text-sm">
                     No reports found
                   </td>
                 </tr>
               )}
               {!loading && reports.map((report) => (
-                <tr
+                <ReportRow
                   key={report._id}
-                  className="border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
-                  onClick={() => onView(report)}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {report.imageUrl && (
-                        <img
-                          src={report.imageUrl}
-                          alt=""
-                          className="w-9 h-9 rounded-lg object-cover shrink-0 border border-border/40"
-                        />
-                      )}
-                      <div className="min-w-0">
-                        <p className="font-medium truncate max-w-[200px]">
-                          {report.title || report.description.slice(0, 50)}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {report.reporter?.name || report.firebaseUid.slice(0, 8) + "…"}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge className={cn("border font-medium text-xs", STATUS_BADGE[report.status])}>
-                      {STATUS_LABELS[report.status]}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={cn("capitalize text-xs font-medium", WASTE_COLORS[report.wasteType])}>
-                      {report.wasteType}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className={cn("w-2 h-2 rounded-full", URGENCY_DOT[report.urgency])} />
-                      <span className="text-xs capitalize">{report.urgency}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {new Date(report.createdAt).toLocaleDateString("en-US", {
-                      month: "short", day: "numeric",
-                    })}
-                  </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onView(report)}>
-                          <Eye className="w-3.5 h-3.5 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onView(report)}>
-                          <UserCheck className="w-3.5 h-3.5 mr-2" />
-                          Manage
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
+                  report={report}
+                  isSelected={selectedIds.has(report._id)}
+                  onToggleSelect={onToggleSelect}
+                  onView={onView}
+                />
               ))}
             </tbody>
           </table>

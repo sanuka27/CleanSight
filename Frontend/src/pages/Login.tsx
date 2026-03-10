@@ -22,7 +22,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { refreshAppUser, markSigningIn } = useAuth();
+  const { refreshAppUser, markSigningIn, suspendedMessage } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,6 +168,13 @@ const Login = () => {
               Sign in to continue to your account
             </motion.p>
           </div>
+
+          {/* Suspension Banner */}
+          {suspendedMessage && (
+            <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {suspendedMessage}
+            </div>
+          )}
 
           {/* Form */}
           <motion.form 

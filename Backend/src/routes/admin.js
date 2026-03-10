@@ -1068,7 +1068,7 @@ router.patch('/users/:id/suspend', async (req, res) => {
     await logAdminAction({
       req,
       actor: req.adminUser,
-      action: 'USER_SUSPENDED',
+      action: isSuspended ? 'USER_SUSPENDED' : 'USER_UNSUSPENDED',
       entityType: 'user',
       entityId: target._id.toString(),
       metadata: {
@@ -1150,6 +1150,10 @@ router.get('/users/:id/tasks', async (req, res) => {
 
     const user = await User.findById(id).select('firebaseUid role').lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (user.role !== 'volunteer') {
+      return res.status(400).json({ success: false, message: 'Task history is only available for volunteers.' });
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
     const [tasks, total] = await Promise.all([

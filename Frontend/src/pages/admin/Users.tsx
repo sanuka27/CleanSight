@@ -3,11 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ChevronLeft, ChevronRight, MoreVertical,
   ShieldCheck, UserX, UserCheck, Loader2, X,
-  AlertTriangle, CheckCircle2, Clock, BarChart2,
-  ChevronDown,
+  AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -101,6 +99,10 @@ function FiltersBar({ filters, onChange, total }: FiltersBarProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
+    return () => clearTimeout(debounceRef.current);
+  }, []);
+
+  useEffect(() => {
     setSearch(filters.q || "");
   }, [filters.q]);
 
@@ -190,6 +192,8 @@ function RoleDialog({ user, onClose, onConfirm }: RoleDialogProps) {
     setLoading(true);
     try {
       await onConfirm(role);
+    } catch {
+      // error already handled and toasted by the parent; keep the dialog open
     } finally {
       setLoading(false);
     }
@@ -844,8 +848,8 @@ export default function AdminUsers() {
         {/* Summary badges */}
         <div className="flex flex-wrap gap-2 text-sm">
           {[
-            { label: "All", count: total },
-            { label: "Suspended", count: users.filter(u => u.isSuspended).length, color: "destructive" },
+            { label: "All", count: users.length },
+            { label: "Suspended", count: users.filter(u => u.isSuspended).length },
           ].map(({ label, count }) => (
             <span key={label} className="bg-card border border-border/60 rounded-full px-3 py-1 text-muted-foreground">
               {count} {label.toLowerCase()}

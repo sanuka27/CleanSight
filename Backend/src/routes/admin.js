@@ -527,7 +527,18 @@ router.get('/reports/map', async (req, res) => {
       }
       filter.location = {
         $geoWithin: {
-          $box: [[west, south], [east, north]],
+          $geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [west, south],
+                [east, south],
+                [east, north],
+                [west, north],
+                [west, south],
+              ],
+            ],
+          },
         },
       };
     }

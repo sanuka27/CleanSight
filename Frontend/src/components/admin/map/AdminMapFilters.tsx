@@ -78,9 +78,17 @@ export function AdminMapFilters({ filters, onChange, onReset }: AdminMapFiltersP
   return (
     <div className="bg-card/80 backdrop-blur-md border border-border/60 rounded-2xl shadow-sm overflow-hidden">
       {/* Header */}
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded((prev) => !prev);
+          }
+        }}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-muted-foreground" />
@@ -115,7 +123,7 @@ export function AdminMapFilters({ filters, onChange, onReset }: AdminMapFiltersP
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
           )}
         </div>
-      </button>
+      </div>
 
       {/* Content */}
       <AnimatePresence>

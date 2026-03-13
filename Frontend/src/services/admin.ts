@@ -19,6 +19,8 @@ import type {
   AppRole,
   BulkActionResult,
   BulkExportFilters,
+  AdminMapReport,
+  AdminMapFilters,
 } from "@/types/admin";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -353,3 +355,16 @@ export async function bulkExportReports(
     URL.revokeObjectURL(url);
   }, 100);
 }
+
+// ── Admin Map ────────────────────────────────────────────────────────
+
+export async function fetchAdminMapReports(
+  filters: AdminMapFilters = {}
+): Promise<{ success: boolean; count: number; data: AdminMapReport[] }> {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
+  });
+  return adminFetch(`/reports/map?${params.toString()}`);
+}
+

@@ -496,6 +496,139 @@ router.post('/reports/bulk/export', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/reports/map
+ * Lightweight, bbox-filterable report list for the admin map view.
+ *
+ * Query params:
+ *   bbox       – west,south,east,north (comma-separated floats)
+ *   status     – comma-separated statuses
+ *   wasteType  – comma-separated waste types
+ *   urgency    – comma-separated urgency levels
+ *   unassigned – "true" to show only unassigned reports
+ *   dateFrom   – ISO date string (lower bound on createdAt)
+ *   dateTo     – ISO date string (upper bound on createdAt)
+ *   q          – free-text search on title/description
+ */
+router.get('/reports/map', async (req, res) => {
+  try {
+    const { bbox, status, wasteType, urgency, unassigned, dateFrom, dateTo, q } = req.query;
+
+    const filter = {};
+
+    // ── Bounding box ────────────────────────────────────────────────
+    if (bbox) {
+      const parts = String(bbox).split(',').map(Number);
+      if (parts.length !== 4 || parts.some(n => isNaN(n))) {
+        return res.status(400).json({ success: false, message: 'bbox must be 4 comma-separated numbers: west,south,east,north' });
+      }
+      const [west, south, east, north] = parts;
+      if (west < -180 || east > 180 || south < -90 || north > 90 || west > east || south > north) {
+        return res.status(400).json({ success: false, message: 'bbox values out of valid range' });
+      }
+      filter.location = {
+        $geoWithin: {
+          $geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [west, south],
+                [east, south],
+                [east, north],
+                [west, north],
+                [west, south],
+              ],
+            ],
+          },
+        },
+      };
+    }
+
+    // ── Status ──────────────────────────────────────────────────────
+    if (status) {
+      const statuses = String(status).split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length) filter.status = { $in: statuses };
+    }
+
+    // ── Waste type ──────────────────────────────────────────────────
+    if (wasteType) {
+      const types = String(wasteType).split(',').map(s => s.trim()).filter(Boolean);
+      if (types.length) filter.wasteType = { $in: types };
+    }
+
+    // ── Urgency ─────────────────────────────────────────────────────
+    if (urgency) {
+      const urgencies = String(urgency).split(',').map(s => s.trim()).filter(Boolean);
+      if (urgencies.length) filter.urgency = { $in: urgencies };
+    }
+
+    // ── Unassigned only ─────────────────────────────────────────────
+    if (unassigned === 'true') {
+      filter.assignedTo = null;
+    }
+
+    // ── Date range ──────────────────────────────────────────────────
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) {
+        const d = new Date(String(dateFrom));
+        if (isNaN(d.getTime())) return res.status(400).json({ success: false, message: 'Invalid dateFrom' });
+        filter.createdAt.$gte = d;
+      }
+      if (dateTo) {
+        const d = new Date(String(dateTo));
+        if (isNaN(d.getTime())) return res.status(400).json({ success: false, message: 'Invalid dateTo' });
+        filter.createdAt.$lte = d;
+      }
+    }
+
+    // ── Text search ─────────────────────────────────────────────────
+    if (q && String(q).trim()) {
+      const escaped = String(q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(escaped, 'i');
+      filter.$or = [{ title: rx }, { description: rx }];
+    }
+
+    // ── Query with lightweight projection ───────────────────────────
+    const reports = await Report.find(filter)
+      .select('title description location status wasteType urgency assignedTo createdAt imageUrl')
+      .sort({ createdAt: -1 })
+      .limit(1000)
+      .lean();
+
+    // Enrich with assigned volunteer name (lightweight)
+    const assignedUids = [...new Set(reports.map(r => r.assignedTo).filter(Boolean))];
+    let assignedMap = {};
+    if (assignedUids.length > 0) {
+      const assignedUsers = await User.find({ firebaseUid: { $in: assignedUids } })
+        .select('firebaseUid name email')
+        .lean();
+      assignedMap = Object.fromEntries(assignedUsers.map(u => [u.firebaseUid, u]));
+    }
+
+    const data = reports.map(r => ({
+      _id: r._id,
+      title: r.title,
+      description: r.description ? r.description.slice(0, 120) : '',
+      location: r.location,
+      status: r.status,
+      wasteType: r.wasteType,
+      urgency: r.urgency,
+      assignedTo: r.assignedTo || null,
+      assignedVolunteer: r.assignedTo
+        ? assignedMap[r.assignedTo] || { firebaseUid: r.assignedTo }
+        : null,
+      createdAt: r.createdAt,
+      imageUrl: r.imageUrl || null,
+    }));
+
+    res.json({ success: true, count: data.length, data });
+  } catch (err) {
+    console.error('Admin map reports error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * GET /api/admin/reports/:id
  * Full report details with reporter info.
  */

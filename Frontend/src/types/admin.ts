@@ -297,3 +297,33 @@ export interface UserFilters {
   page?: number;
   limit?: number;
 }
+
+// ── Admin Map ────────────────────────────────────────────────────────
+
+/** Lightweight report shape returned by GET /api/admin/reports/map */
+export interface AdminMapReport {
+  _id: string;
+  title: string | null;
+  description: string;
+  location: GeoLocation;
+  status: ReportStatus;
+  wasteType: WasteType;
+  urgency: UrgencyLevel;
+  assignedTo: string | null;
+  assignedVolunteer: { firebaseUid: string; name?: string; email?: string } | null;
+  createdAt: string;
+  imageUrl: string | null;
+}
+
+/** Query filters for the admin map endpoint */
+export interface AdminMapFilters {
+  bbox?: string;         // "west,south,east,north"
+  status?: string;       // comma-separated
+  wasteType?: string;    // comma-separated
+  urgency?: string;      // comma-separated
+  unassigned?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
+  q?: string;
+}
+

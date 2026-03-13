@@ -41,6 +41,7 @@ const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
 const AdminDocuments = lazy(() => import("./pages/admin/Documents"));
 const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 const AdminAuditLog = lazy(() => import("./pages/admin/AuditLog"));
+const AdminMapView = lazy(() => import("./pages/admin/AdminMapView"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -120,6 +121,7 @@ const AnimatedRoutes = () => {
             <Route index element={<AdminOverview />} />
             <Route path="overview" element={<AdminOverview />} />
             <Route path="reports" element={<AdminReports />} />
+            <Route path="map" element={<AdminMapView />} />
             <Route path="volunteers" element={<AdminVolunteers />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="analytics" element={<AdminAnalytics />} />

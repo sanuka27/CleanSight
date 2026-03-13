@@ -47,6 +47,14 @@ export default function AdminMapView() {
   useEffect(() => {
     const bbox = bboxFromViewport(viewport);
     setDebouncedBbox(bbox.join(","));
+
+    // Cleanup debounced timeout on unmount
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -81,13 +89,33 @@ export default function AdminMapView() {
 
   // ── Map markers ──────────────────────────────────────────────────
   // Convert AdminMapReport[] to MapReportMarker[] for CleanSightMap
+
+  const mapAdminStatusToMapStatus = (
+    status: AdminMapReport["status"]
+  ): MapReportMarker["status"] => {
+    switch (status) {
+      case "pending":
+      case "assigned":
+      case "resolved":
+        return status;
+      case "verified":
+        return "resolved";
+      case "in_progress":
+        return "assigned";
+      case "rejected":
+        return "resolved";
+      default:
+        return "pending";
+    }
+  };
+
   const mapMarkers: MapReportMarker[] = useMemo(
     () =>
       reports.map((r) => ({
         _id: r._id,
         title: r.title ?? undefined,
         description: r.description,
-        status: r.status as MapReportMarker["status"],
+        status: mapAdminStatusToMapStatus(r.status),
         wasteType: r.wasteType,
         urgency: r.urgency,
         imageUrl: r.imageUrl ?? undefined,

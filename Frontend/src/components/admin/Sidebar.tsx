@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Home,
   MapPin,
+  Map as MapIcon,
   Users,
   PieChart,
   FileText,
@@ -22,6 +23,7 @@ interface SidebarProps {
 const NAV_ITEMS = [
   { path: "/dashboard/admin", label: "Overview", icon: Home, end: true },
   { path: "/dashboard/admin/reports", label: "Reports", icon: MapPin },
+  { path: "/dashboard/admin/map", label: "Map", icon: MapIcon },
   { path: "/dashboard/admin/volunteers", label: "Volunteers", icon: Users },
   { path: "/dashboard/admin/users", label: "Users", icon: UserCog },
   { path: "/dashboard/admin/analytics", label: "Analytics", icon: PieChart },

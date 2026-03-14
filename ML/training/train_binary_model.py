@@ -1,11 +1,11 @@
 import os
+import json
 import tensorflow as tf
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing import image_dataset_from_directory
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-import matplotlib.pyplot as plt
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -92,6 +92,12 @@ def main():
     class_names = train_dataset.class_names
     print(f"Detected classes: {class_names}")
 
+    # Save class names for inference
+    class_names_path = os.path.join(MODELS_DIR, 'class_names.json')
+    with open(class_names_path, 'w') as f:
+        json.dump(class_names, f)
+    print(f"Class names saved to: {class_names_path}")
+
     # Optimize datasets for performance
     AUTOTUNE = tf.data.AUTOTUNE
     train_dataset = train_dataset.prefetch(buffer_size=AUTOTUNE)
@@ -116,7 +122,7 @@ def main():
     )
 
     print("Starting training...")
-    history = model.fit(
+    model.fit(
         train_dataset,
         validation_data=val_dataset,
         epochs=EPOCHS,

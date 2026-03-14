@@ -1,7 +1,10 @@
 import os
 import sys
 import argparse
-import numpy as np
+import json
+
+# Suppress verbose TF logging for cleaner output (must be set before importing TensorFlow)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
@@ -9,14 +12,19 @@ from tensorflow.keras.preprocessing.image import load_img, img_to_array
 # Configuration
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(BASE_DIR, 'models', 'trash_classifier.keras')
+CLASS_NAMES_PATH = os.path.join(BASE_DIR, 'models', 'class_names.json')
 IMG_SIZE = (224, 224)
 
-# Note: Alphabetical order typically used by image_dataset_from_directory
-# Check training output to confirm class names order.
-# Standard is usually ['non-trash', 'trash'] if those are the folder names.
-CLASS_NAMES = ['non-trash', 'trash']
+def load_class_names():
+    \"\"\"Loads the class names mapping saved during training.\"\"\"
+    if os.path.exists(CLASS_NAMES_PATH):
+        with open(CLASS_NAMES_PATH, 'r') as f:
+            return json.load(f)
+    print(f"Warning: Class names file not found at {CLASS_NAMES_PATH}.")
+    print("Falling back to standard alphabetical order.")
+    return ['non-trash', 'trash']
 
-def predict(image_path, model):
+def predict(image_path, model, class_names):
     \"\"\"Predicts whether an image is trash or non-trash.\"\"\"
     if not os.path.exists(image_path):
         print(f"Error: Image not found at {image_path}")
@@ -38,7 +46,7 @@ def predict(image_path, model):
         # Convert sigmoid score to label classification
         # Closer to 0 -> non-trash, closer to 1 -> trash (Assuming 'non-trash' is 0, 'trash' is 1)
         predicted_class_idx = 1 if score > 0.5 else 0
-        predicted_label = CLASS_NAMES[predicted_class_idx]
+        predicted_label = class_names[predicted_class_idx]
         
         # Calculate confidence percentage
         confidence = score if predicted_class_idx == 1 else (1 - score)
@@ -63,12 +71,12 @@ def main():
         sys.exit(1)
 
     print("Loading model...")
-    # Suppress verbose TF logging for cleaner output
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
     model = load_model(MODEL_PATH)
     
+    class_names = load_class_names()
+
     print(f"Processing image: {image_path}...")
-    label, confidence = predict(image_path, model)
+    label, confidence = predict(image_path, model, class_names)
 
     if label:
         print("\n=== PREDICTION RESULT ===")

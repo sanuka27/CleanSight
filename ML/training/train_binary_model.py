@@ -76,7 +76,8 @@ def main():
         subset="training",
         seed=123,
         image_size=IMG_SIZE,
-        batch_size=BATCH_SIZE
+        batch_size=BATCH_SIZE,
+        label_mode='binary'
     )
 
     # Load validation dataset
@@ -86,7 +87,8 @@ def main():
         subset="validation",
         seed=123,
         image_size=IMG_SIZE,
-        batch_size=BATCH_SIZE
+        batch_size=BATCH_SIZE,
+        label_mode='binary'
     )
 
     class_names = train_dataset.class_names

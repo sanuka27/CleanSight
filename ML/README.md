@@ -31,7 +31,7 @@ This folder contains the Phase 1 Machine Learning pipeline for CleanSight. The g
 
 ## Training
 
-To train the MobileNetV2 binary classifier from scratch using your dataset, run:
+To train the MobileNetV2-based binary classifier using transfer learning on your dataset, run:
 ```bash
 python training/train_binary_model.py
 ```

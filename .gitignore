@@ -77,3 +77,15 @@ credentials.json
 # Build outputs
 *.js.map
 *.css.map
+
+# ML Phase 1
+ML/dataset_binary/
+ML/models/*.keras
+ML/models/*.h5
+ML/models/checkpoints/
+ML/models/logs/
+ML/venv/
+ML/.env
+ML/__pycache__/
+ML/**/*.pyc
+.ipynb_checkpoints/

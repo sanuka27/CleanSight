@@ -1,5 +1,4 @@
 import os
-import requests
 import ipaddress
 import socket
 from urllib.parse import urlparse
@@ -20,7 +19,6 @@ def _is_private_ip(hostname: str) -> bool:
     try:
         addrinfos = socket.getaddrinfo(hostname, None)
     except socket.gaierror:
-        # Invalid hostname or cannot be resolved
         raise HTTPException(status_code=400, detail="Invalid image URL host")
         
     for family, _, _, _, sockaddr in addrinfos:
@@ -78,18 +76,43 @@ async def predict_endpoint(image: Optional[UploadFile] = File(None), image_url: 
         if image:
             image_bytes = await image.read()
         elif image_url:
-            # Validate the URL to reduce SSRF risk
             safe_url = validate_image_url(image_url)
+            MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
             try:
-                # Disable redirects so validation cannot be bypassed via redirect, using async HTTP client
+                # Disable redirects and stream the file dynamically preventing SSRF re-bind
                 async with httpx.AsyncClient() as client:
-                    response = await client.get(safe_url, timeout=10.0, follow_redirects=False)
-            except httpx.RequestError:
-                raise HTTPException(status_code=400, detail="Could not retrieve image from provided URL")
+                    async with client.stream("GET", safe_url, timeout=10.0, follow_redirects=False) as response:
+                        
+                        network_stream = response.extensions.get("network_stream") if hasattr(response, "extensions") else None
+                        if network_stream is not None:
+                            peername = network_stream.get_extra_info("peername")
+                            if peername:
+                                peer_ip = peername[0]
+                                try:
+                                    peer_ip_obj = ipaddress.ip_address(peer_ip)
+                                    if peer_ip_obj.is_private or peer_ip_obj.is_loopback or peer_ip_obj.is_link_local or peer_ip_obj.is_reserved or peer_ip_obj.is_multicast:
+                                        raise HTTPException(status_code=400, detail="Could not retrieve image from provided URL")
+                                except ValueError:
+                                    raise HTTPException(status_code=400, detail="Could not retrieve image from provided URL")
 
-            if response.status_code == 200:
-                image_bytes = response.content
-            else:
+                        if response.status_code != 200:
+                            raise HTTPException(status_code=400, detail="Could not retrieve image from provided URL")
+                        
+                        content_type = response.headers.get("content-type", "")
+                        if not content_type.lower().startswith("image/"):
+                            raise HTTPException(status_code=400, detail="URL does not point to a valid image")
+
+                        data = bytearray()
+                        async for chunk in response.aiter_bytes():
+                            if not chunk:
+                                break
+                            data.extend(chunk)
+                            if len(data) > MAX_IMAGE_SIZE:
+                                raise HTTPException(status_code=400, detail="Image too large")
+                                
+                        image_bytes = bytes(data)
+
+            except httpx.RequestError:
                 raise HTTPException(status_code=400, detail="Could not retrieve image from provided URL")
         else:
             raise HTTPException(status_code=400, detail="Must provide 'image' file or 'image_url'")

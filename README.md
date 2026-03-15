@@ -2,8 +2,6 @@
 
 # ♻️ CleanSight
 
-### Community-Powered Waste Reporting & Cleanup Coordination
-
 **Report Waste. Coordinate Cleanup. Transform Communities.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-10b981.svg)](LICENSE)
@@ -11,166 +9,83 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6.svg?logo=typescript&logoColor=white)](https://typescriptlang.org)
 [![Node.js](https://img.shields.io/badge/Node.js-Express-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47a248.svg?logo=mongodb&logoColor=white)](https://mongodb.com)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.15-FF6F00.svg?logo=tensorflow&logoColor=white)](https://tensorflow.org)
 
----
-
-CleanSight empowers citizens to report garbage issues, volunteers to take action, and municipalities to efficiently manage cleanup operations — all from a single, beautiful platform.
+CleanSight is a comprehensive data-driven platform empowering citizens to report garbage issues, volunteers to take action, and municipalities to efficiently manage cleanup operations. 
 
 </div>
 
-<br/>
+---
 
-## ✨ Features
+## 📖 About the Project
 
-<table>
-  <tr>
-    <td align="center" width="33%">
-      <h3>📸 AI-Powered Detection</h3>
-      <p>Advanced AI verifies waste reports instantly, ensuring accuracy and faster response times.</p>
-    </td>
-    <td align="center" width="33%">
-      <h3>📍 GPS Location Tracking</h3>
-      <p>Precise geolocation tags every report, making it easy for cleanup crews to find exact locations.</p>
-    </td>
-    <td align="center" width="33%">
-      <h3>👥 Community Volunteers</h3>
-      <p>Connect with local volunteers who are ready to take action and make a difference.</p>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="33%">
-      <h3>⚡ Instant Notifications</h3>
-      <p>Real-time alerts keep everyone informed about new reports and cleanup progress.</p>
-    </td>
-    <td align="center" width="33%">
-      <h3>🛡️ Verified Reports</h3>
-      <p>Multi-step verification ensures only legitimate reports reach cleanup teams.</p>
-    </td>
-    <td align="center" width="33%">
-      <h3>📊 Impact Analytics</h3>
-      <p>Track community progress with detailed dashboards and environmental impact metrics.</p>
-    </td>
-  </tr>
-</table>
+CleanSight was built to bridge the gap between environmental awareness and actionable community effort. By combining a modern web interface, a robust backend, and custom Machine Learning models, the platform streamlines the entire lifecycle of local waste management—from the moment a user snaps a photo to the final verified cleanup.
 
-<br/>
+## ✨ Core Features
 
-## 🧑‍🤝‍🧑 User Roles
+- **📸 AI-Powered Detection:** Integrated MobileNetV2 binary classifier to automatically verify uploaded images as waste/non-waste.
+- **📍 Geolocation Tracking:** Precise GPS tagging for every report ensures cleanup crews know exactly where to go.
+- **👥 Role-Based Workflows:** Distinct interfaces and permissions for Citizens, Volunteers, Staff, and Admins.
+- **⚡ Real-Time Coordination:** Connects on-the-ground volunteers with reported tasks dynamically.
+- **📊 Impact Analytics:** Comprehensive dashboards displaying environmental impact metrics and community progress.
 
-| Role | Description |
-|------|-------------|
-| **Citizen** | Report waste locations with photos, track submission status, view community impact |
-| **Volunteer** | Claim cleanup tasks, coordinate with teams, log completed cleanups |
-| **Staff** | Manage reports, assign volunteers, oversee regional operations |
-| **Admin** | Full platform oversight, analytics dashboards, user management |
+## 🏗️ System Architecture
 
-<br/>
+The project is structured as a monorepo containing three main modules:
 
-## 🏗️ Architecture
-
-```
+```text
 CleanSight/
-├── Frontend/          React + TypeScript SPA
-│   ├── components/    Reusable UI, layout, landing, auth components
-│   ├── pages/         Route-level page components
-│   ├── context/       Auth state management (Firebase)
-│   ├── hooks/         Custom hooks (analytics, dashboard, reports)
-│   ├── services/      API service layer
-│   ├── constants/     Roles, navigation, footer link configs
-│   └── lib/           Utilities, API client, Firebase config
+├── Frontend/          # React + TypeScript SPA
+│   ├── components/    # Reusable shadcn/ui components & layouts
+│   ├── hooks/         # Custom React hooks (auth, analytics, queries)
+│   ├── pages/         # Role-protected route views
+│   └── lib/           # Firebase config, API clients, utilities
 │
-├── Backend/           Node.js + Express REST API
-│   ├── routes/        Auth, reports, volunteers, analytics, dashboard
-│   ├── models/        MongoDB schemas (User, Report, Volunteer)
-│   ├── middleware/     Token verification, role auth, query validation
-│   ├── services/      Analytics aggregation
-│   └── config/        Database & Firebase Admin setup
+├── Backend/           # Node.js + Express REST API
+│   ├── routes/        # API endpoints (auth, reports, volunteers)
+│   ├── models/        # Mongoose/MongoDB schemas
+│   ├── middleware/    # Firebase token verification & role guards
+│   └── services/      # Business logic & analytics aggregations
 │
-└── docs/              API documentation & audit notes
+└── ML/                # Machine Learning Environment
+    ├── dataset_binary/# Waste vs. Non-waste image dataset
+    ├── training/      # TensorFlow model training & fine-tuning pipelines
+    ├── evaluation/    # Metric reporting (F1, confusion matrices)
+    └── inference/     # Predict scripts for backend integration
 ```
-
-<br/>
 
 ## 🛠️ Tech Stack
 
-<table>
-  <tr>
-    <th align="left">Layer</th>
-    <th align="left">Technologies</th>
-  </tr>
-  <tr>
-    <td><strong>Frontend</strong></td>
-    <td>React 18 &bull; TypeScript &bull; Vite &bull; Tailwind CSS &bull; shadcn/ui &bull; Framer Motion</td>
-  </tr>
-  <tr>
-    <td><strong>State & Data</strong></td>
-    <td>React Context &bull; TanStack Query &bull; React Router v6</td>
-  </tr>
-  <tr>
-    <td><strong>Auth</strong></td>
-    <td>Firebase Authentication (Google + Email/Password) &bull; Firebase Admin SDK</td>
-  </tr>
-  <tr>
-    <td><strong>Backend</strong></td>
-    <td>Node.js &bull; Express.js &bull; MongoDB &bull; Mongoose</td>
-  </tr>
-  <tr>
-    <td><strong>Tooling</strong></td>
-    <td>pnpm Workspaces &bull; ESLint &bull; Vitest &bull; PostCSS</td>
-  </tr>
-</table>
+**Frontend Frameworks & UI:**
+- React 18, Vite, TypeScript
+- Tailwind CSS, shadcn/ui, Framer Motion
+- React Router v6
 
-<br/>
+**Backend & Database:**
+- Node.js, Express.js
+- MongoDB, Mongoose
+- RESTful HTTP architecture
 
-## 🔐 Authentication Flow
+**Machine Learning:**
+- TensorFlow, Keras (MobileNetV2 Transfer Learning)
+- Scikit-learn, Matplotlib, Seaborn, Pillow
 
-```
-┌──────────────┐     Firebase Auth     ┌──────────────┐
-│   Browser     │ ◄──────────────────► │   Firebase    │
-│  (React SPA)  │    ID Token          │   Console     │
-└──────┬───────┘                       └──────────────┘
-       │
-       │  Authorization: Bearer <token>
-       ▼
-┌──────────────┐     Verify Token      ┌──────────────┐
-│   Express     │ ◄──────────────────► │ Firebase      │
-│   Backend     │                      │ Admin SDK     │
-└──────┬───────┘                       └──────────────┘
-       │
-       ▼
-┌──────────────┐
-│   MongoDB     │  User profiles, reports, analytics
-└──────────────┘
-```
+**Authentication & Security:**
+- Firebase Authentication (OAuth & Email/Password)
+- Firebase Admin SDK for backend token verification
+- Custom Role-Based Access Control (RBAC) via database injection
 
-- **New users** (Google sign-in) are routed through a one-time **role onboarding** page
-- **Protected routes** enforce role-based access (citizen, volunteer, staff, admin)
-- **Navigation** adapts dynamically based on authentication state and assigned role
+## 🚀 The Lifecycle of a Report
 
-<br/>
-
-## 📸 How It Works
-
-1. **Report** — Snap a photo, tag the location, and submit a waste report
-2. **Verify** — AI and community moderators validate the report
-3. **Coordinate** — Volunteers claim tasks and organize cleanup events
-4. **Track** — Monitor progress through real-time dashboards and analytics
-
-<br/>
-
-## 📄 License
-
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-
-<br/>
+1. **Submission:** A user captures an image and tags the location on the map.
+2. **AI Screening:** The ML model evaluates the image confidence score to filter out invalid or non-waste uploads.
+3. **Dispatch:** The verified report appears on the localized community dashboard.
+4. **Resolution:** Volunteers claim the task, execute the cleanup, and log completion.
+5. **Review:** Administrators review the result and analytics reflect the community impact.
 
 ---
 
 <div align="center">
-  <p>
-    <strong>Built with 💚 for cleaner communities</strong>
-  </p>
-  <p>
-    <sub>CleanSight &copy; 2026 Sanuka Marasinghe. All rights reserved.</sub>
-  </p>
+  <p><strong>Developed by Sanuka Marasinghe</strong></p>
+  <p>Building technology for cleaner, greener communities.</p>
 </div>

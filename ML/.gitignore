@@ -1,0 +1,6 @@
+dataset_binary/
+models/
+artifacts/
+reports/
+__pycache__/
+*.pyc

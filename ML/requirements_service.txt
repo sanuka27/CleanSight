@@ -1,0 +1,10 @@
+# Service dependencies
+# Tested with: Python 3.10, TensorFlow 2.13.0
+fastapi==0.103.0
+uvicorn==0.23.2
+python-multipart==0.0.6
+pydantic==1.10.12
+httpx==0.24.1
+Pillow==10.0.0
+tensorflow==2.13.0
+numpy==1.24.3

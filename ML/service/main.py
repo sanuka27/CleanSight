@@ -1,12 +1,63 @@
 import os
-import io
 import requests
+import ipaddress
+import socket
+from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from .schemas import PredictionResponse
 from .model_loader import load_model, predict_image
 from typing import Optional
+import httpx
+import logging
 
 app = FastAPI(title="CleanSight ML Phase 1 - Binary Validation")
+
+def _is_private_ip(hostname: str) -> bool:
+    \"\"\"
+    Resolve the hostname and check if any of the resulting IPs are in a private
+    or otherwise non-public range (loopback, link-local, multicast, etc.).
+    \"\"\"
+    try:
+        addrinfos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        # Invalid hostname or cannot be resolved
+        raise HTTPException(status_code=400, detail="Invalid image URL host")
+        
+    for family, _, _, _, sockaddr in addrinfos:
+        ip_str = sockaddr[0]
+        try:
+            ip_obj = ipaddress.ip_address(ip_str)
+        except ValueError:
+            continue
+            
+        if (
+            ip_obj.is_private
+            or ip_obj.is_loopback
+            or ip_obj.is_link_local
+            or ip_obj.is_multicast
+            or ip_obj.is_reserved
+            or ip_obj.is_unspecified
+        ):
+            return True
+    return False
+
+def validate_image_url(image_url: str) -> str:
+    \"\"\"
+    Validate that the provided image URL uses http/https and does not resolve
+    to a private or otherwise disallowed IP range.
+    \"\"\"
+    parsed = urlparse(image_url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="Invalid image URL")
+        
+    hostname = parsed.hostname
+    if not hostname:
+        raise HTTPException(status_code=400, detail="Invalid image URL host")
+        
+    if _is_private_ip(hostname):
+        raise HTTPException(status_code=400, detail="Image URL host is not allowed")
+        
+    return image_url
 
 # Load model on startup
 @app.on_event("startup")
@@ -15,11 +66,10 @@ async def startup_event():
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict_endpoint(image: Optional[UploadFile] = File(None), image_url: Optional[str] = Form(None)):
-    """
+    \"\"\"
     Accepts an image file or an image URL to download.
     Provides real prediction using the loaded Phase 1 model.
-    """
-    import logging
+    \"\"\"
     logging.info(f"Received prediction request. URL: {image_url}")
     
     try:
@@ -28,7 +78,15 @@ async def predict_endpoint(image: Optional[UploadFile] = File(None), image_url: 
         if image:
             image_bytes = await image.read()
         elif image_url:
-            response = requests.get(image_url, timeout=10)
+            # Validate the URL to reduce SSRF risk
+            safe_url = validate_image_url(image_url)
+            try:
+                # Disable redirects so validation cannot be bypassed via redirect, using async HTTP client
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(safe_url, timeout=10.0, follow_redirects=False)
+            except httpx.RequestError:
+                raise HTTPException(status_code=400, detail="Could not retrieve image from provided URL")
+
             if response.status_code == 200:
                 image_bytes = response.content
             else:
@@ -49,7 +107,9 @@ async def predict_endpoint(image: Optional[UploadFile] = File(None), image_url: 
         )
         
     except RuntimeError as re:
-        raise HTTPException(status_code=500, detail=str(re))
+        raise HTTPException(status_code=503, detail=f"Model service unavailable: {str(re)}")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal service error: {str(e)}")
 

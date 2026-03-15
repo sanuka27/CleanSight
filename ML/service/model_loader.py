@@ -3,10 +3,6 @@ import numpy as np
 import tensorflow as tf
 from PIL import Image
 import io
-import warnings
-import urllib.request
-
-warnings.filterwarnings('ignore')
 
 # Provide a fallback model logic if the real model file is not found (to handle missing files in student environment gracefully for now, or assume it's there)
 # In this branch, we must use real prediction flow.
@@ -28,11 +24,11 @@ def load_model():
             print(f"Error loading model: {e}")
 
 def predict_image(image_bytes: bytes) -> tuple[str, float]:
-    """
+    \"\"\"
     Returns (label, confidence).
     Assuming model outputs a single sigmoid probability where > 0.5 is trash.
     If multiple class, logic must be adjusted. Assuming standard binary classifier here.
-    """
+    \"\"\"
     if model is None:
         raise RuntimeError("Model is not loaded.")
         

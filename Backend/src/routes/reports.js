@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Report from '../models/Report.js';
 import User from '../models/User.js';
 import verifyToken from '../middleware/verifyToken.js';
+import { validateImageWithML } from '../services/mlService.js';
 
 // Helper: Valid status transitions
 const isValidTransition = (currentStatus, newStatus) => {
@@ -35,6 +36,25 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid location (lat, lng) is required' });
     }
 
+    // Call ML service before saving
+    const mlValidation = await validateImageWithML(imageUrl);
+    let imageValidationLabel = 'pending';
+    let imageValidationConfidence = null;
+    let aiReviewStatus = 'pending';
+
+    if (mlValidation.success) {
+      imageValidationLabel = mlValidation.label;
+      imageValidationConfidence = mlValidation.confidence;
+      aiReviewStatus = mlValidation.recommendation === 'manual_review' ? 'manual_review' : 'approved';
+      
+      // If prediction label is strongly non-trash, you could also reject or flag immediately
+      if (imageValidationLabel === 'non-trash') {
+        aiReviewStatus = 'flagged';
+      }
+    } else {
+      imageValidationLabel = 'error';
+    }
+
     const report = await Report.create({
       firebaseUid,
       title: title || null,
@@ -46,7 +66,10 @@ router.post('/', verifyToken, async (req, res) => {
       },
       wasteType: wasteType || 'general',
       urgency: urgency || 'medium',
-      status: 'pending'
+      status: 'pending',
+      imageValidationLabel,
+      imageValidationConfidence,
+      aiReviewStatus
     });
 
     // Increment user's report count

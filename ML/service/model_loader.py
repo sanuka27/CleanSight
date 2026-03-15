@@ -6,7 +6,7 @@ import io
 
 # Provide a fallback model logic if the real model file is not found (to handle missing files in student environment gracefully for now, or assume it's there)
 # In this branch, we must use real prediction flow.
-MODEL_PATH = os.getenv("MODEL_PATH", os.path.join(os.path.dirname(__file__), "..", "models", "binary_trash_model.h5"))
+MODEL_PATH = os.getenv("MODEL_PATH", os.path.join(os.path.dirname(__file__), "..", "models", "trash_classifier.keras"))
 
 model = None
 IMG_SIZE = (224, 224)
@@ -39,7 +39,7 @@ def predict_image(image_bytes: bytes) -> tuple[str, float]:
         img_array = np.expand_dims(img_array, axis=0)
         img_array = img_array / 255.0  # normalize
         
-        predictions = model.predict(img_array)
+        predictions = model.predict(img_array, verbose=0)
         prob = float(predictions[0][0])
         
         # Binary: 0 = non-trash, 1 = trash (assumes standard layout).

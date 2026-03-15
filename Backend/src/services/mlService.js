@@ -1,5 +1,10 @@
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
-const ML_SERVICE_TIMEOUT_MS = Number(process.env.ML_SERVICE_TIMEOUT_MS || 10000);
+const ML_SERVICE_TIMEOUT_DEFAULT_MS = 10000;
+const mlServiceTimeoutRaw = process.env.ML_SERVICE_TIMEOUT_MS;
+const mlServiceTimeoutParsed = Number(mlServiceTimeoutRaw);
+const ML_SERVICE_TIMEOUT_MS = Number.isFinite(mlServiceTimeoutParsed) && mlServiceTimeoutRaw != null && mlServiceTimeoutRaw.trim() !== ''
+  ? mlServiceTimeoutParsed
+  : ML_SERVICE_TIMEOUT_DEFAULT_MS;
 
 /**
  * Call the Phase 1 Binary Classifier ML Service.

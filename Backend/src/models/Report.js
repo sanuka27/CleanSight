@@ -70,6 +70,20 @@ const reportSchema = new mongoose.Schema({
     default: null,
     maxlength: [500, 'Rejection reason cannot exceed 500 characters']
   },
+  aiReviewStatus: {
+    type: String,
+    enum: ['approved', 'flagged', 'manual_review', 'pending'],
+    default: 'pending'
+  },
+  imageValidationLabel: {
+    type: String,
+    enum: ['trash', 'non-trash', 'error', 'pending'],
+    default: 'pending'
+  },
+  imageValidationConfidence: {
+    type: Number,
+    default: null
+  },
   resolvedAt: {
     type: Date,
     default: null

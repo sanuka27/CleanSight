@@ -86,7 +86,7 @@ const reportSchema = new mongoose.Schema({
   },
   finalValidationDecision: {
     type: String,
-    enum: ['approved', 'rejected', 'overridden', null],
+    enum: ['approved', 'rejected', 'overridden'],
     default: null
   },
   reviewedBy: {

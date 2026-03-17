@@ -45,13 +45,13 @@ export interface AdminReport {
   rejectionReason: string | null;
   
   // ML Phase 1 fields
-  aiReviewStatus: 'approved' | 'flagged' | 'manual_review' | 'pending' | 'rejected' | 'overridden';
-  imageValidationLabel: 'trash' | 'non-trash' | 'error' | 'pending';
-  imageValidationConfidence: number | null;
-  finalValidationDecision: 'approved' | 'rejected' | 'overridden' | null;
-  reviewedBy: string | null;
-  reviewedAt: string | null;
-  reviewNote: string | null;
+  aiReviewStatus?: 'approved' | 'flagged' | 'manual_review' | 'pending' | 'rejected' | 'overridden';
+  imageValidationLabel?: 'trash' | 'non-trash' | 'error' | 'pending';
+  imageValidationConfidence?: number | null;
+  finalValidationDecision?: 'approved' | 'rejected' | 'overridden' | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
 
   resolvedAt: string | null;
   createdAt: string;

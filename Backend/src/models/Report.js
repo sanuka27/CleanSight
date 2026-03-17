@@ -72,7 +72,7 @@ const reportSchema = new mongoose.Schema({
   },
   aiReviewStatus: {
     type: String,
-    enum: ['approved', 'flagged', 'manual_review', 'pending'],
+    enum: ['approved', 'flagged', 'manual_review', 'pending', 'rejected', 'overridden'],
     default: 'pending'
   },
   imageValidationLabel: {
@@ -83,6 +83,24 @@ const reportSchema = new mongoose.Schema({
   imageValidationConfidence: {
     type: Number,
     default: null
+  },
+  finalValidationDecision: {
+    type: String,
+    enum: ['approved', 'rejected', 'overridden', null],
+    default: null
+  },
+  reviewedBy: {
+    type: String,
+    default: null
+  },
+  reviewedAt: {
+    type: Date,
+    default: null
+  },
+  reviewNote: {
+    type: String,
+    default: null,
+    maxlength: [1000, 'Review note cannot exceed 1000 characters']
   },
   resolvedAt: {
     type: Date,

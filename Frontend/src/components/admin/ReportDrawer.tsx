@@ -220,7 +220,15 @@ export function ReportDrawer({ report, volunteers, onClose, onUpdated }: ReportD
                 <MetaItem icon={CheckCircle} label="ML Status" value={report.aiReviewStatus} />
               )}
               {report.imageValidationLabel && (
-                <MetaItem icon={AlertTriangle} label="ML Label" value={`${report.imageValidationLabel} (${report.imageValidationConfidence ? (report.imageValidationConfidence * 100).toFixed(1) + '%' : 'N/A'})`} />
+                <MetaItem
+                  icon={AlertTriangle}
+                  label="ML Label"
+                  value={`${report.imageValidationLabel} (${
+                    report.imageValidationConfidence != null
+                      ? (report.imageValidationConfidence * 100).toFixed(1) + "%"
+                      : "N/A"
+                  })`}
+                />
               )}
               {report.reporter && (
                 <MetaItem icon={User} label="Reporter" value={report.reporter.name || report.reporter.email} />

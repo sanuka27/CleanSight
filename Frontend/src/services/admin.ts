@@ -77,6 +77,17 @@ export async function updateReportStatus(
   });
 }
 
+export async function reviewAdminReport(
+  id: string,
+  action: "approve" | "reject" | "override",
+  reviewNote?: string
+): Promise<{ success: boolean; data: AdminReport }> {
+  return adminFetch(`/reports/${id}/review`, {
+    method: "PATCH",
+    body: JSON.stringify({ action, reviewNote }),
+  });
+}
+
 export async function assignReportToVolunteer(
   id: string,
   volunteerUid: string

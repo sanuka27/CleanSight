@@ -27,6 +27,7 @@ import {
   updateReportStatus,
   assignReportToVolunteer,
   addReportNote,
+  reviewAdminReport,
 } from "@/services/admin";
 import type { AdminReport, AdminVolunteer, ReportStatus } from "@/types/admin";
 import { cn } from "@/lib/utils";
@@ -132,6 +133,21 @@ export function ReportDrawer({ report, volunteers, onClose, onUpdated }: ReportD
     }
   }
 
+  async function handleReview(action: "approve" | "reject" | "override", reviewNoteStr?: string) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await reviewAdminReport(report!._id, action, reviewNoteStr);
+      onUpdated(res.data);
+      toast({ title: `Review action: ${action} successful` });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to submit review";
+      toast({ title: "Review Error", description: msg, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex">
@@ -200,6 +216,20 @@ export function ReportDrawer({ report, volunteers, onClose, onUpdated }: ReportD
             <div className="grid grid-cols-2 gap-3">
               <MetaItem icon={AlertTriangle} label="Waste Type" value={report.wasteType} />
               <MetaItem icon={Clock} label="Updated" value={new Date(report.updatedAt).toLocaleDateString()} />
+              {report.aiReviewStatus && (
+                <MetaItem icon={CheckCircle} label="ML Status" value={report.aiReviewStatus} />
+              )}
+              {report.imageValidationLabel && (
+                <MetaItem
+                  icon={AlertTriangle}
+                  label="ML Label"
+                  value={`${report.imageValidationLabel} (${
+                    report.imageValidationConfidence != null
+                      ? (report.imageValidationConfidence * 100).toFixed(1) + "%"
+                      : "N/A"
+                  })`}
+                />
+              )}
               {report.reporter && (
                 <MetaItem icon={User} label="Reporter" value={report.reporter.name || report.reporter.email} />
               )}
@@ -247,6 +277,45 @@ export function ReportDrawer({ report, volunteers, onClose, onUpdated }: ReportD
 
             {/* ── Actions ── */}
             <div className="space-y-4">
+              {/* ML Validation Review */}
+              {['flagged', 'manual_review', 'pending'].includes(report.aiReviewStatus) && (
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">ML Validation Review</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                      onClick={() => handleReview("approve")}
+                      disabled={saving}
+                    >
+                      <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                      Approve Image
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-200 text-red-700 hover:bg-red-50"
+                      onClick={() => handleReview("reject")}
+                      disabled={saving}
+                    >
+                      <XCircle className="w-3.5 h-3.5 mr-1" />
+                      Reject (Invalid)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                      onClick={() => handleReview("override")}
+                      disabled={saving}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                      Override (Force Valid)
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Status transitions */}
               {allowedNext.length > 0 && (
                 <div>

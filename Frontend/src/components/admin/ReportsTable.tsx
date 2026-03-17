@@ -42,9 +42,11 @@ interface ReportsTableProps {
   statusFilter: string;
   wasteTypeFilter: string;
   urgencyFilter: string;
+  aiReviewStatusFilter?: string;
   onStatusFilter: (v: string) => void;
   onWasteTypeFilter: (v: string) => void;
   onUrgencyFilter: (v: string) => void;
+  onAiReviewStatusFilter?: (v: string) => void;
   // Selection
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
@@ -63,6 +65,24 @@ const STATUS_BADGE: Record<ReportStatus, string> = {
 const STATUS_LABELS: Record<ReportStatus, string> = {
   pending: "Pending", verified: "Verified", assigned: "Assigned",
   in_progress: "In Progress", resolved: "Resolved", rejected: "Rejected",
+};
+
+const ML_STATUS_BADGE: Record<string, string> = {
+  pending: "bg-gray-100 text-gray-700 border-gray-200",
+  approved: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  flagged: "bg-amber-100 text-amber-700 border-amber-200",
+  manual_review: "bg-blue-100 text-blue-700 border-blue-200",
+  rejected: "bg-red-100 text-red-700 border-red-200",
+  overridden: "bg-pink-100 text-pink-700 border-pink-200",
+};
+
+const ML_STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  flagged: "Flagged",
+  manual_review: "Manual Review",
+  rejected: "Rejected",
+  overridden: "Overridden",
 };
 
 const URGENCY_DOT: Record<UrgencyLevel, string> = {
@@ -145,6 +165,15 @@ const ReportRow = memo(function ReportRow({
         </Badge>
       </td>
       <td className="px-4 py-3">
+        {report.aiReviewStatus ? (
+          <Badge className={cn("border font-medium text-xs", ML_STATUS_BADGE[report.aiReviewStatus] || ML_STATUS_BADGE.pending)}>
+            {ML_STATUS_LABELS[report.aiReviewStatus] || "Pending"}
+          </Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
         <span className={cn("capitalize text-xs font-medium", WASTE_COLORS[report.wasteType])}>
           {report.wasteType}
         </span>
@@ -187,8 +216,8 @@ export function ReportsTable({
   reports, loading, total, page, pageSize,
   onPageChange, onView,
   sortBy, sortOrder, onSort,
-  statusFilter, wasteTypeFilter, urgencyFilter,
-  onStatusFilter, onWasteTypeFilter, onUrgencyFilter,
+  statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter,
+  onStatusFilter, onWasteTypeFilter, onUrgencyFilter, onAiReviewStatusFilter,
   selectedIds, onToggleSelect, onToggleSelectAll,
 }: ReportsTableProps) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -237,6 +266,23 @@ export function ReportsTable({
           </SelectContent>
         </Select>
 
+        {onAiReviewStatusFilter && (
+          <Select value={aiReviewStatusFilter || "all"} onValueChange={(v) => onAiReviewStatusFilter(v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 w-40 text-xs">
+              <SelectValue placeholder="ML Review Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All ML Statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="flagged">Flagged</SelectItem>
+              <SelectItem value="manual_review">Manual Review</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="overridden">Overridden</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+
         <div className="ml-auto flex items-center gap-3">
           {selectedIds.size > 0 && (
             <span className="text-xs font-medium text-primary">
@@ -271,6 +317,9 @@ export function ReportsTable({
                   Status
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                  ML Status
+                </th>
+                <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">
                   Type
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">
@@ -288,14 +337,14 @@ export function ReportsTable({
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="text-center py-16">
+                  <td colSpan={8} className="text-center py-16">
                     <div className="inline-block w-7 h-7 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
                   </td>
                 </tr>
               )}
               {!loading && reports.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-16 text-muted-foreground text-sm">
+                  <td colSpan={8} className="text-center py-16 text-muted-foreground text-sm">
                     No reports found
                   </td>
                 </tr>

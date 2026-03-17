@@ -43,6 +43,16 @@ export interface AdminReport {
   assignedTo: string | null;
   adminNote: string | null;
   rejectionReason: string | null;
+  
+  // ML Phase 1 fields
+  aiReviewStatus?: 'approved' | 'flagged' | 'manual_review' | 'pending' | 'rejected' | 'overridden';
+  imageValidationLabel?: 'trash' | 'non-trash' | 'error' | 'pending';
+  imageValidationConfidence?: number | null;
+  finalValidationDecision?: 'approved' | 'rejected' | 'overridden' | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
+
   resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -185,6 +195,8 @@ export interface ReportFilters {
   status?: string;
   wasteType?: string;
   urgency?: string;
+  aiReviewStatus?: string;
+  imageValidationLabel?: string;
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';

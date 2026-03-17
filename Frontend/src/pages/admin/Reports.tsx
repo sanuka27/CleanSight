@@ -56,6 +56,7 @@ export default function AdminReports() {
   const [statusFilter, setStatusFilter] = useState("");
   const [wasteTypeFilter, setWasteTypeFilter] = useState("");
   const [urgencyFilter, setUrgencyFilter] = useState("");
+  const [aiReviewStatusFilter, setAiReviewStatusFilter] = useState("");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
@@ -78,8 +79,7 @@ export default function AdminReports() {
         search,
         status: statusFilter,
         wasteType: wasteTypeFilter,
-        urgency: urgencyFilter,
-        sortBy,
+        urgency: urgencyFilter,        aiReviewStatus: aiReviewStatusFilter,        sortBy,
         sortOrder,
         from: dates.from,
         to: dates.to,
@@ -93,7 +93,7 @@ export default function AdminReports() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, wasteTypeFilter, urgencyFilter, sortBy, sortOrder, range, customDates, toast]);
+}, [page, search, statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter, sortBy, sortOrder, range, customDates, toast]);
 
   // Load volunteers for assignment dropdown
   useEffect(() => {
@@ -108,7 +108,7 @@ export default function AdminReports() {
     setSelectedIds(new Set());
     loadReports({ pg: 1 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter, wasteTypeFilter, urgencyFilter, sortBy, sortOrder, range]);
+  }, [search, statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter, sortBy, sortOrder, range]);
 
   // Reload when page changes
   const prevPage = useRef(page);
@@ -343,23 +343,11 @@ export default function AdminReports() {
           statusFilter={statusFilter}
           wasteTypeFilter={wasteTypeFilter}
           urgencyFilter={urgencyFilter}
-          onStatusFilter={setStatusFilter}
-          onWasteTypeFilter={setWasteTypeFilter}
-          onUrgencyFilter={setUrgencyFilter}
-          selectedIds={selectedIds}
-          onToggleSelect={handleToggleSelect}
-          onToggleSelectAll={handleToggleSelectAll}
-        />
-
-        {/* Bulk Action Bar — sticky at bottom when items are selected */}
-        <BulkActionBar
-          selectedCount={selectedIds.size}
-          onClear={clearSelection}
-          onBulkAssign={() => setActiveDialog("assign")}
-          onBulkStatus={() => setActiveDialog("status")}
-          onBulkReject={() => setActiveDialog("reject")}
-          onBulkExport={() => setActiveDialog("export")}
-          loading={bulkLoading}
+            aiReviewStatusFilter={aiReviewStatusFilter}
+            onStatusFilter={setStatusFilter}
+            onWasteTypeFilter={setWasteTypeFilter}
+            onUrgencyFilter={setUrgencyFilter}
+            onAiReviewStatusFilter={setAiReviewStatusFilter}
         />
       </div>
 

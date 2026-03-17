@@ -30,6 +30,7 @@ router.get('/reports', async (req, res) => {
       status,
       wasteType,
       urgency,
+      aiReviewStatus,
       search,
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -54,6 +55,10 @@ router.get('/reports', async (req, res) => {
     if (urgency) {
       const urgencies = String(urgency).split(',').map(s => s.trim()).filter(Boolean);
       if (urgencies.length) filter.urgency = { $in: urgencies };
+    }
+    if (aiReviewStatus) {
+      const aiStatuses = String(aiReviewStatus).split(',').map(s => s.trim()).filter(Boolean);
+      if (aiStatuses.length) filter.aiReviewStatus = { $in: aiStatuses };
     }
     if (assignedTo) {
       filter.assignedTo = String(assignedTo);
@@ -721,6 +726,81 @@ router.patch('/reports/:id/status', async (req, res) => {
     res.json({ success: true, data: report });
   } catch (err) {
     console.error('Admin update status error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * PATCH /api/admin/reports/:id/review
+ * Admin review for ML validated reports.
+ */
+router.patch('/reports/:id/review', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, reviewNote } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid report ID' });
+    }
+
+    const VALID_ACTIONS = ['approve', 'reject', 'override'];
+    if (!VALID_ACTIONS.includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`,
+      });
+    }
+
+    const report = await Report.findById(id);
+    if (!report) return res.status(404).json({ success: false, message: 'Report not found' });
+
+    const aiReviewStatusFrom = report.aiReviewStatus;
+    
+    let decision = null;
+    let newAiReviewStatus = report.aiReviewStatus;
+
+    if (action === 'approve') {
+      decision = 'approved';
+      newAiReviewStatus = 'approved';
+    } else if (action === 'reject') {
+      decision = 'rejected';
+      newAiReviewStatus = 'rejected';
+      // Auto-reject the full report when it's marked as invalid non-trash
+      report.status = 'rejected';
+      report.rejectionReason = 'Auto-rejected: invalid image determined during admin review.';
+    } else if (action === 'override') {
+      decision = 'overridden';
+      newAiReviewStatus = 'overridden';
+      // Change imageValidationLabel if overridden (assuming user marked it valid trash)
+      report.imageValidationLabel = 'trash';
+    }
+
+    report.aiReviewStatus = newAiReviewStatus;
+    report.finalValidationDecision = decision;
+    report.reviewedBy = req.adminUser.firebaseUid;
+    report.reviewedAt = new Date();
+    if (reviewNote) {
+      report.reviewNote = reviewNote;
+    }
+
+    await report.save();
+
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'REPORT_ML_REVIEW',
+      entityType: 'report',
+      entityId: id,
+      metadata: {
+        aiReviewStatusFrom,
+        aiReviewStatusTo: newAiReviewStatus,
+        decision,
+      },
+    });
+
+    res.json({ success: true, data: report });
+  } catch (err) {
+    console.error('Admin review ML report error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

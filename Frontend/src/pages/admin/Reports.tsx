@@ -79,7 +79,9 @@ export default function AdminReports() {
         search,
         status: statusFilter,
         wasteType: wasteTypeFilter,
-        urgency: urgencyFilter,        aiReviewStatus: aiReviewStatusFilter,        sortBy,
+        urgency: urgencyFilter,
+        aiReviewStatus: aiReviewStatusFilter,
+        sortBy,
         sortOrder,
         from: dates.from,
         to: dates.to,
@@ -343,11 +345,22 @@ export default function AdminReports() {
           statusFilter={statusFilter}
           wasteTypeFilter={wasteTypeFilter}
           urgencyFilter={urgencyFilter}
-            aiReviewStatusFilter={aiReviewStatusFilter}
-            onStatusFilter={setStatusFilter}
-            onWasteTypeFilter={setWasteTypeFilter}
-            onUrgencyFilter={setUrgencyFilter}
-            onAiReviewStatusFilter={setAiReviewStatusFilter}
+          aiReviewStatusFilter={aiReviewStatusFilter}
+          onStatusFilter={setStatusFilter}
+          onWasteTypeFilter={setWasteTypeFilter}
+          onUrgencyFilter={setUrgencyFilter}
+          onAiReviewStatusFilter={setAiReviewStatusFilter}
+          selectedIds={selectedIds}
+          onToggleSelect={onToggleSelect}
+          onToggleSelectAll={onToggleSelectAll}
+        />
+        <BulkActionBar
+          selectedCount={selectedIds.size}
+          onClearSelection={onClearSelection}
+          onAssign={() => setActiveDialog("assign")}
+          onStatus={() => setActiveDialog("status")}
+          onReject={() => setActiveDialog("reject")}
+          onExport={() => setActiveDialog("export")}
         />
       </div>
 

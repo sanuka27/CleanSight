@@ -78,12 +78,15 @@ credentials.json
 *.js.map
 *.css.map
 
-# ML Phase 1
+# ML — Phase 1 & Phase 2
 ML/dataset_binary/
+ML/dataset_category/
 ML/models/*.keras
 ML/models/*.h5
+ML/models/*.json
 ML/models/checkpoints/
 ML/models/logs/
+ML/artifacts/
 ML/venv/
 ML/.env
 ML/__pycache__/

@@ -12,7 +12,25 @@ Usage (from project root):
 
 import os
 import sys
-from PIL import Image
+
+# Check for required dependencies before importing
+try:
+    from PIL import Image
+except ImportError as e:
+    print("\n" + "=" * 70)
+    print("  ERROR: Missing required dependencies")
+    print("=" * 70)
+    print(f"\nFailed to import: {e}")
+    print("\nThis script requires Pillow (PIL) to run.")
+    print("\nTo fix this issue:")
+    print("  1. Ensure your Python virtual environment is activated")
+    print("     Windows PowerShell: .\\venv\\Scripts\\Activate.ps1")
+    print("     Windows CMD:        venv\\Scripts\\activate.bat")
+    print("  2. Install dependencies:")
+    print("     pip install -r ML/requirements.txt")
+    print("\nFor more help, see ML/README.md - Setup and Installation section")
+    print("=" * 70 + "\n")
+    sys.exit(1)
 
 # Paths (relative to project root)
 ML_DIR = os.path.join(os.path.dirname(__file__), os.pardir)

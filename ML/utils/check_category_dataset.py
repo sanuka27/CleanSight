@@ -20,7 +20,7 @@ ML_DIR = os.path.abspath(ML_DIR)
 
 DATASET_DIR = os.path.join(ML_DIR, "dataset_category")
 EXPECTED_CLASSES = ["glass", "mixed", "paper", "plastic"]
-VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"}
+VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".gif"}
 
 
 def check_category_dataset(dataset_dir=None):

@@ -50,10 +50,16 @@ def load_class_names(class_names_path):
 def predict_category(model, image_path, class_names):
     """Predict the waste category for a single image."""
     # Load and preprocess the image
-    img = tf.keras.utils.load_img(image_path, target_size=IMG_SIZE)
-    img_array = tf.keras.utils.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_input(img_array)
+    try:
+        img = tf.keras.utils.load_img(image_path, target_size=IMG_SIZE)
+        img_array = tf.keras.utils.img_to_array(img)
+        img_array = np.expand_dims(img_array, axis=0)
+        img_array = preprocess_input(img_array)
+    except Exception as e:
+        print(f"ERROR: Failed to load or preprocess image: {image_path}")
+        print(f"Reason: {e}")
+        print("Please ensure the file is a valid/decodable image.")
+        sys.exit(1)
 
     # Run inference
     predictions = model.predict(img_array, verbose=0)

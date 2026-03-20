@@ -60,7 +60,7 @@ EXPECTED_CLASSES = ["glass", "mixed", "paper", "plastic"]
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def validate_dataset_dir(dataset_dir):
-    """Check that the dataset directory exists and contains the expected class folders."""
+    """Check that the dataset directory exists and contains exactly the expected class folders."""
     if not os.path.isdir(dataset_dir):
         print(f"ERROR: Dataset directory not found: {dataset_dir}")
         print("Please create ML/dataset_category/ with subfolders: plastic, paper, glass, mixed")
@@ -73,12 +73,23 @@ def validate_dataset_dir(dataset_dir):
 
     if not found_classes:
         print(f"ERROR: No class subdirectories found in {dataset_dir}")
-        print("Expected subfolders: plastic, paper, glass, mixed")
+        print(f"Expected subfolders: {EXPECTED_CLASSES}")
         sys.exit(1)
 
-    # Check each folder has at least some images
+    # Enforce expected classes
+    missing = [c for c in EXPECTED_CLASSES if c not in found_classes]
+    if missing:
+        print(f"ERROR: Missing required class folders: {missing}")
+        print(f"Expected subfolders: {EXPECTED_CLASSES}")
+        sys.exit(1)
+
+    unexpected = [c for c in found_classes if c not in EXPECTED_CLASSES]
+    if unexpected:
+        print(f"WARNING: Unexpected class folders found (will be ignored by training): {unexpected}")
+
+    # Check each expected folder has at least some images
     empty_folders = []
-    for cls in found_classes:
+    for cls in EXPECTED_CLASSES:
         cls_path = os.path.join(dataset_dir, cls)
         files = [f for f in os.listdir(cls_path) if os.path.isfile(os.path.join(cls_path, f))]
         if len(files) == 0:
@@ -90,8 +101,8 @@ def validate_dataset_dir(dataset_dir):
         sys.exit(1)
 
     print(f"Dataset directory: {dataset_dir}")
-    print(f"Found classes: {found_classes}")
-    return found_classes
+    print(f"Found classes: {EXPECTED_CLASSES}")
+    return EXPECTED_CLASSES
 
 
 def build_data_augmentation():
@@ -108,10 +119,14 @@ def save_training_history(history, fine_tune_history, save_path):
     """Save training accuracy and loss plots."""
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-    acc = history.history["accuracy"]
-    val_acc = history.history["val_accuracy"]
-    loss = history.history["loss"]
-    val_loss = history.history["val_loss"]
+    # Copy lists to avoid mutating history.history in place
+    acc = list(history.history["accuracy"])
+    val_acc = list(history.history["val_accuracy"])
+    loss = list(history.history["loss"])
+    val_loss = list(history.history["val_loss"])
+
+    # Record the initial epoch count before appending fine-tune data
+    initial_epochs = len(acc)
 
     if fine_tune_history:
         acc += fine_tune_history.history["accuracy"]
@@ -126,7 +141,7 @@ def save_training_history(history, fine_tune_history, save_path):
     ax1.plot(epochs_range, acc, label="Train Accuracy")
     ax1.plot(epochs_range, val_acc, label="Val Accuracy")
     if fine_tune_history:
-        ax1.axvline(x=len(history.history["accuracy"]), color="gray", linestyle="--", label="Fine-Tune Start")
+        ax1.axvline(x=initial_epochs, color="gray", linestyle="--", label="Fine-Tune Start")
     ax1.set_title("Category Model — Accuracy")
     ax1.set_xlabel("Epoch")
     ax1.set_ylabel("Accuracy")
@@ -136,7 +151,7 @@ def save_training_history(history, fine_tune_history, save_path):
     ax2.plot(epochs_range, loss, label="Train Loss")
     ax2.plot(epochs_range, val_loss, label="Val Loss")
     if fine_tune_history:
-        ax2.axvline(x=len(history.history["loss"]), color="gray", linestyle="--", label="Fine-Tune Start")
+        ax2.axvline(x=initial_epochs, color="gray", linestyle="--", label="Fine-Tune Start")
     ax2.set_title("Category Model — Loss")
     ax2.set_xlabel("Epoch")
     ax2.set_ylabel("Loss")

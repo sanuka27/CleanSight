@@ -2,10 +2,12 @@
 
 This directory contains the machine learning components for the CleanSight waste detection system. The ML pipeline is split into two phases:
 
-- **Phase 1** — Binary classification (trash vs. non-trash)
-- **Phase 2** — Waste category classification (plastic, paper, glass, mixed)
+- **Phase 1** — Binary classification (trash vs. non-trash) — TensorFlow/Keras
+- **Phase 2** — Waste category classification (plastic, paper, glass, mixed) — **PyTorch**
 
 In the full pipeline, Phase 1 first determines whether an image contains waste. If it does, Phase 2 classifies the type of waste. Backend integration and admin review flows are handled in separate branches.
+
+> **Note**: Phase 2 was migrated from TensorFlow/Keras to PyTorch for Python 3.14+ compatibility on Windows. See the "Why PyTorch?" section below for details.
 
 ---
 
@@ -51,9 +53,11 @@ python -m ML.utils.check_dataset
 
 ---
 
-## Phase 2 — Waste Category Classification
+## Phase 2 — Waste Category Classification (PyTorch)
 
 Phase 2 classifies waste images into one of four categories. It is designed to run **after** Phase 1 confirms the image contains trash.
+
+This phase uses **PyTorch** with a **MobileNetV3-Small** backbone for Python 3.14+ compatibility on Windows.
 
 ### Dataset Structure
 
@@ -74,11 +78,11 @@ python -m ML.training.train_category_model
 ```
 
 This script:
-- Loads images from `ML/dataset_category/` using `image_dataset_from_directory`
-- Uses 224×224 image size with 80/20 validation split
-- Applies data augmentation (random flip, rotation, zoom, contrast)
-- Uses MobileNetV2 transfer learning (frozen base → fine-tuned top layers)
-- Saves the best model to `ML/models/waste_category_classifier.keras`
+- Loads images from `ML/dataset_category/` using `torchvision.datasets.ImageFolder`
+- Uses 224×224 image size with 80/20 train/validation split
+- Applies data augmentation (random flip, rotation, affine transforms, color jitter)
+- Uses MobileNetV3-Small transfer learning (frozen backbone → fine-tuned)
+- Saves the best model to `ML/models/waste_category_classifier.pt`
 - Saves the class name order to `ML/models/category_class_names.json`
 - Saves training history plot to `ML/artifacts/category_training_history.png`
 
@@ -92,7 +96,7 @@ Options:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--image` | *(required)* | Path to the image to classify |
-| `--model` | `ML/models/waste_category_classifier.keras` | Path to model file |
+| `--model` | `ML/models/waste_category_classifier.pt` | Path to model file |
 | `--labels` | `ML/models/category_class_names.json` | Path to class names JSON |
 
 The script outputs the predicted category, confidence score, and per-class probabilities.
@@ -103,7 +107,9 @@ The script outputs the predicted category, confidence score, and per-class proba
 python -m ML.evaluation.evaluate_category_model
 ```
 
-Reports accuracy, precision, recall, F1-score (per class), and saves a confusion matrix to `ML/artifacts/category_confusion_matrix.png`.
+Reports accuracy, precision, recall, F1-score (per class), and saves:
+- Confusion matrix plot: `ML/artifacts/category_confusion_matrix.png`
+- Evaluation report JSON: `ML/artifacts/category_evaluation_report.json`
 
 ### Dataset Check
 
@@ -119,11 +125,12 @@ Scans the category dataset folders, counts images per class, reports distributio
 
 | File | Description |
 |------|-------------|
-| `models/trash_classifier.keras` | Phase 1 binary model |
-| `models/waste_category_classifier.keras` | Phase 2 category model |
+| `models/trash_classifier.keras` | Phase 1 binary model (TensorFlow) |
+| `models/waste_category_classifier.pt` | Phase 2 category model (PyTorch) |
 | `models/category_class_names.json` | Phase 2 class name order (saved during training) |
 | `artifacts/category_training_history.png` | Phase 2 training accuracy/loss plot |
 | `artifacts/category_confusion_matrix.png` | Phase 2 evaluation confusion matrix |
+| `artifacts/category_evaluation_report.json` | Phase 2 evaluation metrics report |
 
 All model files and artifacts are git-ignored.
 
@@ -135,11 +142,11 @@ All model files and artifacts are git-ignored.
     Image Input
          │
     ┌────▼────┐
-    │ Phase 1 │  → trash or non-trash?
+    │ Phase 1 │  → trash or non-trash? (TensorFlow)
     └────┬────┘
          │ (trash confirmed)
     ┌────▼────┐
-    │ Phase 2 │  → plastic / paper / glass / mixed
+    │ Phase 2 │  → plastic / paper / glass / mixed (PyTorch)
     └─────────┘
 ```
 
@@ -151,8 +158,15 @@ A future integration branch will combine both phases into a single prediction fl
 
 ### Prerequisites
 
-- Python 3.9 or 3.10 (recommended for TensorFlow 2.15 compatibility)
+**Phase 2 (PyTorch):**
+- **Python 3.10+** (tested on Python 3.14.3 on Windows)
 - Windows PowerShell or Command Prompt
+
+**Phase 1 (TensorFlow):**
+- **Python 3.9 or 3.10** (recommended for TensorFlow 2.15 compatibility)
+- Note: If you need to run both phases, consider using separate virtual environments
+
+> **Important**: Phase 1 and Phase 2 have different Python version requirements. Phase 2 (PyTorch) supports Python 3.10+ including Python 3.14, while Phase 1 (TensorFlow) requires Python 3.9-3.10. If you only need Phase 2, you can use the latest Python version.
 
 ### Step 1: Create a Python Virtual Environment
 
@@ -186,57 +200,80 @@ You should see `(venv)` prefix in your terminal prompt indicating the virtual en
 
 ### Step 3: Install ML Dependencies
 
-With the virtual environment activated, install all required packages:
+**For Phase 2 (PyTorch) only:**
+
+With the virtual environment activated, install the Phase 2 requirements:
 
 ```powershell
 pip install -r ML/requirements.txt
 ```
 
-**Note**: This installs packages for training and inference (TensorFlow 2.15.0, matplotlib, seaborn, scikit-learn). For the ML service only (FastAPI), use `pip install -r ML/requirements_service.txt` instead. Both files use TensorFlow 2.15.0 for consistency.
-
 This will install:
-- `tensorflow==2.15.0` — Deep learning framework
-- `Pillow==10.2.0` — Image processing
-- `numpy==1.26.4` — Numerical computing
-- `matplotlib==3.8.3` — Plotting and visualization
-- `seaborn==0.13.2` — Statistical visualization
-- `scikit-learn==1.4.1.post1` — Machine learning metrics
+- `torch` — PyTorch deep learning framework
+- `torchvision` — Computer vision models and transforms
+- `Pillow` — Image processing
+- `numpy` — Numerical computing
+- `matplotlib` — Plotting and visualization
+- `seaborn` — Statistical visualization
+- `scikit-learn` — Machine learning metrics
 
-### Step 4: Verify TensorFlow Installation
-
-Test that TensorFlow is correctly installed:
+**Note for CPU-only installation** (if you don't have a CUDA GPU):
 
 ```powershell
-python -c "import tensorflow as tf; print('TensorFlow version:', tf.__version__)"
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install -r ML/requirements.txt
 ```
 
-Expected output:
+**For Phase 1 (TensorFlow) only:**
+
+Phase 1 requires TensorFlow 2.15 and Python 3.9-3.10. Install Phase 1 dependencies in a separate virtual environment:
+
+```powershell
+pip install -r ML/requirements_service.txt
+```
+
+> **Note**: If you need to run both phases, create separate virtual environments (e.g., `venv-phase1` with Python 3.10 for TensorFlow, and `venv-phase2` with Python 3.10+ for PyTorch).
+
+### Step 4: Verify PyTorch Installation
+
+Test that PyTorch is correctly installed:
+
+```powershell
+python -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available())"
+```
+
+Expected output (example):
 
 ```
-TensorFlow version: 2.15.0
+PyTorch version: 2.5.0
+CUDA available: False
 ```
 
-### Common Issues and Solutions
+(CUDA will be `True` if you have a compatible NVIDIA GPU with drivers installed)
 
-#### Issue: "ModuleNotFoundError: No module named 'tensorflow'"
+---
 
-**Cause**: TensorFlow is not installed in the active environment.
+## Common Issues and Solutions
+
+### Issue: "ModuleNotFoundError: No module named 'torch'"
+
+**Cause**: PyTorch is not installed in the active environment.
 
 **Solution**:
 1. Verify your virtual environment is activated (check for `(venv)` prefix)
 2. Install dependencies: `pip install -r ML/requirements.txt`
-3. If the issue persists, reinstall TensorFlow: `pip install tensorflow==2.15.0`
+3. If the issue persists, install PyTorch directly: `pip install torch torchvision`
 
-#### Issue: "ModuleNotFoundError: No module named 'seaborn'"
+### Issue: "ModuleNotFoundError: No module named 'seaborn'"
 
 **Cause**: seaborn is not installed in the active environment.
 
 **Solution**:
 1. Verify your virtual environment is activated
-2. Install seaborn: `pip install seaborn==0.13.2`
+2. Install seaborn: `pip install seaborn`
 3. Or reinstall all dependencies: `pip install -r ML/requirements.txt`
 
-#### Issue: Virtual environment activation fails (PowerShell)
+### Issue: Virtual environment activation fails (PowerShell)
 
 **Cause**: PowerShell execution policy restriction.
 
@@ -249,15 +286,15 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 Then try activating again: `.\venv\Scripts\Activate.ps1`
 
-#### Issue: Python command not found
+### Issue: Python command not found
 
 **Cause**: Python is not in your system PATH.
 
 **Solution**:
 1. Reinstall Python and check "Add Python to PATH" during installation
-2. Or use the full path to python.exe: `C:\Python310\python.exe -m venv venv`
+2. Or use the full path to python.exe: `C:\Python314\python.exe -m venv venv`
 
-#### Issue: "pip install -r ML/requirements.txt" fails with encoding error
+### Issue: "pip install -r ML/requirements.txt" fails with encoding error
 
 **Cause**: The requirements.txt file may be encoded incorrectly (UTF-16 instead of UTF-8).
 
@@ -265,19 +302,19 @@ Then try activating again: `.\venv\Scripts\Activate.ps1`
 1. Check file encoding in VS Code (bottom-right status bar should show "UTF-8")
 2. If it shows UTF-16, click encoding → "Save with Encoding" → UTF-8
 3. Retry installation: `pip install -r ML/requirements.txt`
-4. Verify installation: `pip show tensorflow pillow numpy matplotlib seaborn scikit-learn`
 
-#### Issue: TensorFlow version mismatch between training and service
+### Issue: CUDA out of memory during training
 
-**Cause**: Using different TensorFlow versions can cause model loading failures.
+**Cause**: GPU memory is insufficient for the batch size.
 
 **Solution**:
-- Both `ML/requirements.txt` and `ML/requirements_service.txt` now use TensorFlow 2.15.0 for consistency
-- Use `requirements.txt` for training/inference development
-- Use `requirements_service.txt` for deploying the FastAPI service
-- To verify versions: `pip show tensorflow numpy`
+1. Reduce `BATCH_SIZE` in the training script (try 16 or 8)
+2. Or train on CPU by ensuring CUDA is not available
+3. Close other GPU-intensive applications
 
-### Running ML Scripts
+---
+
+## Running ML Scripts
 
 Always ensure your virtual environment is activated before running scripts. From the project root:
 
@@ -289,8 +326,8 @@ python -m ML.utils.check_category_dataset  # Phase 2 dataset
 
 **Train models:**
 ```powershell
-python -m ML.training.train_binary_model    # Phase 1 training
-python -m ML.training.train_category_model  # Phase 2 training
+python -m ML.training.train_binary_model    # Phase 1 training (TensorFlow)
+python -m ML.training.train_category_model  # Phase 2 training (PyTorch)
 ```
 
 **Run inference:**
@@ -307,11 +344,29 @@ python -m ML.evaluation.evaluate_category_model # Phase 2 evaluation
 
 ---
 
+## Why PyTorch for Phase 2?
+
+Phase 2 was migrated from TensorFlow/Keras to PyTorch for the following reasons:
+
+1. **Python 3.14+ Compatibility**: TensorFlow 2.x does not yet officially support Python 3.14. PyTorch has better forward compatibility with newer Python versions on Windows.
+
+2. **Simpler Windows Installation**: PyTorch installation on Windows is more straightforward, especially for students who may not have complex build environments.
+
+3. **Lightweight Model**: MobileNetV3-Small was chosen over MobileNetV2 as it offers better accuracy-to-efficiency ratio and is well-suited for student laptops.
+
+4. **Transfer Learning Support**: PyTorch's `torchvision.models` provides excellent pretrained models with modern weight APIs.
+
+5. **Educational Value**: PyTorch's explicit training loop helps students understand the training process better than Keras's high-level `model.fit()`.
+
+**Note**: Phase 1 remains on TensorFlow/Keras. A future integration branch may unify both phases under a single framework if needed.
+
+---
+
 ## Future Branches
 
 The following features are planned for later branches (not included here):
 
-- Phase 2 training/tuning optimizations
+- Phase 1 migration to PyTorch (if needed for unified framework)
 - Phase 2 backend integration
 - Phase 2 admin review flow
 - Combined Phase 1 → Phase 2 prediction endpoint

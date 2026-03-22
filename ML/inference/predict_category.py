@@ -1,14 +1,16 @@
 """
-CleanSight ML Phase 2 — Waste Category Prediction (Inference)
+CleanSight ML Phase 2 — Waste Category Prediction (Inference) (PyTorch)
 
 Loads the trained Phase 2 model and predicts the waste category
 (plastic, paper, glass, or mixed) for a single image.
+
+This implementation uses PyTorch for Python 3.14.3 compatibility on Windows.
 
 Usage (from project root):
     python -m ML.inference.predict_category --image <path_to_image>
 
 Options:
-    --model   Path to model file (default: ML/models/waste_category_classifier.keras)
+    --model   Path to model file (default: ML/models/waste_category_classifier.pt)
     --labels  Path to class names JSON (default: ML/models/category_class_names.json)
 """
 
@@ -17,20 +19,18 @@ import sys
 import json
 import argparse
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+import torch
+import torch.nn.functional as F
+from PIL import Image
 
-import numpy as np
-import tensorflow as tf
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+from ML.utils.model_utils import get_device, create_model, get_val_transform
 
 # Paths (relative to project root)
 ML_DIR = os.path.join(os.path.dirname(__file__), os.pardir)
 ML_DIR = os.path.abspath(ML_DIR)
 
-DEFAULT_MODEL_PATH = os.path.join(ML_DIR, "models", "waste_category_classifier.keras")
+DEFAULT_MODEL_PATH = os.path.join(ML_DIR, "models", "waste_category_classifier.pt")
 DEFAULT_CLASS_NAMES_PATH = os.path.join(ML_DIR, "models", "category_class_names.json")
-
-IMG_SIZE = (224, 224)
 
 
 def load_class_names(class_names_path):
@@ -47,14 +47,23 @@ def load_class_names(class_names_path):
     return class_names
 
 
-def predict_category(model, image_path, class_names):
+def load_model(model_path, num_classes, device):
+    """Load the trained model weights."""
+    model = create_model(num_classes, pretrained=False)
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+    model = model.to(device)
+    model.eval()
+    return model
+
+
+def predict_category(model, image_path, class_names, device):
     """Predict the waste category for a single image."""
+    transform = get_val_transform()
+
     # Load and preprocess the image
     try:
-        img = tf.keras.utils.load_img(image_path, target_size=IMG_SIZE)
-        img_array = tf.keras.utils.img_to_array(img)
-        img_array = np.expand_dims(img_array, axis=0)
-        img_array = preprocess_input(img_array)
+        img = Image.open(image_path).convert("RGB")
+        img_tensor = transform(img).unsqueeze(0).to(device)
     except Exception as e:
         print(f"ERROR: Failed to load or preprocess image: {image_path}")
         print(f"Reason: {e}")
@@ -62,17 +71,21 @@ def predict_category(model, image_path, class_names):
         sys.exit(1)
 
     # Run inference
-    predictions = model.predict(img_array, verbose=0)
-    predicted_index = np.argmax(predictions[0])
-    confidence = float(predictions[0][predicted_index])
-    predicted_label = class_names[predicted_index]
+    with torch.no_grad():
+        outputs = model(img_tensor)
+        probabilities = F.softmax(outputs, dim=1)
+        confidence, predicted_idx = torch.max(probabilities, 1)
 
-    return predicted_label, confidence, predictions[0]
+    predicted_label = class_names[predicted_idx.item()]
+    confidence_value = confidence.item()
+    all_scores = probabilities[0].cpu().numpy()
+
+    return predicted_label, confidence_value, all_scores
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="CleanSight Phase 2 — Predict waste category from an image"
+        description="CleanSight Phase 2 - Predict waste category from an image (PyTorch)"
     )
     parser.add_argument(
         "--image", type=str, required=True,
@@ -80,7 +93,7 @@ def main():
     )
     parser.add_argument(
         "--model", type=str, default=DEFAULT_MODEL_PATH,
-        help="Path to the trained model file (.keras)"
+        help="Path to the trained model file (.pt)"
     )
     parser.add_argument(
         "--labels", type=str, default=DEFAULT_CLASS_NAMES_PATH,
@@ -102,12 +115,17 @@ def main():
     # Load class names from training
     class_names = load_class_names(args.labels)
 
+    # Get device
+    device = get_device()
+
     # Load model
-    print("Loading model...")
-    model = tf.keras.models.load_model(args.model)
+    print(f"Loading model... (device: {device})")
+    model = load_model(args.model, len(class_names), device)
 
     # Predict
-    predicted_label, confidence, all_scores = predict_category(model, args.image, class_names)
+    predicted_label, confidence, all_scores = predict_category(
+        model, args.image, class_names, device
+    )
 
     # Display results
     print("\n" + "=" * 50)
@@ -125,11 +143,11 @@ def main():
 
     # Status message
     if confidence >= 0.8:
-        print(f"  Status: High confidence — {predicted_label}")
+        print(f"  Status: High confidence - {predicted_label}")
     elif confidence >= 0.5:
-        print(f"  Status: Moderate confidence — {predicted_label}")
+        print(f"  Status: Moderate confidence - {predicted_label}")
     else:
-        print(f"  Status: Low confidence — manual review suggested")
+        print(f"  Status: Low confidence - manual review suggested")
     print("")
 
 

@@ -32,6 +32,13 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms, models
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
+from ML.utils.model_utils import (
+    get_device,
+    create_model,
+    get_val_transform,
+    validate_split_sizes,
+)
+
 # Paths (relative to project root)
 ML_DIR = os.path.join(os.path.dirname(__file__), os.pardir)
 ML_DIR = os.path.abspath(ML_DIR)
@@ -45,28 +52,6 @@ IMG_SIZE = 224
 BATCH_SIZE = 32
 VALIDATION_SPLIT = 0.2  # Must match training split
 NUM_WORKERS = 0  # Set to 0 for Windows compatibility
-
-
-def get_device():
-    """Get the best available device (CUDA, MPS, or CPU)."""
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return torch.device("mps")
-    else:
-        return torch.device("cpu")
-
-
-def get_val_transform():
-    """Get the transform for validation (must match training validation transform)."""
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-
-    return transforms.Compose([
-        transforms.Resize((IMG_SIZE, IMG_SIZE)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std),
-    ])
 
 
 def load_class_names(class_names_path):
@@ -83,28 +68,9 @@ def load_class_names(class_names_path):
     return class_names
 
 
-def create_model(num_classes):
-    """Create the model architecture (must match training)."""
-    model = models.mobilenet_v3_small(weights=None)
-
-    # Replace the classifier head (same architecture as training)
-    in_features = model.classifier[0].in_features
-    model.classifier = nn.Sequential(
-        nn.Linear(in_features, 256),
-        nn.Hardswish(),
-        nn.Dropout(p=0.3),
-        nn.Linear(256, 128),
-        nn.Hardswish(),
-        nn.Dropout(p=0.2),
-        nn.Linear(128, num_classes),
-    )
-
-    return model
-
-
 def load_model(model_path, num_classes, device):
     """Load the trained model weights."""
-    model = create_model(num_classes)
+    model = create_model(num_classes, pretrained=False)
     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model = model.to(device)
     model.eval()
@@ -184,10 +150,13 @@ def evaluate(model_path, class_names_path, dataset_dir):
         print(f"WARNING: Dataset class order {dataset_class_names} differs from training {class_names}")
         print("This may cause incorrect evaluation results.")
 
-    # Calculate split sizes (must match training)
+    # Calculate and validate split sizes (must match training)
     total_size = len(full_dataset)
-    val_size = int(total_size * VALIDATION_SPLIT)
-    train_size = total_size - val_size
+    try:
+        train_size, val_size = validate_split_sizes(total_size, VALIDATION_SPLIT)
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
 
     # Split dataset with fixed seed for reproducibility (same as training)
     generator = torch.Generator().manual_seed(42)

@@ -158,8 +158,15 @@ A future integration branch will combine both phases into a single prediction fl
 
 ### Prerequisites
 
-- **Python 3.14+** (tested on Python 3.14.3 on Windows)
+**Phase 2 (PyTorch):**
+- **Python 3.10+** (tested on Python 3.14.3 on Windows)
 - Windows PowerShell or Command Prompt
+
+**Phase 1 (TensorFlow):**
+- **Python 3.9 or 3.10** (recommended for TensorFlow 2.15 compatibility)
+- Note: If you need to run both phases, consider using separate virtual environments
+
+> **Important**: Phase 1 and Phase 2 have different Python version requirements. Phase 2 (PyTorch) supports Python 3.10+ including Python 3.14, while Phase 1 (TensorFlow) requires Python 3.9-3.10. If you only need Phase 2, you can use the latest Python version.
 
 ### Step 1: Create a Python Virtual Environment
 

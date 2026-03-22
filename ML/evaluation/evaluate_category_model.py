@@ -29,7 +29,7 @@ import seaborn as sns
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, transforms, models
+from torchvision import datasets
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
 from ML.utils.model_utils import (
@@ -48,7 +48,6 @@ DEFAULT_CLASS_NAMES_PATH = os.path.join(ML_DIR, "models", "category_class_names.
 DEFAULT_DATASET_DIR = os.path.join(ML_DIR, "dataset_category")
 ARTIFACTS_DIR = os.path.join(ML_DIR, "artifacts")
 
-IMG_SIZE = 224
 BATCH_SIZE = 32
 VALIDATION_SPLIT = 0.2  # Must match training split
 NUM_WORKERS = 0  # Set to 0 for Windows compatibility
@@ -145,10 +144,13 @@ def evaluate(model_path, class_names_path, dataset_dir):
     full_dataset = datasets.ImageFolder(dataset_dir)
     dataset_class_names = full_dataset.classes
 
-    # Verify class order matches training
+    # Verify class order matches training (fail fast if mismatch)
     if dataset_class_names != class_names:
-        print(f"WARNING: Dataset class order {dataset_class_names} differs from training {class_names}")
-        print("This may cause incorrect evaluation results.")
+        print("ERROR: Dataset class names/order do not match training-time class names.")
+        print(f"  Dataset classes:  {dataset_class_names}")
+        print(f"  Training classes: {class_names}")
+        print("Please ensure the evaluation dataset uses the exact same classes and ordering as during training.")
+        sys.exit(1)
 
     # Calculate and validate split sizes (must match training)
     total_size = len(full_dataset)

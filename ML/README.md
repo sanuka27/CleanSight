@@ -200,7 +200,9 @@ You should see `(venv)` prefix in your terminal prompt indicating the virtual en
 
 ### Step 3: Install ML Dependencies
 
-With the virtual environment activated, install all required packages:
+**For Phase 2 (PyTorch) only:**
+
+With the virtual environment activated, install the Phase 2 requirements:
 
 ```powershell
 pip install -r ML/requirements.txt
@@ -221,6 +223,16 @@ This will install:
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 pip install -r ML/requirements.txt
 ```
+
+**For Phase 1 (TensorFlow) only:**
+
+Phase 1 requires TensorFlow 2.15 and Python 3.9-3.10. Install Phase 1 dependencies in a separate virtual environment:
+
+```powershell
+pip install -r ML/requirements_service.txt
+```
+
+> **Note**: If you need to run both phases, create separate virtual environments (e.g., `venv-phase1` with Python 3.10 for TensorFlow, and `venv-phase2` with Python 3.10+ for PyTorch).
 
 ### Step 4: Verify PyTorch Installation
 

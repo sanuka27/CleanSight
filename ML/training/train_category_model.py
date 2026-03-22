@@ -29,9 +29,16 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms, models
 
+from ML.utils.model_utils import (
+    get_device,
+    create_model,
+    get_data_transforms,
+    validate_split_sizes,
+    IMG_SIZE,
+)
+
 # ── Configuration ──────────────────────────────────────────────────────────────
 
-IMG_SIZE = 224
 BATCH_SIZE = 32
 INITIAL_EPOCHS = 15
 FINE_TUNE_EPOCHS = 10
@@ -56,15 +63,6 @@ EXPECTED_CLASSES = ["glass", "mixed", "paper", "plastic"]
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-
-def get_device():
-    """Get the best available device (CUDA, MPS, or CPU)."""
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return torch.device("mps")
-    else:
-        return torch.device("cpu")
 
 
 def validate_dataset_dir(dataset_dir):
@@ -111,56 +109,6 @@ def validate_dataset_dir(dataset_dir):
     print(f"Dataset directory: {dataset_dir}")
     print(f"Found classes: {EXPECTED_CLASSES}")
     return EXPECTED_CLASSES
-
-
-def get_data_transforms():
-    """Get training and validation data transforms."""
-    # ImageNet normalization values
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-
-    train_transform = transforms.Compose([
-        transforms.Resize((IMG_SIZE, IMG_SIZE)),
-        transforms.RandomHorizontalFlip(p=0.5),
-        transforms.RandomRotation(15),
-        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std),
-    ])
-
-    val_transform = transforms.Compose([
-        transforms.Resize((IMG_SIZE, IMG_SIZE)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std),
-    ])
-
-    return train_transform, val_transform
-
-
-def create_model(num_classes, pretrained=True):
-    """Create a MobileNetV3-Small model with a custom classifier head."""
-    # Use MobileNetV3-Small - lightweight and fast for student laptops
-    weights = models.MobileNet_V3_Small_Weights.IMAGENET1K_V1 if pretrained else None
-    model = models.mobilenet_v3_small(weights=weights)
-
-    # Freeze the feature extractor initially
-    for param in model.features.parameters():
-        param.requires_grad = False
-
-    # Replace the classifier head
-    in_features = model.classifier[0].in_features
-    model.classifier = nn.Sequential(
-        nn.Linear(in_features, 256),
-        nn.Hardswish(),
-        nn.Dropout(p=0.3),
-        nn.Linear(256, 128),
-        nn.Hardswish(),
-        nn.Dropout(p=0.2),
-        nn.Linear(128, num_classes),
-    )
-
-    return model
 
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device):
@@ -256,7 +204,7 @@ def main():
     print("=" * 60 + "\n")
 
     # 1. Validate dataset
-    found_classes = validate_dataset_dir(DATASET_DIR)
+    validate_dataset_dir(DATASET_DIR)
 
     # 2. Get device
     device = get_device()
@@ -275,10 +223,13 @@ def main():
     print(f"Number of classes: {num_classes}")
     print(f"Total images: {len(full_dataset)}")
 
-    # Calculate split sizes
+    # Calculate and validate split sizes
     total_size = len(full_dataset)
-    val_size = int(total_size * VALIDATION_SPLIT)
-    train_size = total_size - val_size
+    try:
+        train_size, val_size = validate_split_sizes(total_size, VALIDATION_SPLIT)
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
 
     # Split dataset with fixed seed for reproducibility
     generator = torch.Generator().manual_seed(42)
@@ -328,6 +279,11 @@ def main():
     # 7. Create model
     print("\nBuilding model with MobileNetV3-Small backbone...")
     model = create_model(num_classes=num_classes, pretrained=True)
+
+    # Freeze the feature extractor initially (for transfer learning)
+    for param in model.features.parameters():
+        param.requires_grad = False
+
     model = model.to(device)
 
     # Print model summary
@@ -348,7 +304,7 @@ def main():
         "val_acc": [],
     }
 
-    best_val_acc = 0.0
+    best_val_acc = -float('inf')  # Initialize to -inf to ensure first epoch is always saved
     best_model_weights = None
 
     # 10. Phase 1: Train classifier head only (frozen backbone)

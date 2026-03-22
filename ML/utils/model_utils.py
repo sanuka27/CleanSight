@@ -5,6 +5,8 @@ Centralized helpers used by training, inference, and evaluation scripts.
 This module ensures consistency across the Phase 2 pipeline.
 """
 
+import math
+
 import torch
 import torch.nn as nn
 from torchvision import transforms, models
@@ -108,9 +110,20 @@ def validate_split_sizes(total_size, validation_split, min_val_samples=1, min_tr
         Tuple of (train_size, val_size)
 
     Raises:
-        ValueError: If dataset is too small for the configured split
+        ValueError: If dataset is too small for the configured split or invalid parameters
     """
-    val_size = max(min_val_samples, int(total_size * validation_split))
+    # Validate validation_split range
+    if not (0.0 < validation_split < 1.0):
+        raise ValueError(
+            f"validation_split must be between 0.0 and 1.0 (exclusive), got {validation_split}"
+        )
+
+    # Use math.ceil to ensure at least min_val_samples in validation set
+    val_size = max(min_val_samples, math.ceil(total_size * validation_split))
+
+    # Ensure val_size doesn't exceed total_size
+    val_size = min(val_size, total_size - min_train_samples)
+
     train_size = total_size - val_size
 
     if train_size < min_train_samples:

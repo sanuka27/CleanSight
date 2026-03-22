@@ -27,7 +27,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, transforms, models
+from torchvision import datasets
 
 from ML.utils.model_utils import (
     get_device,
@@ -91,7 +91,11 @@ def validate_dataset_dir(dataset_dir):
 
     unexpected = [c for c in found_classes if c not in EXPECTED_CLASSES]
     if unexpected:
-        print(f"WARNING: Unexpected class folders found (will be ignored by training): {unexpected}")
+        print(f"ERROR: Unexpected class folders found: {unexpected}")
+        print(f"Expected exactly these subfolders: {EXPECTED_CLASSES}")
+        print("ImageFolder will treat all subfolders as classes, which changes label ordering.")
+        print("Please remove unexpected folders or update EXPECTED_CLASSES.")
+        sys.exit(1)
 
     # Check each expected folder has at least some images
     empty_folders = []

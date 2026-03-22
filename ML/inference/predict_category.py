@@ -25,36 +25,14 @@ import torch.nn.functional as F
 from torchvision import transforms, models
 from PIL import Image
 
+from ML.utils.model_utils import get_device, create_model, get_val_transform
+
 # Paths (relative to project root)
 ML_DIR = os.path.join(os.path.dirname(__file__), os.pardir)
 ML_DIR = os.path.abspath(ML_DIR)
 
 DEFAULT_MODEL_PATH = os.path.join(ML_DIR, "models", "waste_category_classifier.pt")
 DEFAULT_CLASS_NAMES_PATH = os.path.join(ML_DIR, "models", "category_class_names.json")
-
-IMG_SIZE = 224
-
-
-def get_device():
-    """Get the best available device (CUDA, MPS, or CPU)."""
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return torch.device("mps")
-    else:
-        return torch.device("cpu")
-
-
-def get_inference_transform():
-    """Get the transform for inference (must match training validation transform)."""
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-
-    return transforms.Compose([
-        transforms.Resize((IMG_SIZE, IMG_SIZE)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std),
-    ])
 
 
 def load_class_names(class_names_path):
@@ -71,28 +49,9 @@ def load_class_names(class_names_path):
     return class_names
 
 
-def create_model(num_classes):
-    """Create the model architecture (must match training)."""
-    model = models.mobilenet_v3_small(weights=None)
-
-    # Replace the classifier head (same architecture as training)
-    in_features = model.classifier[0].in_features
-    model.classifier = nn.Sequential(
-        nn.Linear(in_features, 256),
-        nn.Hardswish(),
-        nn.Dropout(p=0.3),
-        nn.Linear(256, 128),
-        nn.Hardswish(),
-        nn.Dropout(p=0.2),
-        nn.Linear(128, num_classes),
-    )
-
-    return model
-
-
 def load_model(model_path, num_classes, device):
     """Load the trained model weights."""
-    model = create_model(num_classes)
+    model = create_model(num_classes, pretrained=False)
     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model = model.to(device)
     model.eval()
@@ -101,7 +60,7 @@ def load_model(model_path, num_classes, device):
 
 def predict_category(model, image_path, class_names, device):
     """Predict the waste category for a single image."""
-    transform = get_inference_transform()
+    transform = get_val_transform()
 
     # Load and preprocess the image
     try:

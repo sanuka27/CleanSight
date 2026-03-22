@@ -3,8 +3,9 @@
 # For Windows installation, see ML/README.md
 
 # PyTorch ecosystem (use --index-url for CPU-only if needed)
-torch>=2.5.0
-torchvision>=0.20.0
+# Pinned versions to ensure reproducibility and compatibility
+torch==2.5.0
+torchvision==0.20.0
 
 # Image processing
 Pillow>=10.2.0

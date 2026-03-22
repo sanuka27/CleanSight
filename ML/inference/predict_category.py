@@ -20,9 +20,7 @@ import json
 import argparse
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import transforms, models
 from PIL import Image
 
 from ML.utils.model_utils import get_device, create_model, get_val_transform

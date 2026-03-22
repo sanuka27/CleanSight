@@ -1,5 +1,5 @@
 # CleanSight ML Phase 2 - PyTorch-based Category Classifier
-# Requires Python 3.14+ (tested on Python 3.14.3)
+# Requires Python 3.10+ (tested with Python 3.14.3)
 # For Windows installation, see ML/README.md
 
 # PyTorch ecosystem (use --index-url for CPU-only if needed)

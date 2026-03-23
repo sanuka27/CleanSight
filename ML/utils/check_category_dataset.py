@@ -173,7 +173,11 @@ def check_category_dataset(dataset_dir=None, save_report=False):
     unexpected = [c for c in found_dirs if c not in EXPECTED_CLASSES]
     if unexpected:
         print(f"WARNING: Unexpected class folders found: {unexpected}")
-        print("  These will be included as additional classes by ImageFolder.")
+        print("  Note: A raw torchvision.datasets.ImageFolder would treat these")
+        print("        as additional classes, but this project's training and")
+        print("        evaluation scripts will fail validation until you either")
+        print("        remove these folders or update EXPECTED_CLASSES to include")
+        print("        them.")
 
     print(f"Found class folders: {found_dirs}\n")
     print("-" * 65)

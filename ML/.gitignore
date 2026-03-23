@@ -1,7 +1,23 @@
+# Datasets
 dataset_binary/
 dataset_category/
+
+# Model files
 models/
+
+# Generated artifacts
 artifacts/
+
+# Generated reports
 reports/
+
+# Python cache
 __pycache__/
 *.pyc
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment files
+.env

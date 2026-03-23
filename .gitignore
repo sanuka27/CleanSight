@@ -84,9 +84,11 @@ ML/dataset_category/
 ML/models/*.keras
 ML/models/*.h5
 ML/models/*.json
+ML/models/*.pt
 ML/models/checkpoints/
 ML/models/logs/
 ML/artifacts/
+ML/reports/
 ML/venv/
 ML/.env
 ML/__pycache__/

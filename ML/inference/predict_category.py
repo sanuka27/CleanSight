@@ -247,7 +247,8 @@ def print_result(result, top_k=None):
     print("-" * 55)
 
     predictions = result['all_predictions']
-    if top_k is not None and top_k < len(predictions):
+    # Only apply top-k when it is a positive integer; non-positive means "show all"
+    if top_k is not None and top_k > 0 and top_k < len(predictions):
         predictions = predictions[:top_k]
         print(f"  (showing top {top_k})\n")
     else:
@@ -348,6 +349,7 @@ def main():
                 {"class": p["class"], "confidence": p["confidence"]}
                 for p in result.get("all_predictions", [])
             ],
+            "error": result.get("error"),
         }
         print(json.dumps(json_result, indent=2))
     else:

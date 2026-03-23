@@ -333,6 +333,14 @@ router.post('/reports/bulk/reject', async (req, res) => {
     const bulkOps = [];
 
     for (const id of uniqueIds) {
+      const report = existingMap[id];
+      if (!report) {
+        failed.push({ id, reason: 'Report not found' });
+        continue;
+      }
+      if (report.status === 'rejected') {
+        // Already rejected — count as success (idempotent)
+        succeeded.push(id);
         continue;
       }
       bulkOps.push({

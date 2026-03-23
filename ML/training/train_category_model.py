@@ -180,12 +180,28 @@ def compute_class_weights(class_counts, num_classes, strategy="balanced"):
 
     Returns:
         torch.Tensor of class weights
+
+    Raises:
+        ValueError: If any class has 0 samples in the training set
     """
     total_samples = sum(class_counts.values())
+
+    if total_samples == 0:
+        raise ValueError(
+            "Cannot compute class weights: no samples found in class_counts. "
+            "Check your dataset and train/validation split."
+        )
+
     weights = torch.zeros(num_classes)
 
     for class_idx in range(num_classes):
-        count = class_counts.get(class_idx, 1)  # Avoid division by zero
+        count = class_counts.get(class_idx, 0)
+        if count == 0:
+            raise ValueError(
+                f"Cannot compute class weights: class index {class_idx} has 0 samples "
+                "in the training set. Ensure every class is represented in the "
+                "training split (e.g., by using a stratified split or adjusting the dataset)."
+            )
         if strategy == "balanced":
             # Inverse frequency: classes with fewer samples get higher weight
             weights[class_idx] = total_samples / (num_classes * count)
@@ -293,10 +309,12 @@ def save_training_history(history, save_path, fine_tune_start=None):
     if fine_tune_start:
         ax1.axvline(x=fine_tune_start, color="gray", linestyle="--", label="Fine-Tune Start")
 
-    # Mark best epoch
-    best_epoch = history["val_acc"].index(max(history["val_acc"])) + 1
-    best_acc = max(history["val_acc"])
-    ax1.scatter([best_epoch], [best_acc], color='green', s=100, zorder=5, label=f"Best ({best_acc:.4f})")
+    # Mark best epoch (only if we have validation accuracy data)
+    val_acc = history.get("val_acc") or []
+    if val_acc:
+        best_epoch = val_acc.index(max(val_acc)) + 1
+        best_acc = max(val_acc)
+        ax1.scatter([best_epoch], [best_acc], color='green', s=100, zorder=5, label=f"Best ({best_acc:.4f})")
 
     ax1.set_title("Category Model - Accuracy")
     ax1.set_xlabel("Epoch")

@@ -7,7 +7,7 @@ This directory contains the machine learning components for the CleanSight waste
 
 In the full pipeline, Phase 1 first determines whether an image contains waste. If it does, Phase 2 classifies the type of waste. Backend integration and admin review flows are handled in separate branches.
 
-> **Note**: Phase 2 was migrated from TensorFlow/Keras to PyTorch for Python 3.14+ compatibility on Windows. See the "Why PyTorch?" section below for details.
+> **Note**: Phase 2 uses PyTorch for Python 3.14+ compatibility on Windows. See the "Why PyTorch?" section below for details.
 
 ---
 
@@ -71,20 +71,79 @@ ML/dataset_category/
 
 Each subfolder must contain real images (`.jpg`, `.jpeg`, `.png`, etc.). Do **not** use placeholder or synthetic data.
 
+### Dataset Validation
+
+Before training, validate your dataset to check for class imbalance and corrupted files:
+
+```bash
+python -m ML.utils.check_category_dataset
+```
+
+Options:
+| Flag | Description |
+|------|-------------|
+| `--dataset` | Path to dataset directory (default: ML/dataset_category) |
+| `--save-report` | Save a JSON summary report to ML/reports/ |
+
+The validation script reports:
+- Image counts per class with visual distribution bars
+- Class imbalance ratio and severity warnings
+- Invalid or corrupted files
+- Recommendations for handling imbalanced data
+
 ### Training
 
 ```bash
 python -m ML.training.train_category_model
 ```
 
-This script:
-- Loads images from `ML/dataset_category/` using `torchvision.datasets.ImageFolder`
-- Uses 224×224 image size with 80/20 train/validation split
-- Applies data augmentation (random flip, rotation, affine transforms, color jitter)
-- Uses MobileNetV3-Small transfer learning (frozen backbone → fine-tuned)
-- Saves the best model to `ML/models/waste_category_classifier.pt`
-- Saves the class name order to `ML/models/category_class_names.json`
-- Saves training history plot to `ML/artifacts/category_training_history.png`
+Options:
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--epochs` | 15 | Epochs for initial training (frozen backbone) |
+| `--fine-tune-epochs` | 10 | Epochs for fine-tuning phase |
+| `--no-class-weights` | off | Disable class weighting (not recommended) |
+
+#### How Training Works
+
+The training pipeline includes:
+
+1. **Dataset Loading** — Images loaded from `ML/dataset_category/` using `torchvision.datasets.ImageFolder`
+2. **Class Distribution Analysis** — Reports per-class counts and imbalance ratio before training
+3. **Class Imbalance Handling** — Computes class weights (inverse frequency) and applies them to the loss function
+4. **Two-Phase Training**:
+   - **Phase 1**: Train classifier head only (frozen backbone, LR=1e-3)
+   - **Phase 2**: Fine-tune entire model (unfrozen backbone, LR=1e-5)
+5. **Best Model Checkpointing** — Saves model with best validation accuracy
+6. **Reproducibility** — Fixed random seed (42) for consistent results
+
+#### Class Imbalance Handling
+
+The training pipeline automatically handles class imbalance using **weighted loss**:
+
+- Classes with fewer samples receive higher weights in the loss function
+- Weight formula: `weight[class] = total_samples / (num_classes * class_count)`
+- Weights are normalized so the average is 1.0
+
+This approach helps the model:
+- Pay more attention to minority classes
+- Reduce bias toward majority classes
+- Improve F1-score on underrepresented classes (e.g., plastic)
+
+To disable class weighting (not recommended for imbalanced data):
+```bash
+python -m ML.training.train_category_model --no-class-weights
+```
+
+#### Training Outputs
+
+| File | Description |
+|------|-------------|
+| `models/waste_category_classifier.pt` | Best model weights |
+| `models/category_class_names.json` | Class name order (for inference) |
+| `artifacts/category_training_history.png` | Training/validation accuracy and loss plot |
+| `artifacts/category_training_history.json` | Raw training metrics for analysis |
+| `reports/category_training_report.json` | Comprehensive training configuration and results |
 
 ### Inference
 
@@ -98,8 +157,53 @@ Options:
 | `--image` | *(required)* | Path to the image to classify |
 | `--model` | `ML/models/waste_category_classifier.pt` | Path to model file |
 | `--labels` | `ML/models/category_class_names.json` | Path to class names JSON |
+| `--top-k` | all | Number of top predictions to show |
+| `--json` | off | Output result as JSON (for programmatic use) |
 
-The script outputs the predicted category, confidence score, and per-class probabilities.
+The script outputs:
+- Predicted category with confidence score
+- All class probabilities ranked by confidence
+- Confidence interpretation (HIGH / MODERATE / LOW / VERY LOW)
+- Entropy-based uncertainty metric
+- Recommendations for low-confidence predictions
+
+Example human-readable output:
+```
+===========================================================
+  CATEGORY PREDICTION RESULT
+===========================================================
+
+  Image: test_image.jpg
+  Size:  640x480 px
+
+-----------------------------------------------------------
+  Predicted Category:  PLASTIC
+  Confidence:          87.32%
+  Uncertainty:         0.234 (entropy)
+-----------------------------------------------------------
+
+  Confidence Level: HIGH
+  Model is confident in this prediction
+  Prediction can be trusted
+
+-----------------------------------------------------------
+  All Class Scores:
+-----------------------------------------------------------
+
+    plastic  87.32%  ██████████████████████████████ <--
+    mixed    8.45%   ██
+    paper    3.12%   █
+    glass    1.11%
+
+===========================================================
+  Status: PLASTIC (HIGH confidence)
+===========================================================
+```
+
+For programmatic use (API integration), use `--json`:
+```bash
+python -m ML.inference.predict_category --image test.jpg --json
+```
 
 ### Evaluation
 
@@ -107,32 +211,62 @@ The script outputs the predicted category, confidence score, and per-class proba
 python -m ML.evaluation.evaluate_category_model
 ```
 
-Reports accuracy, precision, recall, F1-score (per class), and saves:
-- Confusion matrix plot: `ML/artifacts/category_confusion_matrix.png`
-- Evaluation report JSON: `ML/artifacts/category_evaluation_report.json`
+Options:
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--model` | `ML/models/waste_category_classifier.pt` | Path to model file |
+| `--labels` | `ML/models/category_class_names.json` | Path to class names JSON |
+| `--dataset` | `ML/dataset_category` | Path to dataset directory |
 
-### Dataset Check
+#### Evaluation Metrics
 
-```bash
-python -m ML.utils.check_category_dataset
-```
+The evaluation script reports:
 
-Scans the category dataset folders, counts images per class, reports distribution, and detects invalid or corrupted files.
+**Overall Metrics:**
+- Validation Loss
+- Accuracy
+- Macro Precision, Recall, F1-Score
+- Weighted F1-Score
+
+**Per-Class Metrics:**
+- Precision, Recall, F1-Score for each class
+- Support (number of samples) per class
+
+**Weak Class Analysis:**
+- Automatically identifies classes with F1-score < 0.80
+- Highlights common misclassification pairs
+- Provides recommendations for improvement
+
+#### Evaluation Outputs
+
+| File | Description |
+|------|-------------|
+| `artifacts/category_confusion_matrix.png` | Confusion matrix heatmap |
+| `artifacts/category_confusion_matrix_normalized.png` | Normalized confusion matrix |
+| `artifacts/category_per_class_metrics.png` | Per-class precision/recall/F1 bar chart |
+| `reports/category_evaluation_report.json` | Comprehensive JSON report |
+| `reports/category_evaluation_report.txt` | Human-readable text report |
 
 ---
 
-## Model Artifacts
+## Model Artifacts Summary
 
 | File | Description |
 |------|-------------|
 | `models/trash_classifier.keras` | Phase 1 binary model (TensorFlow) |
 | `models/waste_category_classifier.pt` | Phase 2 category model (PyTorch) |
-| `models/category_class_names.json` | Phase 2 class name order (saved during training) |
-| `artifacts/category_training_history.png` | Phase 2 training accuracy/loss plot |
-| `artifacts/category_confusion_matrix.png` | Phase 2 evaluation confusion matrix |
-| `artifacts/category_evaluation_report.json` | Phase 2 evaluation metrics report |
+| `models/category_class_names.json` | Phase 2 class name order |
+| `artifacts/category_training_history.png` | Training accuracy/loss plot |
+| `artifacts/category_training_history.json` | Raw training metrics |
+| `artifacts/category_confusion_matrix.png` | Evaluation confusion matrix |
+| `artifacts/category_confusion_matrix_normalized.png` | Normalized confusion matrix |
+| `artifacts/category_per_class_metrics.png` | Per-class metrics plot |
+| `reports/category_dataset_report.json` | Dataset validation report |
+| `reports/category_training_report.json` | Training configuration/results |
+| `reports/category_evaluation_report.json` | Evaluation metrics (JSON) |
+| `reports/category_evaluation_report.txt` | Evaluation metrics (text) |
 
-All model files and artifacts are git-ignored.
+All model files, artifacts, and reports are git-ignored.
 
 ---
 
@@ -320,26 +454,28 @@ Always ensure your virtual environment is activated before running scripts. From
 
 **Check datasets:**
 ```powershell
-python -m ML.utils.check_dataset          # Phase 1 dataset
-python -m ML.utils.check_category_dataset  # Phase 2 dataset
+python -m ML.utils.check_dataset              # Phase 1 dataset
+python -m ML.utils.check_category_dataset     # Phase 2 dataset
+python -m ML.utils.check_category_dataset --save-report  # With report
 ```
 
 **Train models:**
 ```powershell
-python -m ML.training.train_binary_model    # Phase 1 training (TensorFlow)
-python -m ML.training.train_category_model  # Phase 2 training (PyTorch)
+python -m ML.training.train_binary_model      # Phase 1 training (TensorFlow)
+python -m ML.training.train_category_model    # Phase 2 training (PyTorch)
 ```
 
 **Run inference:**
 ```powershell
 python -m ML.inference.predict_image --image path/to/image.jpg           # Phase 1
 python -m ML.inference.predict_category --image path/to/image.jpg        # Phase 2
+python -m ML.inference.predict_category --image path/to/image.jpg --json # Phase 2 JSON
 ```
 
 **Evaluate models:**
 ```powershell
-python -m ML.evaluation.evaluate_model          # Phase 1 evaluation
-python -m ML.evaluation.evaluate_category_model # Phase 2 evaluation
+python -m ML.evaluation.evaluate_model              # Phase 1 evaluation
+python -m ML.evaluation.evaluate_category_model     # Phase 2 evaluation
 ```
 
 ---
@@ -359,6 +495,40 @@ Phase 2 was migrated from TensorFlow/Keras to PyTorch for the following reasons:
 5. **Educational Value**: PyTorch's explicit training loop helps students understand the training process better than Keras's high-level `model.fit()`.
 
 **Note**: Phase 1 remains on TensorFlow/Keras. A future integration branch may unify both phases under a single framework if needed.
+
+---
+
+## Branch History
+
+### feature/ml-phase2-training-tuning-pytorch
+
+This branch improves the Phase 2 PyTorch implementation with:
+
+**Training Improvements:**
+- Fixed random seed (42) for reproducible training
+- Class distribution reporting before training starts
+- Class imbalance handling via weighted loss function
+- Comprehensive training reports (JSON)
+- Training history saved as JSON for analysis
+
+**Dataset Validation Improvements:**
+- Enhanced imbalance detection and warning system
+- Recommendations for handling imbalanced datasets
+- Optional JSON report generation
+- Clearer console output with visual distribution bars
+
+**Evaluation Improvements:**
+- Weak class identification with specific recommendations
+- Common misclassification pair analysis
+- Normalized confusion matrix visualization
+- Per-class metrics bar chart
+- Human-readable text report alongside JSON
+
+**Inference Improvements:**
+- Entropy-based uncertainty estimation
+- Confidence level interpretation (HIGH/MODERATE/LOW/VERY LOW)
+- JSON output mode for API integration
+- Top-k prediction filtering option
 
 ---
 

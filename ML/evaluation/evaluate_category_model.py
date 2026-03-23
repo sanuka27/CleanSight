@@ -103,7 +103,14 @@ def save_confusion_matrix(cm, class_names, save_path, normalize=False):
 
     # Optionally normalize
     if normalize:
-        cm_display = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        row_sums = cm.sum(axis=1, keepdims=True)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            cm_display = np.divide(
+                cm.astype("float"),
+                row_sums,
+                where=row_sums != 0,
+            )
+        cm_display = np.nan_to_num(cm_display, nan=0.0)
         fmt = ".2f"
         title = "CleanSight Phase 2 - Normalized Confusion Matrix"
     else:
@@ -347,7 +354,6 @@ def evaluate(model_path, class_names_path, dataset_dir):
     print("\nRunning evaluation...")
     y_true = []
     y_pred = []
-    y_probs = []
     running_loss = 0.0
     criterion = nn.CrossEntropyLoss()
 
@@ -359,16 +365,13 @@ def evaluate(model_path, class_names_path, dataset_dir):
             loss = criterion(outputs, labels)
             running_loss += loss.item() * images.size(0)
 
-            probs = torch.nn.functional.softmax(outputs, dim=1)
             _, predicted = outputs.max(1)
 
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(predicted.cpu().numpy())
-            y_probs.extend(probs.cpu().numpy())
 
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
-    y_probs = np.array(y_probs)
 
     # Calculate overall metrics
     val_loss = running_loss / len(val_dataset)
@@ -394,17 +397,21 @@ def evaluate(model_path, class_names_path, dataset_dir):
     print("=" * 65)
     report = classification_report(
         y_true, y_pred,
+        labels=list(range(len(class_names))),
         target_names=class_names,
         digits=4,
+        zero_division=0,
     )
     print(report)
 
     # Get report as dictionary for analysis
     report_dict = classification_report(
         y_true, y_pred,
+        labels=list(range(len(class_names))),
         target_names=class_names,
         digits=4,
         output_dict=True,
+        zero_division=0,
     )
 
     # Identify weak classes
@@ -423,7 +430,7 @@ def evaluate(model_path, class_names_path, dataset_dir):
             print()
 
     # Confusion matrix
-    cm = confusion_matrix(y_true, y_pred)
+    cm = confusion_matrix(y_true, y_pred, labels=list(range(len(class_names))))
     print("=" * 65)
     print("  Confusion Matrix")
     print("=" * 65)

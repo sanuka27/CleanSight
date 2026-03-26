@@ -12,10 +12,15 @@ import torch.nn.functional as F
 from PIL import Image
 import io
 
-# Import shared utilities
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from utils.model_utils import get_device, create_model, get_val_transform
+# Import shared utilities from parent ML package
+try:
+    from ..utils.model_utils import get_device, create_model, get_val_transform
+except ImportError:
+    # Fallback for cases where package structure isn't properly set up
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    from utils.model_utils import get_device, create_model, get_val_transform
 
 # Model paths
 ML_DIR = os.path.join(os.path.dirname(__file__), '..')

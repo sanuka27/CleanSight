@@ -114,6 +114,18 @@ export const predictCategoryWithML = async (imageUrl) => {
 
     if (response.ok) {
       const data = await response.json();
+
+      // Check if prediction actually succeeded
+      if (!data.success) {
+        console.warn('ML Category Service returned success=false', {
+          error: data.error
+        });
+        return {
+          success: false,
+          error: data.error || 'ML category service prediction failed'
+        };
+      }
+
       // Determine review status based on confidence level
       let reviewStatus = 'pending';
       if (data.confidence_level === 'HIGH') {
@@ -124,13 +136,20 @@ export const predictCategoryWithML = async (imageUrl) => {
         reviewStatus = 'manual_review';
       }
 
+      // Normalize all_predictions field names: class_name → class
+      const rawPredictions = Array.isArray(data.all_predictions) ? data.all_predictions : [];
+      const normalizedPredictions = rawPredictions.map((prediction) => ({
+        class: prediction.class_name || prediction.class,
+        confidence: prediction.confidence,
+      }));
+
       return {
         success: true,
         predictedLabel: data.predicted_class,
         confidence: data.confidence,
         entropy: data.entropy,
         confidenceLevel: data.confidence_level,
-        allPredictions: data.all_predictions || [],
+        allPredictions: normalizedPredictions,
         reviewStatus,
       };
     } else {

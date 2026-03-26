@@ -86,11 +86,20 @@ async def predict_category_endpoint(
     """
     logging.info(f"Category prediction request. URL: {image_url}")
 
+    # Maximum image size for both file upload and URL download
+    MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
+
     try:
         image_bytes = None
 
         if image:
+            # Read file upload with size limit
             image_bytes = await image.read()
+            if len(image_bytes) > MAX_IMAGE_SIZE:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Uploaded image too large. Maximum size is {MAX_IMAGE_SIZE / 1024 / 1024:.1f}MB"
+                )
         elif image_url:
             safe_url = validate_image_url(image_url)
             MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB

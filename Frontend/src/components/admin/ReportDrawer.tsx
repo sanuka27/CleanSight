@@ -28,6 +28,7 @@ import {
   assignReportToVolunteer,
   addReportNote,
   reviewAdminReport,
+  reviewCategoryReport,
 } from "@/services/admin";
 import type { AdminReport, AdminVolunteer, ReportStatus } from "@/types/admin";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,8 @@ export function ReportDrawer({ report, volunteers, onClose, onUpdated }: ReportD
   const [note, setNote] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const [selectedVolunteer, setSelectedVolunteer] = useState<string>("");
+  const [categoryOverride, setCategoryOverride] = useState<string>("");
+  const [categoryReviewNote, setCategoryReviewNote] = useState("");
 
   if (!report) return null;
 
@@ -147,6 +150,36 @@ export function ReportDrawer({ report, volunteers, onClose, onUpdated }: ReportD
       setSaving(false);
     }
   }
+
+  async function handleCategoryReview(action: "approve" | "reject" | "override") {
+    if (saving) return;
+    if (action === "override" && !categoryOverride) {
+      toast({ title: "Select category", description: "Please select a category to override with", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const override = action === "override" ? categoryOverride as "glass" | "mixed" | "paper" | "plastic" : undefined;
+      const res = await reviewCategoryReport(report!._id, action, override, categoryReviewNote || undefined);
+      onUpdated(res.data);
+      toast({ title: `Category ${action} successful` });
+      setCategoryOverride("");
+      setCategoryReviewNote("");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to submit category review";
+      toast({ title: "Category Review Error", description: msg, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Check if Phase 2 category review is available (Phase 1 must be approved/overridden)
+  const canReviewCategory = report.aiReviewStatus === "approved" || report.aiReviewStatus === "overridden";
+  const needsCategoryReview = canReviewCategory &&
+    ["flagged", "manual_review", "pending"].includes(report.wasteCategoryReviewStatus || "");
+  const hasCategoryPrediction = report.wasteCategoryPredictedLabel &&
+    report.wasteCategoryPredictedLabel !== "pending" &&
+    report.wasteCategoryPredictedLabel !== "error";
 
   return (
     <AnimatePresence>
@@ -238,6 +271,93 @@ export function ReportDrawer({ report, volunteers, onClose, onUpdated }: ReportD
               )}
             </div>
 
+            {/* Phase 2 Category Prediction Info */}
+            {hasCategoryPrediction && (
+              <div className="bg-indigo-50/50 rounded-xl p-4 border border-indigo-200/60">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-indigo-600 mb-3">
+                  Category Classification (Phase 2)
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Predicted:</span>
+                    <span className="text-sm font-semibold capitalize">{report.wasteCategoryPredictedLabel}</span>
+                  </div>
+                  {report.wasteCategoryConfidence != null && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Confidence:</span>
+                      <span className="text-sm font-medium">{(report.wasteCategoryConfidence * 100).toFixed(1)}%</span>
+                    </div>
+                  )}
+                  {report.wasteCategoryConfidenceLevel && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Level:</span>
+                      <Badge variant="outline" className={cn(
+                        "text-xs",
+                        report.wasteCategoryConfidenceLevel === "HIGH" && "border-emerald-300 text-emerald-700",
+                        report.wasteCategoryConfidenceLevel === "MODERATE" && "border-amber-300 text-amber-700",
+                        report.wasteCategoryConfidenceLevel === "LOW" && "border-orange-300 text-orange-700",
+                        report.wasteCategoryConfidenceLevel === "VERY LOW" && "border-red-300 text-red-700",
+                      )}>
+                        {report.wasteCategoryConfidenceLevel}
+                      </Badge>
+                    </div>
+                  )}
+                  {report.wasteCategoryReviewStatus && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Review Status:</span>
+                      <Badge variant="outline" className={cn(
+                        "text-xs capitalize",
+                        report.wasteCategoryReviewStatus === "approved" && "border-emerald-300 text-emerald-700",
+                        report.wasteCategoryReviewStatus === "auto_accepted" && "border-emerald-300 text-emerald-700",
+                        report.wasteCategoryReviewStatus === "flagged" && "border-amber-300 text-amber-700",
+                        report.wasteCategoryReviewStatus === "manual_review" && "border-blue-300 text-blue-700",
+                        report.wasteCategoryReviewStatus === "rejected" && "border-red-300 text-red-700",
+                        report.wasteCategoryReviewStatus === "overridden" && "border-pink-300 text-pink-700",
+                      )}>
+                        {report.wasteCategoryReviewStatus.replace("_", " ")}
+                      </Badge>
+                    </div>
+                  )}
+                  {report.wasteCategoryFinalLabel && (
+                    <div className="flex items-center justify-between pt-2 border-t border-indigo-200/60">
+                      <span className="text-sm font-medium text-indigo-700">Final Category:</span>
+                      <span className="text-sm font-bold capitalize text-indigo-900">{report.wasteCategoryFinalLabel}</span>
+                    </div>
+                  )}
+                </div>
+                {/* All predictions breakdown */}
+                {report.wasteCategoryAllPredictions && report.wasteCategoryAllPredictions.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-indigo-200/60">
+                    <p className="text-xs font-semibold text-indigo-600 mb-2">All Predictions:</p>
+                    <div className="space-y-1.5">
+                      {report.wasteCategoryAllPredictions.map((pred) => (
+                        <div key={pred.class} className="flex items-center gap-2">
+                          <span className="text-xs capitalize w-14">{pred.class}</span>
+                          <div className="flex-1 h-2 bg-indigo-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-indigo-500 rounded-full"
+                              style={{ width: `${pred.confidence * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground w-12 text-right">
+                            {(pred.confidence * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Category Review Note (if reviewed) */}
+            {report.wasteCategoryReviewNote && (
+              <div className="bg-indigo-50 rounded-xl p-3 border border-indigo-200">
+                <p className="text-xs font-semibold text-indigo-600 mb-1">CATEGORY REVIEW NOTE</p>
+                <p className="text-sm text-indigo-700">{report.wasteCategoryReviewNote}</p>
+              </div>
+            )}
+
             {/* Location */}
             {lat !== undefined && lng !== undefined && (
               <div>
@@ -311,6 +431,79 @@ export function ReportDrawer({ report, volunteers, onClose, onUpdated }: ReportD
                     >
                       <AlertTriangle className="w-3.5 h-3.5 mr-1" />
                       Override (Force Valid)
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Phase 2 Category Review */}
+              {needsCategoryReview && (
+                <div className="bg-indigo-50/30 rounded-xl p-4 border border-indigo-200/60">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-indigo-600 mb-3">
+                    Category Review (Phase 2)
+                  </h4>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Predicted: <span className="font-semibold capitalize">{report.wasteCategoryPredictedLabel}</span>
+                    {report.wasteCategoryConfidence != null && (
+                      <> ({(report.wasteCategoryConfidence * 100).toFixed(1)}% confidence)</>
+                    )}
+                  </p>
+
+                  {/* Override category selection */}
+                  <div className="mb-3">
+                    <Select value={categoryOverride} onValueChange={setCategoryOverride}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Select category to override..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="glass">Glass</SelectItem>
+                        <SelectItem value="mixed">Mixed</SelectItem>
+                        <SelectItem value="paper">Paper</SelectItem>
+                        <SelectItem value="plastic">Plastic</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Review note */}
+                  <Textarea
+                    placeholder="Category review note (optional)..."
+                    rows={2}
+                    className="text-sm resize-none mb-3"
+                    value={categoryReviewNote}
+                    onChange={(e) => setCategoryReviewNote(e.target.value)}
+                    maxLength={1000}
+                  />
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                      onClick={() => handleCategoryReview("approve")}
+                      disabled={saving}
+                    >
+                      <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                      Approve Category
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                      onClick={() => handleCategoryReview("override")}
+                      disabled={saving || !categoryOverride}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                      Override Category
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-200 text-red-700 hover:bg-red-50"
+                      onClick={() => handleCategoryReview("reject")}
+                      disabled={saving}
+                    >
+                      <XCircle className="w-3.5 h-3.5 mr-1" />
+                      Reject Category
                     </Button>
                   </div>
                 </div>

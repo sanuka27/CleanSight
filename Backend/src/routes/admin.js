@@ -871,8 +871,16 @@ router.patch('/reports/:id/category-review', async (req, res) => {
     let finalLabel = null;
 
     if (action === 'approve') {
+      // Validate that predicted label is a valid category before approving
+      const predictedLabel = report.wasteCategoryPredictedLabel;
+      if (!VALID_CATEGORIES.includes(predictedLabel)) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot approve: predicted category "${predictedLabel}" is not valid. Expected one of: ${VALID_CATEGORIES.join(', ')}`,
+        });
+      }
       newReviewStatus = 'approved';
-      finalLabel = report.wasteCategoryPredictedLabel;
+      finalLabel = predictedLabel;
     } else if (action === 'reject') {
       newReviewStatus = 'rejected';
       finalLabel = null;

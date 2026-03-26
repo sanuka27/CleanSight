@@ -87,26 +87,6 @@ const ML_STATUS_LABELS: Record<string, string> = {
   overridden: "Overridden",
 };
 
-const CATEGORY_STATUS_BADGE: Record<string, string> = {
-  pending: "bg-gray-100 text-gray-700 border-gray-200",
-  auto_accepted: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  approved: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  flagged: "bg-amber-100 text-amber-700 border-amber-200",
-  manual_review: "bg-blue-100 text-blue-700 border-blue-200",
-  rejected: "bg-red-100 text-red-700 border-red-200",
-  overridden: "bg-pink-100 text-pink-700 border-pink-200",
-};
-
-const CATEGORY_STATUS_LABELS: Record<string, string> = {
-  pending: "Pending",
-  auto_accepted: "Auto Accepted",
-  approved: "Approved",
-  flagged: "Flagged",
-  manual_review: "Manual Review",
-  rejected: "Rejected",
-  overridden: "Overridden",
-};
-
 const URGENCY_DOT: Record<UrgencyLevel, string> = {
   low: "bg-emerald-500", medium: "bg-amber-500", high: "bg-red-500",
 };

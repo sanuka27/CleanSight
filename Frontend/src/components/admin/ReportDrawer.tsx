@@ -180,6 +180,10 @@ export function ReportDrawer({ report, volunteers, onClose, onUpdated }: ReportD
   const hasCategoryPrediction = report.wasteCategoryPredictedLabel &&
     report.wasteCategoryPredictedLabel !== "pending" &&
     report.wasteCategoryPredictedLabel !== "error";
+  // Valid categories that can be approved
+  const VALID_CATEGORIES = ["glass", "mixed", "paper", "plastic"];
+  const canApprovePrediction = hasCategoryPrediction &&
+    VALID_CATEGORIES.includes(report.wasteCategoryPredictedLabel || "");
 
   return (
     <AnimatePresence>
@@ -480,7 +484,7 @@ export function ReportDrawer({ report, volunteers, onClose, onUpdated }: ReportD
                       variant="outline"
                       className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                       onClick={() => handleCategoryReview("approve")}
-                      disabled={saving}
+                      disabled={saving || !canApprovePrediction}
                     >
                       <CheckCircle className="w-3.5 h-3.5 mr-1" />
                       Approve Category

@@ -1,0 +1,15 @@
+# CleanSight ML Phase 2 - Category Classification Service Requirements
+# PyTorch-based FastAPI service for waste category classification
+
+# Core dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+python-multipart>=0.0.6
+httpx>=0.24.1
+pydantic>=2.0.0
+Pillow>=10.0.0
+
+# Optional but recommended
+python-jose[cryptography]>=3.3.0  # For JWT tokens if auth is added later

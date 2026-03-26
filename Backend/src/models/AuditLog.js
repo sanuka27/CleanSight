@@ -27,6 +27,7 @@ const AuditLogSchema = new mongoose.Schema(
         'REPORTS_BULK_REJECTED',
         'REPORTS_BULK_EXPORTED',
         'REPORT_ML_REVIEW',
+        'REPORT_CATEGORY_REVIEW',
         'DOCUMENT_UPLOADED',
         'DOCUMENT_DELETED',
         'SETTINGS_UPDATED',

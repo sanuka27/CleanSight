@@ -43,10 +43,12 @@ interface ReportsTableProps {
   wasteTypeFilter: string;
   urgencyFilter: string;
   aiReviewStatusFilter?: string;
+  categoryReviewStatusFilter?: string;
   onStatusFilter: (v: string) => void;
   onWasteTypeFilter: (v: string) => void;
   onUrgencyFilter: (v: string) => void;
   onAiReviewStatusFilter?: (v: string) => void;
+  onCategoryReviewStatusFilter?: (v: string) => void;
   // Selection
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
@@ -78,6 +80,26 @@ const ML_STATUS_BADGE: Record<string, string> = {
 
 const ML_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
+  approved: "Approved",
+  flagged: "Flagged",
+  manual_review: "Manual Review",
+  rejected: "Rejected",
+  overridden: "Overridden",
+};
+
+const CATEGORY_STATUS_BADGE: Record<string, string> = {
+  pending: "bg-gray-100 text-gray-700 border-gray-200",
+  auto_accepted: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  approved: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  flagged: "bg-amber-100 text-amber-700 border-amber-200",
+  manual_review: "bg-blue-100 text-blue-700 border-blue-200",
+  rejected: "bg-red-100 text-red-700 border-red-200",
+  overridden: "bg-pink-100 text-pink-700 border-pink-200",
+};
+
+const CATEGORY_STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  auto_accepted: "Auto Accepted",
   approved: "Approved",
   flagged: "Flagged",
   manual_review: "Manual Review",
@@ -216,8 +238,8 @@ export function ReportsTable({
   reports, loading, total, page, pageSize,
   onPageChange, onView,
   sortBy, sortOrder, onSort,
-  statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter,
-  onStatusFilter, onWasteTypeFilter, onUrgencyFilter, onAiReviewStatusFilter,
+  statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter, categoryReviewStatusFilter,
+  onStatusFilter, onWasteTypeFilter, onUrgencyFilter, onAiReviewStatusFilter, onCategoryReviewStatusFilter,
   selectedIds, onToggleSelect, onToggleSelectAll,
 }: ReportsTableProps) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -276,6 +298,24 @@ export function ReportsTable({
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="flagged">Flagged</SelectItem>
               <SelectItem value="manual_review">Manual Review</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="overridden">Overridden</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+
+        {onCategoryReviewStatusFilter && (
+          <Select value={categoryReviewStatusFilter || "all"} onValueChange={(v) => onCategoryReviewStatusFilter(v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectValue placeholder="Category Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Category Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="flagged">Flagged</SelectItem>
+              <SelectItem value="manual_review">Manual Review</SelectItem>
+              <SelectItem value="auto_accepted">Auto Accepted</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
               <SelectItem value="overridden">Overridden</SelectItem>

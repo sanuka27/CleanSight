@@ -31,6 +31,8 @@ router.get('/reports', async (req, res) => {
       wasteType,
       urgency,
       aiReviewStatus,
+      wasteCategoryReviewStatus,
+      wasteCategoryPredictedLabel,
       search,
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -59,6 +61,14 @@ router.get('/reports', async (req, res) => {
     if (aiReviewStatus) {
       const aiStatuses = String(aiReviewStatus).split(',').map(s => s.trim()).filter(Boolean);
       if (aiStatuses.length) filter.aiReviewStatus = { $in: aiStatuses };
+    }
+    if (wasteCategoryReviewStatus) {
+      const catStatuses = String(wasteCategoryReviewStatus).split(',').map(s => s.trim()).filter(Boolean);
+      if (catStatuses.length) filter.wasteCategoryReviewStatus = { $in: catStatuses };
+    }
+    if (wasteCategoryPredictedLabel) {
+      const catLabels = String(wasteCategoryPredictedLabel).split(',').map(s => s.trim()).filter(Boolean);
+      if (catLabels.length) filter.wasteCategoryPredictedLabel = { $in: catLabels };
     }
     if (assignedTo) {
       filter.assignedTo = String(assignedTo);
@@ -809,6 +819,185 @@ router.patch('/reports/:id/review', async (req, res) => {
     res.json({ success: true, data: report });
   } catch (err) {
     console.error('Admin review ML report error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * PATCH /api/admin/reports/:id/category-review
+ * Admin review for ML Phase 2 category classification results.
+ * Actions: approve, reject, override
+ */
+router.patch('/reports/:id/category-review', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, overrideCategory, reviewNote } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid report ID' });
+    }
+
+    const VALID_ACTIONS = ['approve', 'reject', 'override'];
+    if (!VALID_ACTIONS.includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`,
+      });
+    }
+
+    const VALID_CATEGORIES = ['glass', 'mixed', 'paper', 'plastic'];
+    if (action === 'override' && !VALID_CATEGORIES.includes(overrideCategory)) {
+      return res.status(400).json({
+        success: false,
+        message: `Override requires a valid category: ${VALID_CATEGORIES.join(', ')}`,
+      });
+    }
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ success: false, message: 'Report not found' });
+    }
+
+    // Ensure Phase 1 validation passed before allowing Phase 2 review
+    if (report.aiReviewStatus !== 'approved' && report.aiReviewStatus !== 'overridden') {
+      return res.status(400).json({
+        success: false,
+        message: 'Phase 1 image validation must be approved or overridden before category review',
+      });
+    }
+
+    const categoryReviewStatusFrom = report.wasteCategoryReviewStatus;
+    let newReviewStatus = report.wasteCategoryReviewStatus;
+    let finalLabel = null;
+
+    if (action === 'approve') {
+      newReviewStatus = 'approved';
+      finalLabel = report.wasteCategoryPredictedLabel;
+    } else if (action === 'reject') {
+      newReviewStatus = 'rejected';
+      finalLabel = null;
+    } else if (action === 'override') {
+      newReviewStatus = 'overridden';
+      finalLabel = overrideCategory;
+    }
+
+    report.wasteCategoryReviewStatus = newReviewStatus;
+    report.wasteCategoryFinalLabel = finalLabel;
+    report.wasteCategoryReviewedBy = req.adminUser.firebaseUid;
+    report.wasteCategoryReviewedAt = new Date();
+    if (reviewNote) {
+      report.wasteCategoryReviewNote = reviewNote;
+    }
+
+    await report.save();
+
+    logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'REPORT_CATEGORY_REVIEW',
+      entityType: 'report',
+      entityId: id,
+      metadata: {
+        categoryReviewStatusFrom,
+        categoryReviewStatusTo: newReviewStatus,
+        predictedLabel: report.wasteCategoryPredictedLabel,
+        finalLabel,
+        overrideCategory: action === 'override' ? overrideCategory : null,
+      },
+    });
+
+    res.json({ success: true, data: report });
+  } catch (err) {
+    console.error('Admin category review error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/reports/category-review-queue
+ * Get reports that need Phase 2 category review.
+ * Includes: flagged, manual_review, pending (with Phase 1 approved)
+ */
+router.get('/reports/category-review-queue', async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      reviewStatus,
+      predictedCategory,
+      lowConfidenceOnly,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = req.query;
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Base filter: Phase 1 must be approved/overridden
+    const filter = {
+      $or: [
+        { aiReviewStatus: 'approved' },
+        { aiReviewStatus: 'overridden' },
+      ],
+    };
+
+    // Review status filter
+    if (reviewStatus) {
+      const statuses = String(reviewStatus).split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length) filter.wasteCategoryReviewStatus = { $in: statuses };
+    } else {
+      // Default: show items needing review
+      filter.wasteCategoryReviewStatus = { $in: ['flagged', 'manual_review', 'pending'] };
+    }
+
+    // Category filter
+    if (predictedCategory) {
+      const categories = String(predictedCategory).split(',').map(s => s.trim()).filter(Boolean);
+      if (categories.length) filter.wasteCategoryPredictedLabel = { $in: categories };
+    }
+
+    // Low confidence filter (confidence < 0.5)
+    if (lowConfidenceOnly === 'true') {
+      filter.wasteCategoryConfidence = { $lt: 0.5 };
+    }
+
+    const sortDir = sortOrder === 'asc' ? 1 : -1;
+    const sortField = ['createdAt', 'updatedAt', 'wasteCategoryConfidence'].includes(String(sortBy))
+      ? String(sortBy)
+      : 'createdAt';
+
+    const [reports, total] = await Promise.all([
+      Report.find(filter)
+        .sort({ [sortField]: sortDir })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Report.countDocuments(filter),
+    ]);
+
+    // Enrich with reporter info
+    const uids = [...new Set(reports.map(r => r.firebaseUid))];
+    const users = await User.find({ firebaseUid: { $in: uids } })
+      .select('firebaseUid name email avatar')
+      .lean();
+    const userMap = Object.fromEntries(users.map(u => [u.firebaseUid, u]));
+
+    const enriched = reports.map(r => ({
+      ...r,
+      reporter: userMap[r.firebaseUid] || null,
+    }));
+
+    res.json({
+      success: true,
+      data: enriched,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (err) {
+    console.error('Admin category review queue error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

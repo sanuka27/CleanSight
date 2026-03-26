@@ -14,6 +14,23 @@ export type AppRole = 'citizen' | 'volunteer' | 'staff' | 'admin';
 export type DocumentCategory = 'sop' | 'policy' | 'report' | 'guide' | 'other';
 export type FileType = 'pdf' | 'doc' | 'docx' | 'xlsx' | 'csv' | 'image' | 'other';
 
+// ML Phase 2 Category Types
+export type WasteCategoryLabel = 'glass' | 'mixed' | 'paper' | 'plastic' | 'pending' | 'error';
+export type WasteCategoryReviewStatus =
+  | 'auto_accepted'
+  | 'flagged'
+  | 'manual_review'
+  | 'pending'
+  | 'approved'
+  | 'overridden'
+  | 'rejected';
+export type WasteCategoryConfidenceLevel = 'HIGH' | 'MODERATE' | 'LOW' | 'VERY LOW';
+
+export interface CategoryPrediction {
+  class: string;
+  confidence: number;
+}
+
 // ── Report ──────────────────────────────────────────────────────────
 
 export interface GeoLocation {
@@ -52,6 +69,18 @@ export interface AdminReport {
   reviewedBy?: string | null;
   reviewedAt?: string | null;
   reviewNote?: string | null;
+
+  // ML Phase 2 Category fields
+  wasteCategoryPredictedLabel?: WasteCategoryLabel;
+  wasteCategoryConfidence?: number | null;
+  wasteCategoryEntropy?: number | null;
+  wasteCategoryConfidenceLevel?: WasteCategoryConfidenceLevel | null;
+  wasteCategoryAllPredictions?: CategoryPrediction[] | null;
+  wasteCategoryReviewStatus?: WasteCategoryReviewStatus;
+  wasteCategoryFinalLabel?: 'glass' | 'mixed' | 'paper' | 'plastic' | null;
+  wasteCategoryReviewedBy?: string | null;
+  wasteCategoryReviewedAt?: string | null;
+  wasteCategoryReviewNote?: string | null;
 
   resolvedAt: string | null;
   createdAt: string;
@@ -197,6 +226,8 @@ export interface ReportFilters {
   urgency?: string;
   aiReviewStatus?: string;
   imageValidationLabel?: string;
+  wasteCategoryReviewStatus?: string;
+  wasteCategoryPredictedLabel?: string;
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
@@ -219,6 +250,8 @@ export type AuditAction =
   | 'REPORTS_BULK_STATUS_UPDATED'
   | 'REPORTS_BULK_REJECTED'
   | 'REPORTS_BULK_EXPORTED'
+  | 'REPORT_ML_REVIEW'
+  | 'REPORT_CATEGORY_REVIEW'
   | 'DOCUMENT_UPLOADED'
   | 'DOCUMENT_DELETED'
   | 'SETTINGS_UPDATED'

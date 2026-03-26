@@ -88,6 +88,40 @@ export async function reviewAdminReport(
   });
 }
 
+// ── Phase 2 Category Review ──────────────────────────────────────────
+
+export async function reviewCategoryReport(
+  id: string,
+  action: "approve" | "reject" | "override",
+  overrideCategory?: "glass" | "mixed" | "paper" | "plastic",
+  reviewNote?: string
+): Promise<{ success: boolean; data: AdminReport }> {
+  return adminFetch(`/reports/${id}/category-review`, {
+    method: "PATCH",
+    body: JSON.stringify({ action, overrideCategory, reviewNote }),
+  });
+}
+
+export interface CategoryReviewQueueFilters {
+  page?: number;
+  limit?: number;
+  reviewStatus?: string;
+  predictedCategory?: string;
+  lowConfidenceOnly?: boolean;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
+export async function getCategoryReviewQueue(
+  filters: CategoryReviewQueueFilters = {}
+): Promise<PaginatedResponse<AdminReport>> {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
+  });
+  return adminFetch(`/reports/category-review-queue?${params.toString()}`);
+}
+
 export async function assignReportToVolunteer(
   id: string,
   volunteerUid: string

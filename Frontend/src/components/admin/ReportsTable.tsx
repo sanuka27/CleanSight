@@ -43,10 +43,12 @@ interface ReportsTableProps {
   wasteTypeFilter: string;
   urgencyFilter: string;
   aiReviewStatusFilter?: string;
+  categoryReviewStatusFilter?: string;
   onStatusFilter: (v: string) => void;
   onWasteTypeFilter: (v: string) => void;
   onUrgencyFilter: (v: string) => void;
   onAiReviewStatusFilter?: (v: string) => void;
+  onCategoryReviewStatusFilter?: (v: string) => void;
   // Selection
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
@@ -216,8 +218,8 @@ export function ReportsTable({
   reports, loading, total, page, pageSize,
   onPageChange, onView,
   sortBy, sortOrder, onSort,
-  statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter,
-  onStatusFilter, onWasteTypeFilter, onUrgencyFilter, onAiReviewStatusFilter,
+  statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter, categoryReviewStatusFilter,
+  onStatusFilter, onWasteTypeFilter, onUrgencyFilter, onAiReviewStatusFilter, onCategoryReviewStatusFilter,
   selectedIds, onToggleSelect, onToggleSelectAll,
 }: ReportsTableProps) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -276,6 +278,24 @@ export function ReportsTable({
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="flagged">Flagged</SelectItem>
               <SelectItem value="manual_review">Manual Review</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="overridden">Overridden</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+
+        {onCategoryReviewStatusFilter && (
+          <Select value={categoryReviewStatusFilter || "all"} onValueChange={(v) => onCategoryReviewStatusFilter(v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectValue placeholder="Category Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Category Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="flagged">Flagged</SelectItem>
+              <SelectItem value="manual_review">Manual Review</SelectItem>
+              <SelectItem value="auto_accepted">Auto Accepted</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
               <SelectItem value="overridden">Overridden</SelectItem>

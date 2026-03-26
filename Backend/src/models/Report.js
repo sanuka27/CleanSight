@@ -102,6 +102,55 @@ const reportSchema = new mongoose.Schema({
     default: null,
     maxlength: [1000, 'Review note cannot exceed 1000 characters']
   },
+  // ML Phase 2 Category Classification fields
+  wasteCategoryPredictedLabel: {
+    type: String,
+    enum: ['glass', 'mixed', 'paper', 'plastic', 'pending', 'error'],
+    default: 'pending'
+  },
+  wasteCategoryConfidence: {
+    type: Number,
+    default: null
+  },
+  wasteCategoryEntropy: {
+    type: Number,
+    default: null
+  },
+  wasteCategoryConfidenceLevel: {
+    type: String,
+    enum: ['HIGH', 'MODERATE', 'LOW', 'VERY LOW', null],
+    default: null
+  },
+  wasteCategoryAllPredictions: {
+    type: [{
+      class: String,
+      confidence: Number
+    }],
+    default: null
+  },
+  wasteCategoryReviewStatus: {
+    type: String,
+    enum: ['auto_accepted', 'flagged', 'manual_review', 'pending', 'approved', 'overridden', 'rejected'],
+    default: 'pending'
+  },
+  wasteCategoryFinalLabel: {
+    type: String,
+    enum: ['glass', 'mixed', 'paper', 'plastic', null],
+    default: null
+  },
+  wasteCategoryReviewedBy: {
+    type: String,
+    default: null
+  },
+  wasteCategoryReviewedAt: {
+    type: Date,
+    default: null
+  },
+  wasteCategoryReviewNote: {
+    type: String,
+    default: null,
+    maxlength: [1000, 'Category review note cannot exceed 1000 characters']
+  },
   resolvedAt: {
     type: Date,
     default: null
@@ -120,6 +169,8 @@ reportSchema.index({ status: 1, createdAt: -1 });
 reportSchema.index({ assignedTo: 1, status: 1 });
 reportSchema.index({ wasteType: 1 });
 reportSchema.index({ urgency: 1 });
+reportSchema.index({ wasteCategoryReviewStatus: 1 });
+reportSchema.index({ wasteCategoryPredictedLabel: 1 });
 
 const Report = mongoose.model('Report', reportSchema);
 

@@ -5,6 +5,7 @@
 
 import express from 'express';
 import verifyToken from '../middleware/verifyToken.js';
+import validateAnalyticsQuery from '../middleware/validateAnalyticsQuery.js';
 import { parseDateRange } from '../utils/dateRange.js';
 import {
   getMLSummary,
@@ -21,7 +22,7 @@ const router = express.Router();
  * GET /api/ml-analytics/summary
  * Overall ML analytics summary for both phases
  */
-router.get('/summary', verifyToken, async (req, res) => {
+router.get('/summary', verifyToken, validateAnalyticsQuery, async (req, res) => {
   try {
     const { from, to } = parseDateRange(req.query);
     const summary = await getMLSummary(from, to);
@@ -46,7 +47,7 @@ router.get('/summary', verifyToken, async (req, res) => {
  * GET /api/ml-analytics/phase1
  * Phase 1 (binary validation) specific metrics
  */
-router.get('/phase1', verifyToken, async (req, res) => {
+router.get('/phase1', verifyToken, validateAnalyticsQuery, async (req, res) => {
   try {
     const { from, to } = parseDateRange(req.query);
     const metrics = await getPhase1Metrics(from, to);
@@ -71,7 +72,7 @@ router.get('/phase1', verifyToken, async (req, res) => {
  * GET /api/ml-analytics/phase2
  * Phase 2 (category classification) specific metrics
  */
-router.get('/phase2', verifyToken, async (req, res) => {
+router.get('/phase2', verifyToken, validateAnalyticsQuery, async (req, res) => {
   try {
     const { from, to } = parseDateRange(req.query);
     const metrics = await getPhase2Metrics(from, to);
@@ -96,7 +97,7 @@ router.get('/phase2', verifyToken, async (req, res) => {
  * GET /api/ml-analytics/trends
  * Time-series trends for ML predictions and reviews
  */
-router.get('/trends', verifyToken, async (req, res) => {
+router.get('/trends', verifyToken, validateAnalyticsQuery, async (req, res) => {
   try {
     const { from, to } = parseDateRange(req.query);
     const trends = await getMLTrends(from, to);
@@ -121,7 +122,7 @@ router.get('/trends', verifyToken, async (req, res) => {
  * GET /api/ml-analytics/weak-points
  * Categories with high override rates or low confidence
  */
-router.get('/weak-points', verifyToken, async (req, res) => {
+router.get('/weak-points', verifyToken, validateAnalyticsQuery, async (req, res) => {
   try {
     const { from, to } = parseDateRange(req.query);
     const weakPoints = await getWeakPoints(from, to);
@@ -146,7 +147,7 @@ router.get('/weak-points', verifyToken, async (req, res) => {
  * GET /api/ml-analytics/confidence-distribution
  * Confidence distribution for both Phase 1 and Phase 2
  */
-router.get('/confidence-distribution', verifyToken, async (req, res) => {
+router.get('/confidence-distribution', verifyToken, validateAnalyticsQuery, async (req, res) => {
   try {
     const { from, to } = parseDateRange(req.query);
     const distribution = await getConfidenceDistribution(from, to);

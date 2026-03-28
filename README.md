@@ -24,10 +24,12 @@ CleanSight was built to bridge the gap between environmental awareness and actio
 ## ✨ Core Features
 
 - **📸 AI-Powered Detection:** Integrated MobileNetV2 binary classifier to automatically verify uploaded images as waste/non-waste.
+- **🔬 ML Category Classification:** PyTorch-based waste category classifier (glass, mixed, paper, plastic) with confidence-based auto-acceptance.
+- **📊 ML Analytics Dashboard:** Comprehensive monitoring of ML model performance, prediction accuracy, review workload, and weak point identification for continuous improvement.
 - **📍 Geolocation Tracking:** Precise GPS tagging for every report ensures cleanup crews know exactly where to go.
 - **👥 Role-Based Workflows:** Distinct interfaces and permissions for Citizens, Volunteers, Staff, and Admins.
 - **⚡ Real-Time Coordination:** Connects on-the-ground volunteers with reported tasks dynamically.
-- **📊 Impact Analytics:** Comprehensive dashboards displaying environmental impact metrics and community progress.
+- **📈 Impact Analytics:** Comprehensive dashboards displaying environmental impact metrics and community progress.
 
 ## 🏗️ System Architecture
 

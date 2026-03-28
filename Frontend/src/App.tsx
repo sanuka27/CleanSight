@@ -38,6 +38,7 @@ const AdminReports = lazy(() => import("./pages/admin/Reports"));
 const AdminVolunteers = lazy(() => import("./pages/admin/Volunteers"));
 const AdminUsers = lazy(() => import("./pages/admin/Users"));
 const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
+const AdminMLAnalytics = lazy(() => import("./pages/admin/MLAnalytics"));
 const AdminDocuments = lazy(() => import("./pages/admin/Documents"));
 const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 const AdminAuditLog = lazy(() => import("./pages/admin/AuditLog"));
@@ -125,6 +126,7 @@ const AnimatedRoutes = () => {
             <Route path="volunteers" element={<AdminVolunteers />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="analytics" element={<AdminAnalytics />} />
+            <Route path="ml-analytics" element={<AdminMLAnalytics />} />
             <Route path="documents" element={<AdminDocuments />} />
             <Route path="audit-log" element={<AdminAuditLog />} />
             <Route path="settings" element={<AdminSettings />} />

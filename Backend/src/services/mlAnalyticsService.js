@@ -20,78 +20,85 @@ export const getPhase1Metrics = async (from, to) => {
     ? { createdAt: dateFilter }
     : {};
 
-  // Total predictions and label distribution
-  const labelStats = await Report.aggregate([
-    { $match: matchStage },
-    {
-      $group: {
-        _id: '$imageValidationLabel',
-        count: { $sum: 1 },
-        avgConfidence: { $avg: '$imageValidationConfidence' },
-      },
-    },
-  ]);
-
-  // Review status breakdown
-  const reviewStatusStats = await Report.aggregate([
-    { $match: matchStage },
-    {
-      $group: {
-        _id: '$aiReviewStatus',
-        count: { $sum: 1 },
-      },
-    },
-  ]);
-
-  // Final decision breakdown (for reviewed reports)
-  const finalDecisionStats = await Report.aggregate([
-    {
-      $match: {
-        ...matchStage,
-        finalValidationDecision: { $ne: null },
-      },
-    },
-    {
-      $group: {
-        _id: '$finalValidationDecision',
-        count: { $sum: 1 },
-      },
-    },
-  ]);
-
-  // Confidence distribution (only for reports with confidence)
-  const confidenceDistribution = await Report.aggregate([
-    {
-      $match: {
-        ...matchStage,
-        imageValidationConfidence: { $ne: null },
-      },
-    },
-    {
-      $bucket: {
-        groupBy: '$imageValidationConfidence',
-        boundaries: [0, 0.5, 0.7, 0.85, 1.0, 1.01],
-        default: 'other',
-        output: {
+  // Execute all aggregations in parallel for better performance
+  const [
+    labelStats,
+    reviewStatusStats,
+    finalDecisionStats,
+    confidenceDistribution,
+    totalReviewed,
+    overrideCount,
+    totalPredictions,
+  ] = await Promise.all([
+    // Total predictions and label distribution
+    Report.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: '$imageValidationLabel',
           count: { $sum: 1 },
           avgConfidence: { $avg: '$imageValidationConfidence' },
         },
       },
-    },
+    ]),
+    // Review status breakdown
+    Report.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: '$aiReviewStatus',
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+    // Final decision breakdown (for reviewed reports)
+    Report.aggregate([
+      {
+        $match: {
+          ...matchStage,
+          finalValidationDecision: { $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: '$finalValidationDecision',
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+    // Confidence distribution (only for reports with confidence)
+    Report.aggregate([
+      {
+        $match: {
+          ...matchStage,
+          imageValidationConfidence: { $ne: null },
+        },
+      },
+      {
+        $bucket: {
+          groupBy: '$imageValidationConfidence',
+          boundaries: [0, 0.5, 0.7, 0.85, 1.0, 1.01],
+          default: 'other',
+          output: {
+            count: { $sum: 1 },
+            avgConfidence: { $avg: '$imageValidationConfidence' },
+          },
+        },
+      },
+    ]),
+    // Total reviewed count
+    Report.countDocuments({
+      ...matchStage,
+      finalValidationDecision: { $ne: null },
+    }),
+    // Override count
+    Report.countDocuments({
+      ...matchStage,
+      finalValidationDecision: 'overridden',
+    }),
+    // Total predictions
+    Report.countDocuments(matchStage),
   ]);
-
-  // Override rate calculation
-  const totalReviewed = await Report.countDocuments({
-    ...matchStage,
-    finalValidationDecision: { $ne: null },
-  });
-
-  const overrideCount = await Report.countDocuments({
-    ...matchStage,
-    finalValidationDecision: 'overridden',
-  });
-
-  const totalPredictions = await Report.countDocuments(matchStage);
 
   return {
     totalPredictions,

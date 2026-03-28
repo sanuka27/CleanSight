@@ -32,7 +32,6 @@ import type {
   Phase2Metrics,
   MLTrendPoint,
   WeakPointData,
-  DateRange as DateRangeType,
 } from "@/types/mlAnalytics";
 
 type DateRange = "7d" | "30d" | "90d" | "custom";
@@ -69,8 +68,8 @@ export default function MLAnalytics() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const from = customDates.from || undefined;
-      const to = customDates.to || undefined;
+      const from = range === "custom" && customDates.from ? customDates.from : undefined;
+      const to = range === "custom" && customDates.to ? customDates.to : undefined;
 
       const [summaryRes, phase1Res, phase2Res, trendsRes, weakRes] = await Promise.all([
         getMLSummary(range, from, to),
@@ -480,17 +479,23 @@ export default function MLAnalytics() {
                       </td>
                       <td className="text-center p-3">{cat.totalPredictions}</td>
                       <td className="text-center p-3">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            cat.avgConfidence >= 0.8
-                              ? "bg-emerald-100 text-emerald-700"
-                              : cat.avgConfidence >= 0.5
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {(cat.avgConfidence * 100).toFixed(1)}%
-                        </span>
+                        {cat.avgConfidence == null ? (
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-muted text-muted-foreground">
+                            N/A
+                          </span>
+                        ) : (
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              cat.avgConfidence >= 0.8
+                                ? "bg-emerald-100 text-emerald-700"
+                                : cat.avgConfidence >= 0.5
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {(cat.avgConfidence * 100).toFixed(1)}%
+                          </span>
+                        )}
                       </td>
                       <td className="text-center p-3">
                         <span

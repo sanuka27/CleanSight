@@ -16,6 +16,12 @@ export interface Phase1LabelStat {
   avgConfidence: number | null;
 }
 
+export interface Phase1ConfidenceBucket {
+  _id: number | 'other'; // boundary value or 'other' default bucket
+  count: number;
+  avgConfidence: number;
+}
+
 export interface Phase1ReviewStatusStat {
   _id: string; // 'approved' | 'flagged' | 'manual_review' | 'pending' | 'rejected' | 'overridden'
   count: number;
@@ -27,7 +33,7 @@ export interface Phase1FinalDecisionStat {
 }
 
 export interface Phase1ConfidenceBucket {
-  _id: number; // boundary value
+  _id: number | 'other'; // boundary value or 'other' default bucket
   count: number;
   avgConfidence: number;
 }
@@ -147,8 +153,8 @@ export interface MLAnalyticsResponse<T> {
   success: boolean;
   data: T & {
     range?: {
-      from: Date | null;
-      to: Date | null;
+      from: string | null;
+      to: string | null;
     };
   };
   message?: string;
@@ -171,7 +177,7 @@ export interface ConfidenceDistributionResponse extends MLAnalyticsResponse<Conf
 // Filters
 
 export interface MLAnalyticsFilters {
-  range?: string; // '7d' | '30d' | '90d' | 'custom'
+  preset?: string; // '7d' | '30d' | '90d' | 'custom'
   from?: string; // ISO date string
   to?: string; // ISO date string
 }

@@ -12,6 +12,7 @@ import analyticsRoutes from './routes/analytics.js';
 import dashboardRoutes from './routes/dashboard.js';
 import contactRoutes from './routes/contact.js';
 import adminRoutes from './routes/admin.js';
+import mlAnalyticsRoutes from './routes/mlAnalytics.js';
 
 // Load environment variables
 dotenv.config();
@@ -44,6 +45,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/ml-analytics', mlAnalyticsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

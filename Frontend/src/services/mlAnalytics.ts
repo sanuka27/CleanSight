@@ -26,8 +26,8 @@ async function mlFetch<T>(path: string, filters: MLAnalyticsFilters = {}): Promi
   const token = await getToken();
   const params = new URLSearchParams();
   
-  if (filters.range && filters.range !== 'custom') {
-    params.set('range', filters.range);
+  if (filters.preset && filters.preset !== 'custom') {
+    params.set('preset', filters.preset);
   }
   if (filters.from) {
     params.set('from', filters.from);
@@ -57,64 +57,64 @@ async function mlFetch<T>(path: string, filters: MLAnalyticsFilters = {}): Promi
  * Get ML analytics summary (overview of both phases)
  */
 export async function getMLSummary(
-  range?: string,
+  preset?: string,
   from?: string,
   to?: string
 ): Promise<MLSummaryResponse> {
-  return mlFetch<MLSummaryResponse>('/summary', { range, from, to });
+  return mlFetch<MLSummaryResponse>('/summary', { preset, from, to });
 }
 
 /**
  * Get Phase 1 (binary validation) metrics
  */
 export async function getPhase1Metrics(
-  range?: string,
+  preset?: string,
   from?: string,
   to?: string
 ): Promise<Phase1MetricsResponse> {
-  return mlFetch<Phase1MetricsResponse>('/phase1', { range, from, to });
+  return mlFetch<Phase1MetricsResponse>('/phase1', { preset, from, to });
 }
 
 /**
  * Get Phase 2 (category classification) metrics
  */
 export async function getPhase2Metrics(
-  range?: string,
+  preset?: string,
   from?: string,
   to?: string
 ): Promise<Phase2MetricsResponse> {
-  return mlFetch<Phase2MetricsResponse>('/phase2', { range, from, to });
+  return mlFetch<Phase2MetricsResponse>('/phase2', { preset, from, to });
 }
 
 /**
  * Get ML trends over time
  */
 export async function getMLTrends(
-  range?: string,
+  preset?: string,
   from?: string,
   to?: string
 ): Promise<MLTrendsResponse> {
-  return mlFetch<MLTrendsResponse>('/trends', { range, from, to });
+  return mlFetch<MLTrendsResponse>('/trends', { preset, from, to });
 }
 
 /**
  * Get weak points analysis (categories with issues)
  */
 export async function getWeakPoints(
-  range?: string,
+  preset?: string,
   from?: string,
   to?: string
 ): Promise<WeakPointsResponse> {
-  return mlFetch<WeakPointsResponse>('/weak-points', { range, from, to });
+  return mlFetch<WeakPointsResponse>('/weak-points', { preset, from, to });
 }
 
 /**
  * Get confidence distribution for both phases
  */
 export async function getConfidenceDistribution(
-  range?: string,
+  preset?: string,
   from?: string,
   to?: string
 ): Promise<ConfidenceDistributionResponse> {
-  return mlFetch<ConfidenceDistributionResponse>('/confidence-distribution', { range, from, to });
+  return mlFetch<ConfidenceDistributionResponse>('/confidence-distribution', { preset, from, to });
 }

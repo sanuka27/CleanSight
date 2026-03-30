@@ -69,13 +69,92 @@ CleanSight/
 - RESTful HTTP architecture
 
 **Machine Learning:**
-- TensorFlow, Keras (MobileNetV2 Transfer Learning)
+- TensorFlow, Keras (MobileNetV2 Transfer Learning - Phase 1)
+- PyTorch (Category Classification - Phase 2)
 - Scikit-learn, Matplotlib, Seaborn, Pillow
+- FastAPI ML Service
 
 **Authentication & Security:**
 - Firebase Authentication (OAuth & Email/Password)
 - Firebase Admin SDK for backend token verification
 - Custom Role-Based Access Control (RBAC) via database injection
+
+## 🚀 Local Development
+
+### Prerequisites
+- **Node.js** 18+ and npm/pnpm
+- **Python** 3.10+ (tested with 3.14)
+- **MongoDB** (Atlas or local)
+- **Git**
+
+### Quick Start
+
+1. **Clone and install dependencies:**
+   ```bash
+   git clone <repository-url>
+   cd CleanSight
+   pnpm install  # or npm install
+   ```
+
+2. **Configure environment variables:**
+   ```bash
+   # Frontend
+   cd Frontend
+   copy .env.example .env
+   # Edit .env with your Firebase config
+   
+   # Backend
+   cd ../Backend
+   copy .env.example .env
+   # Edit .env with MongoDB URI and Firebase Admin credentials
+   
+   # ML Service
+   cd ../ML
+   copy .env.example .env
+   # Optional: customize ML service settings
+   ```
+
+3. **Set up Python environment (for ML Service):**
+   ```bash
+   cd ML
+   python -m venv venv
+   .\venv\Scripts\Activate.ps1  # Windows PowerShell
+   pip install -r requirements_service.txt
+   ```
+
+4. **Start services** (in separate terminals):
+   ```bash
+   # Terminal 1: Backend
+   cd Backend
+   npm run dev
+   # → http://localhost:5000
+   
+   # Terminal 2: ML Service
+   cd ML
+   .\venv\Scripts\Activate.ps1
+   python -m uvicorn service.main:app --host 0.0.0.0 --port 8000 --reload
+   # → http://localhost:8000
+   
+   # Terminal 3: Frontend
+   cd Frontend
+   npm run dev
+   # → http://localhost:8080
+   ```
+
+5. **Verify deployment:**
+   - Frontend: http://localhost:8080
+   - Backend: http://localhost:5000/api/health (or check terminal output)
+   - ML Service: http://localhost:8000/health
+
+### Service Ports
+
+| Service | Port | URL |
+|---------|------|-----|
+| Frontend | 8080 | http://localhost:8080 |
+| Backend | 5000 | http://localhost:5000 |
+| ML Service | 8000 | http://localhost:8000 |
+
+📖 **Full setup guide**: [docs/LOCAL_DEPLOYMENT.md](docs/LOCAL_DEPLOYMENT.md)
 
 ## 🚀 The Lifecycle of a Report
 

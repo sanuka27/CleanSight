@@ -74,13 +74,7 @@ git clone <repository-url>
 cd CleanSight
 ```
 
-### 2. Checkout the Deployment Config Branch
-
-```bash
-git checkout feature/ml-deployment-config
-```
-
-### 3. Install Dependencies
+### 2. Install Dependencies
 
 **Option A: Using pnpm (recommended)**
 ```bash
@@ -186,7 +180,7 @@ ML_SERVICE_HOST=0.0.0.0
 ML_SERVICE_PORT=8000
 
 BINARY_MODEL_PATH=models/trash_classifier.keras
-CATEGORY_MODEL_PATH=models/category_classifier.pth
+CATEGORY_MODEL_PATH=models/waste_category_classifier.pt
 
 BINARY_CONFIDENCE_THRESHOLD=0.85
 CATEGORY_CONFIDENCE_THRESHOLD=0.85
@@ -270,7 +264,7 @@ This creates: `ML/models/trash_classifier.keras`
 ```bash
 python -m training.train_category_model
 ```
-This creates: `ML/models/category_classifier.pth`
+This creates: `ML/models/waste_category_classifier.pt` and `ML/models/category_class_names.json`
 
 ⚠️ **Note**: Training requires datasets in `ML/dataset_binary/` and `ML/dataset_category/`. If you don't have datasets, the ML service will return mock predictions or errors.
 
@@ -280,12 +274,13 @@ This creates: `ML/models/category_classifier.pth`
 
 **Important**: Services must be started in this order:
 1. Backend (depends on MongoDB)
-2. ML Service (depends on trained models)
-3. Frontend (depends on Backend)
+2. ML Phase 1 Service (depends on trained Phase 1 model)
+3. ML Phase 2 Category Service (depends on trained Phase 2 model)
+4. Frontend (depends on Backend)
 
 ### Manual Start (Recommended for Development)
 
-Open **three separate terminal windows**:
+Open **four separate terminal windows**:
 
 **Terminal 1 - Backend:**
 ```bash
@@ -294,19 +289,26 @@ npm run dev
 ```
 Expected output: `Server running on http://localhost:5000`
 
-**Terminal 2 - ML Service:**
+**Terminal 2 - ML Phase 1 Service (Binary classifier):**
 ```bash
 cd ML
-# Activate venv if not already activated
 .\venv\Scripts\Activate.ps1
 python -m uvicorn service.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 Expected output: `Uvicorn running on http://0.0.0.0:8000`
 
-**Terminal 3 - Frontend:**
+**Terminal 3 - ML Phase 2 Category Service:**
+```bash
+cd ML
+.\venv\Scripts\Activate.ps1
+python -m uvicorn ML.category_service.main:app --host 0.0.0.0 --port 8001 --reload
+```
+Expected output: `Uvicorn running on http://0.0.0.0:8001`
+
+**Terminal 4 - Frontend:**
 ```bash
 cd Frontend
-npm run dev
+pnpm dev
 ```
 Expected output: `Local: http://localhost:8080/`
 
@@ -324,9 +326,13 @@ Manually check each service:
 2. **Backend**: Visit http://localhost:5000/api/health
    - Should return: `{"status":"ok"}`
 
-3. **ML Service**: Visit http://localhost:8000/health
+3. **ML Phase 1 Service**: Visit http://localhost:8000/health
    - Should return: `{"status":"ok"}`
    - API docs: http://localhost:8000/docs
+
+4. **ML Phase 2 Category Service**: Visit http://localhost:8001/health
+   - Should return: `{"status":"ok","service":"category-classification"}`
+   - API docs: http://localhost:8001/docs
 
 ### Service URLs
 
@@ -334,8 +340,10 @@ Manually check each service:
 |---------|-----|---------|
 | Frontend | http://localhost:8080 | Main web interface |
 | Backend | http://localhost:5000 | REST API |
-| ML Service | http://localhost:8000 | ML predictions |
-| ML API Docs | http://localhost:8000/docs | Interactive API documentation |
+| ML Phase 1 Service | http://localhost:8000 | Binary trash/non-trash prediction |
+| ML Phase 2 Service | http://localhost:8001 | Waste category classification |
+| ML Phase 1 API Docs | http://localhost:8000/docs | Interactive API documentation |
+| ML Phase 2 API Docs | http://localhost:8001/docs | Interactive API documentation |
 
 ---
 
@@ -728,7 +736,8 @@ pip install -U <package-name>
 |---------|------|----------|---------|
 | Frontend | 8080 | HTTP | Vite dev server |
 | Backend | 5000 | HTTP | Express.js API |
-| ML Service | 8000 | HTTP | FastAPI ML predictions |
+| ML Phase 1 Service | 8000 | HTTP | FastAPI binary classifier (trash/non-trash) |
+| ML Phase 2 Service | 8001 | HTTP | FastAPI category classifier (plastic/paper/glass/mixed) |
 | MongoDB Local | 27017 | TCP | MongoDB database (if running locally) |
 
 ---

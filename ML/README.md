@@ -5,7 +5,7 @@ This directory contains the machine learning components for the CleanSight waste
 - **Phase 1** — Binary classification (trash vs. non-trash) — TensorFlow/Keras
 - **Phase 2** — Waste category classification (plastic, paper, glass, mixed) — **PyTorch**
 
-In the full pipeline, Phase 1 first determines whether an image contains waste. If it does, Phase 2 classifies the type of waste. Backend integration and admin review flows are handled in separate branches.
+In the full pipeline, Phase 1 first determines whether an image contains waste. If it does, Phase 2 classifies the type of waste. Both phases are served via separate FastAPI services and fully integrated with the backend and admin review flow.
 
 > **Note**: Phase 2 uses PyTorch for Python 3.14+ compatibility on Windows. See the "Why PyTorch?" section below for details.
 
@@ -284,7 +284,7 @@ All model files, artifacts, and reports are git-ignored.
     └─────────┘
 ```
 
-A future integration branch will combine both phases into a single prediction flow and connect them to the backend API.
+Both phases are fully integrated into the backend API and the admin review flow. Phase 1 runs on port 8000; Phase 2 category service runs on port 8001.
 
 ---
 
@@ -498,45 +498,3 @@ Phase 2 was migrated from TensorFlow/Keras to PyTorch for the following reasons:
 
 ---
 
-## Branch History
-
-### feature/ml-phase2-training-tuning-pytorch
-
-This branch improves the Phase 2 PyTorch implementation with:
-
-**Training Improvements:**
-- Fixed random seed (42) for reproducible training
-- Class distribution reporting before training starts
-- Class imbalance handling via weighted loss function
-- Comprehensive training reports (JSON)
-- Training history saved as JSON for analysis
-
-**Dataset Validation Improvements:**
-- Enhanced imbalance detection and warning system
-- Recommendations for handling imbalanced datasets
-- Optional JSON report generation
-- Clearer console output with visual distribution bars
-
-**Evaluation Improvements:**
-- Weak class identification with specific recommendations
-- Common misclassification pair analysis
-- Normalized confusion matrix visualization
-- Per-class metrics bar chart
-- Human-readable text report alongside JSON
-
-**Inference Improvements:**
-- Entropy-based uncertainty estimation
-- Confidence level interpretation (HIGH/MODERATE/LOW/VERY LOW)
-- JSON output mode for API integration
-- Top-k prediction filtering option
-
----
-
-## Future Branches
-
-The following features are planned for later branches (not included here):
-
-- Phase 1 migration to PyTorch (if needed for unified framework)
-- Phase 2 backend integration
-- Phase 2 admin review flow
-- Combined Phase 1 → Phase 2 prediction endpoint

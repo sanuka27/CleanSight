@@ -4,9 +4,16 @@
 
 ### 1. Setup Environment Files
 ```bash
-setup-env.bat
+# Frontend
+copy Frontend\.env.example Frontend\.env
+
+# Backend
+copy Backend\.env.example Backend\.env
+
+# ML Service (optional)
+copy ML\.env.example ML\.env
 ```
-Then edit the `.env` files with your actual credentials.
+Then edit each `.env` file with your actual credentials.
 
 ### 2. Install Node Dependencies
 ```bash

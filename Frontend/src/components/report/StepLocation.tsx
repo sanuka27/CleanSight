@@ -11,7 +11,7 @@ import {
   Trash2,
   ArrowRight,
 } from "lucide-react";
-import { CleanSightMap } from "@/components/maps/CleanSightMap";
+import { CleanSightMap } from "@/components/map/CleanSightMap";
 import { fmtCoord } from "./constants";
 import type { LatLng } from "@/types/map";
 

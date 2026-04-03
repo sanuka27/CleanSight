@@ -1,12 +1,13 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { PageTransition } from "./components/layout/PageTransition";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { queryClient } from "./lib/queryClient";
 import { lazy, Suspense } from "react";
 
 // Lazy load pages for better performance
@@ -43,15 +44,6 @@ const AdminDocuments = lazy(() => import("./pages/admin/Documents"));
 const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 const AdminAuditLog = lazy(() => import("./pages/admin/AuditLog"));
 const AdminMapView = lazy(() => import("./pages/admin/AdminMapView"));
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000, // 1 minute
-      refetchOnWindowFocus: false,
-    },
-  },
-});
 
 // Loading fallback
 const PageLoader = () => (

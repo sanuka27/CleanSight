@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { DashboardReport } from "@/types/dashboard";
 import { reportAge } from "@/utils/volunteerInsights";
-import { CleanSightMap } from "@/components/maps/CleanSightMap";
+import { CleanSightMap } from "@/components/map/CleanSightMap";
 import type { MapReportMarker } from "@/types/map";
 
 const statusColors: Record<string, string> = {

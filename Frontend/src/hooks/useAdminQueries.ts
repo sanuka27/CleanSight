@@ -35,6 +35,13 @@ import {
   fetchAdminMapReports,
   type CategoryReviewQueueFilters,
 } from "@/services/admin";
+import {
+  getMLSummary,
+  getPhase1Metrics,
+  getPhase2Metrics,
+  getMLTrends,
+  getWeakPoints,
+} from "@/services/mlAnalytics";
 import type {
   ReportFilters,
   ReportStatus,
@@ -229,11 +236,14 @@ export function useAdminVolunteersQuery(params?: {
   });
 }
 
-export function useAdminVolunteerDetailQuery(uid: string | null) {
+export function useAdminVolunteerDetailQuery(
+  uid: string | null,
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: queryKeys.admin.volunteers.detail(uid ?? ""),
     queryFn: () => getAdminVolunteer(uid!),
-    enabled: !!uid,
+    enabled: options?.enabled !== false && !!uid,
   });
 }
 
@@ -390,5 +400,44 @@ export function useUpdateUserSuspensionMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.users.all() });
     },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ML Analytics Queries
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useMLSummaryQuery(preset?: string, from?: string, to?: string) {
+  return useQuery({
+    queryKey: queryKeys.mlAnalytics.summary({ preset, from, to }),
+    queryFn: () => getMLSummary(preset, from, to),
+  });
+}
+
+export function usePhase1MetricsQuery(preset?: string, from?: string, to?: string) {
+  return useQuery({
+    queryKey: queryKeys.mlAnalytics.phase1({ preset, from, to }),
+    queryFn: () => getPhase1Metrics(preset, from, to),
+  });
+}
+
+export function usePhase2MetricsQuery(preset?: string, from?: string, to?: string) {
+  return useQuery({
+    queryKey: queryKeys.mlAnalytics.phase2({ preset, from, to }),
+    queryFn: () => getPhase2Metrics(preset, from, to),
+  });
+}
+
+export function useMLTrendsQuery(preset?: string, from?: string, to?: string) {
+  return useQuery({
+    queryKey: queryKeys.mlAnalytics.trends({ preset, from, to }),
+    queryFn: () => getMLTrends(preset, from, to),
+  });
+}
+
+export function useWeakPointsQuery(preset?: string, from?: string, to?: string) {
+  return useQuery({
+    queryKey: queryKeys.mlAnalytics.weakPoints({ preset, from, to }),
+    queryFn: () => getWeakPoints(preset, from, to),
   });
 }

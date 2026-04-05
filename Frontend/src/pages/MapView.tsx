@@ -4,14 +4,15 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { Layers, Route, X, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CleanSightMap } from "@/components/maps/CleanSightMap";
-import { RouteOverlay } from "@/components/maps/RouteOverlay";
+import { CleanSightMap } from "@/components/map/CleanSightMap";
+import { RouteOverlay } from "@/components/map/RouteOverlay";
 import { fromGeoJSONPoint, bboxFromViewport } from "@/utils/geo";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, VIEWPORT_DEBOUNCE_MS } from "@/constants/map";
 import { URGENCY_CONFIG, LEGEND_ITEMS } from "@/constants/mapUi";
 import type { StatusFilterValue, SortValue } from "@/constants/mapUi";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useMapReportsQuery } from "@/hooks/useReportsQueries";
 import api from "@/lib/api";
 import type { MapReportMarker, LatLng, MapViewport } from "@/types/map";
 import { LiveReportsPanel } from "@/components/map/LiveReportsPanel";
@@ -53,11 +54,6 @@ const MapView = () => {
     pitch: 0,
   });
 
-  // Reports data
-  const [reports, setReports] = useState<MapReportMarker[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Filters & UI
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -72,44 +68,29 @@ const MapView = () => {
 
   // Debounced fetch timer
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  
+  // Local reports state for viewport-based updates
+  const [localReports, setLocalReports] = useState<MapReportMarker[]>([]);
 
-  // ── Fetch reports ────────────────────────────────────────────────
+  // React Query for initial load with status filter
+  const queryParams = useMemo(() => ({
+    status: statusFilter !== "All" ? [statusFilter] : undefined,
+  }), [statusFilter]);
+  
+  const { data: initialReports, isLoading, error: queryError } = useMapReportsQuery(queryParams);
+  const error = queryError ? (queryError instanceof Error ? queryError.message : "Failed to load reports") : null;
 
-  const fetchReports = useCallback(
-    async (statusOverride?: string) => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const activeStatus = statusOverride ?? statusFilter;
+  // Use React Query data initially, then local state for viewport updates
+  const reports = localReports.length > 0 ? localReports : (initialReports ?? []);
 
-        const res = await api.listReportsForMap({
-          status: activeStatus !== "All" ? [activeStatus] : undefined,
-        });
-
-        setReports(res.data);
-      } catch (err: any) {
-        const msg = err.message ?? "Failed to load reports";
-        setError(msg);
-        toast({ title: "Error", description: msg, variant: "destructive" });
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [statusFilter, toast]
-  );
-
-  // Initial load
+  // Sync initial reports to local state
   useEffect(() => {
-    fetchReports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (initialReports) {
+      setLocalReports(initialReports);
+    }
+  }, [initialReports]);
 
-  // Refetch on filter change
-  useEffect(() => {
-    fetchReports();
-  }, [statusFilter, fetchReports]);
-
-  // Debounced viewport-based refetch
+  // ── Debounced viewport-based refetch ─────────────────────────────
   const handleViewportChange = useCallback(
     (vp: MapViewport) => {
       setViewport(vp);
@@ -119,7 +100,7 @@ const MapView = () => {
           const bbox = bboxFromViewport(vp);
           const activeStatus = statusFilter !== "All" ? [statusFilter] : undefined;
           const res = await api.listReportsForMap({ bbox, status: activeStatus });
-          setReports(res.data);
+          setLocalReports(res.data);
         } catch {
           // Silently fall back to current data
         }

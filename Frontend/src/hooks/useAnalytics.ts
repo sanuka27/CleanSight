@@ -1,82 +1,32 @@
-import { useState, useCallback } from "react";
-import api from "@/lib/api";
-import type {
-  AnalyticsQueryParams,
-  SummaryResponse,
-  PerformanceResponse,
-  VolunteerAnalyticsResponse,
-} from "@/types/analytics";
+// DEPRECATED: Use @/hooks/useAnalyticsQueries.ts instead
+// This file uses manual useState/useCallback patterns
+// The new hooks use React Query for better caching and state management
 
-interface AnalyticsState {
-  summary: SummaryResponse["data"] | null;
-  performance: PerformanceResponse["data"] | null;
-  volunteers: VolunteerAnalyticsResponse["data"] | null;
-  isLoading: boolean;
-  error: string | null;
-}
+export {
+  useAnalyticsSummaryQuery,
+  useAnalyticsPerformanceQuery,
+  useVolunteerAnalyticsQuery,
+} from './useAnalyticsQueries';
 
-export function useAnalytics() {
-  const [state, setState] = useState<AnalyticsState>({
-    summary: null,
-    performance: null,
-    volunteers: null,
-    isLoading: false,
-    error: null,
-  });
+// For backwards compatibility - composite hook
+import { useAnalyticsSummaryQuery, useAnalyticsPerformanceQuery, useVolunteerAnalyticsQuery } from './useAnalyticsQueries';
+import type { AnalyticsQueryParams } from "@/types/analytics";
 
-  /* ----- Summary ----- */
-
-  const fetchSummary = useCallback(async (params?: AnalyticsQueryParams) => {
-    setState((s) => ({ ...s, isLoading: true, error: null }));
-    try {
-      const res = await api.getAnalyticsSummary(params);
-      setState((s) => ({ ...s, summary: res.data, isLoading: false }));
-      return res.data;
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to fetch analytics summary";
-      setState((s) => ({ ...s, isLoading: false, error: message }));
-      return null;
-    }
-  }, []);
-
-  /* ----- Performance ----- */
-
-  const fetchPerformance = useCallback(async (params?: AnalyticsQueryParams) => {
-    setState((s) => ({ ...s, isLoading: true, error: null }));
-    try {
-      const res = await api.getAnalyticsPerformance(params);
-      setState((s) => ({ ...s, performance: res.data, isLoading: false }));
-      return res.data;
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to fetch performance data";
-      setState((s) => ({ ...s, isLoading: false, error: message }));
-      return null;
-    }
-  }, []);
-
-  /* ----- Volunteers (staff/admin only) ----- */
-
-  const fetchVolunteers = useCallback(async (params?: AnalyticsQueryParams) => {
-    setState((s) => ({ ...s, isLoading: true, error: null }));
-    try {
-      const res = await api.getVolunteerAnalytics(params);
-      setState((s) => ({ ...s, volunteers: res.data, isLoading: false }));
-      return res.data;
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to fetch volunteer analytics";
-      setState((s) => ({ ...s, isLoading: false, error: message }));
-      return null;
-    }
-  }, []);
+export function useAnalytics(params?: AnalyticsQueryParams) {
+  const summaryQuery = useAnalyticsSummaryQuery(params);
+  const performanceQuery = useAnalyticsPerformanceQuery(params);
+  const volunteersQuery = useVolunteerAnalyticsQuery(params);
 
   return {
-    ...state,
-    fetchSummary,
-    fetchPerformance,
-    fetchVolunteers,
+    summary: summaryQuery.data ?? null,
+    performance: performanceQuery.data ?? null,
+    volunteers: volunteersQuery.data ?? null,
+    isLoading: summaryQuery.isLoading || performanceQuery.isLoading,
+    error: summaryQuery.error?.message ?? performanceQuery.error?.message ?? null,
+    // Legacy method stubs for compatibility (no-op, data is fetched automatically)
+    fetchSummary: async () => summaryQuery.data,
+    fetchPerformance: async () => performanceQuery.data,
+    fetchVolunteers: async () => volunteersQuery.data,
   };
 }
 

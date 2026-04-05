@@ -1,30 +1,30 @@
 // ── Admin Types ─────────────────────────────────────────────────────
+// Import shared types from core
+import type {
+  AppRole,
+  ExtendedReportStatus,
+  WasteType,
+  UrgencyLevel,
+  WasteCategoryLabel,
+  WasteCategoryReviewStatus,
+  WasteCategoryConfidenceLevel,
+  GeoJSONPoint,
+  Pagination,
+  PaginatedResponse,
+  DateRangePreset,
+} from './core';
 
-export type ReportStatus =
-  | 'pending'
-  | 'verified'
-  | 'assigned'
-  | 'in_progress'
-  | 'resolved'
-  | 'rejected';
+// Re-export for backwards compatibility
+export type { AppRole, WasteType, UrgencyLevel, Pagination, PaginatedResponse };
 
-export type WasteType = 'general' | 'recyclable' | 'organic' | 'construction' | 'hazardous';
-export type UrgencyLevel = 'low' | 'medium' | 'high';
-export type AppRole = 'citizen' | 'volunteer' | 'staff' | 'admin';
+// Use extended report status for admin
+export type ReportStatus = ExtendedReportStatus;
+
 export type DocumentCategory = 'sop' | 'policy' | 'report' | 'guide' | 'other';
 export type FileType = 'pdf' | 'doc' | 'docx' | 'xlsx' | 'csv' | 'image' | 'other';
 
-// ML Phase 2 Category Types
-export type WasteCategoryLabel = 'glass' | 'mixed' | 'paper' | 'plastic' | 'pending' | 'error';
-export type WasteCategoryReviewStatus =
-  | 'auto_accepted'
-  | 'flagged'
-  | 'manual_review'
-  | 'pending'
-  | 'approved'
-  | 'overridden'
-  | 'rejected';
-export type WasteCategoryConfidenceLevel = 'HIGH' | 'MODERATE' | 'LOW' | 'VERY LOW';
+// Re-export ML types with admin namespace
+export type { WasteCategoryLabel, WasteCategoryReviewStatus, WasteCategoryConfidenceLevel };
 
 export interface CategoryPrediction {
   class: string;
@@ -33,10 +33,7 @@ export interface CategoryPrediction {
 
 // ── Report ──────────────────────────────────────────────────────────
 
-export interface GeoLocation {
-  type: 'Point';
-  coordinates: [number, number]; // [lng, lat]
-}
+export type GeoLocation = GeoJSONPoint;
 
 export interface ReporterProfile {
   firebaseUid: string;
@@ -203,20 +200,7 @@ export interface SystemSettings {
   updatedAt?: string;
 }
 
-// ── Pagination ──────────────────────────────────────────────────────
-
-export interface Pagination {
-  page: number;
-  limit: number;
-  total: number;
-  pages?: number;
-}
-
-export interface PaginatedResponse<T> {
-  success: boolean;
-  data: T[];
-  pagination: Pagination;
-}
+// Pagination types are imported and re-exported from core.ts
 
 // ── Report Filters ──────────────────────────────────────────────────
 

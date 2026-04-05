@@ -3,13 +3,12 @@
 /* ------------------------------------------------------------------ */
 
 import type { DateRange, StatusTotals, Rates, SeriesBucket, WasteTypeCount, UrgencyCount } from "./analytics";
+import type { GeoJSONPoint } from "./core";
 
 /* ── Shared ──────────────────────────────────────────────────────── */
 
-export interface GeoJSONPoint {
-  type: "Point";
-  coordinates: [number, number]; // [lng, lat]
-}
+// Re-export GeoJSONPoint for backwards compatibility
+export type { GeoJSONPoint };
 
 export interface DashboardReport {
   _id: string;

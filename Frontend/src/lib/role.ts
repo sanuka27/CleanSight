@@ -5,7 +5,9 @@
  * /api/auth/me and exposes simple boolean checks.
  */
 
-export type AppRole = "citizen" | "volunteer" | "staff" | "admin";
+// Import from centralized types
+export type { AppRole } from "@/types/core";
+import type { AppRole } from "@/types/core";
 
 /**
  * Extract the role string from the user profile object.

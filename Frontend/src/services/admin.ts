@@ -1,3 +1,4 @@
+import { api } from "@/lib/api";
 import { auth } from "@/lib/firebase";
 import type {
   AdminReport,
@@ -23,32 +24,10 @@ import type {
   AdminMapFilters,
 } from "@/types/admin";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-
-async function getToken(): Promise<string> {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated");
-  return user.getIdToken();
-}
-
-async function adminFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = await getToken();
-  const res = await fetch(`${API_BASE}/api/admin${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(init.headers || {}),
-    },
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || `Admin API error ${res.status}`);
-  }
-
-  return res.json();
-}
+// Use the main API client for admin requests
+const adminFetch = <T>(path: string, init: RequestInit = {}): Promise<T> => {
+  return api.adminRequest<T>(path, init);
+};
 
 // ── Reports ─────────────────────────────────────────────────────────
 
@@ -364,12 +343,15 @@ export async function bulkRejectReports(
 /**
  * Bulk export reports to CSV and trigger browser download.
  * Pass either reportIds (for selected) or filters (for current filter set).
+ * Note: Uses direct fetch for blob response handling
  */
 export async function bulkExportReports(
   payload: { reportIds: string[] } | { filters: BulkExportFilters }
 ): Promise<void> {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Not authenticated");
+  
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
   const res = await fetch(`${API_BASE}/api/admin/reports/bulk/export`, {
     method: "POST",

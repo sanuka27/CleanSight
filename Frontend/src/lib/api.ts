@@ -292,6 +292,17 @@ class ApiClient {
       requiresAuth: true,
     });
   }
+
+  /**
+   * Generic admin request - for use by admin services
+   * Prefixes path with /api/admin automatically
+   */
+  async adminRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+    return this.request(`/api/admin${path}`, {
+      ...options,
+      requiresAuth: true,
+    });
+  }
 }
 
 export const api = new ApiClient(API_BASE_URL);

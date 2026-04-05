@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useMemo } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -33,12 +33,17 @@ import {
   Pie
 } from 'recharts';
 import { motion } from "framer-motion";
-import { useAnalytics } from "@/hooks/useAnalytics";
-import { useAdminDashboard } from "@/hooks/useDashboard";
+import {
+  useAnalyticsSummaryQuery,
+  useAnalyticsPerformanceQuery,
+  useVolunteerAnalyticsQuery,
+} from "@/hooks/useAnalyticsQueries";
+import { useAdminDashboardQuery } from "@/hooks/useDashboardQueries";
 import { useAuth } from "@/context/AuthContext";
-import { defaultParams, fromPreset, PRESETS } from "@/lib/dateRange";
-import { getUserRole, canViewVolunteerAnalytics } from "@/lib/role";
+import { fromPreset } from "@/lib/dateRange";
+import { canViewVolunteerAnalytics } from "@/lib/role";
 import type { AnalyticsPreset } from "@/types/analytics";
+import { useState } from "react";
 
 /* ── Fallback mock data (used while loading / on error) ────────── */
 
@@ -81,47 +86,21 @@ const Dashboard = () => {
     const [preset, setPreset] = useState<AnalyticsPreset>("7d");
 
     const { user } = useAuth();
-    const {
-      summary,
-      performance,
-      volunteers,
-      isLoading,
-      error,
-      fetchSummary,
-      fetchPerformance,
-      fetchVolunteers,
-    } = useAnalytics();
-
-    const { data: adminData, fetch: fetchAdmin } = useAdminDashboard();
-
-    // Fetch on mount and when preset changes
-    useEffect(() => {
-      const params = fromPreset(preset);
-      fetchSummary(params);
-      fetchPerformance(params);
-    }, [preset, fetchSummary, fetchPerformance]);
-
-    // Derive user role from backend profile stored in summary
-    // (we don't have a separate profile fetch yet — use a safe fallback)
-    const userRole = useMemo(() => {
-      // If volunteer analytics are already loaded, user is staff/admin
-      // This is a safe heuristic; the real gating happens server-side
-      return "citizen" as const; // will be replaced by profile fetch later
-    }, []);
-
-    // Fetch volunteer analytics only for staff/admin (gated server-side too)
-    useEffect(() => {
-      if (canViewVolunteerAnalytics("staff")) {
-        if (summary) {
-          fetchVolunteers(fromPreset(preset));
-        }
-      }
-    }, [summary, preset, fetchVolunteers]);
-
-    // Fetch admin dashboard payload for recent activity
-    useEffect(() => {
-      fetchAdmin();
-    }, [fetchAdmin]);
+    
+    // Derive query params from preset
+    const queryParams = useMemo(() => fromPreset(preset), [preset]);
+    
+    // React Query hooks for analytics
+    const { data: summary, isLoading: summaryLoading } = useAnalyticsSummaryQuery(queryParams);
+    const { data: performance, isLoading: perfLoading } = useAnalyticsPerformanceQuery(queryParams);
+    const { data: volunteers } = useVolunteerAnalyticsQuery(queryParams, {
+      enabled: canViewVolunteerAnalytics("staff"),
+    });
+    
+    // Admin dashboard data (recent activity, etc.)
+    const { data: adminData } = useAdminDashboardQuery();
+    
+    const isLoading = summaryLoading || perfLoading;
 
     /* ── Derived display data (falls back to zeros while loading) ── */
 

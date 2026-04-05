@@ -1,11 +1,9 @@
-/** Latitude / Longitude pair */
-export interface LatLng {
-  lat: number;
-  lng: number;
-}
+// Import shared types from core
+import type { LatLng as CoreLatLng, BBox as CoreBBox, BaseReportStatus } from './core';
 
-/** Bounding box: [west, south, east, north] */
-export type BBox = [number, number, number, number];
+/** Re-export for backwards compatibility */
+export type LatLng = CoreLatLng;
+export type BBox = CoreBBox;
 
 /** Map viewport state (mirrors mapcn MapViewport) */
 export interface MapViewport {
@@ -16,7 +14,7 @@ export interface MapViewport {
 }
 
 /** Report status values used across the app */
-export type ReportStatus = "pending" | "assigned" | "resolved";
+export type ReportStatus = BaseReportStatus;
 
 /** Lightweight report shape for map markers.
  *  Supports both GeoJSON and legacy {lat, lng} location formats. */

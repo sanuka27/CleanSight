@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Upload, Trash2, ExternalLink,
@@ -6,8 +6,8 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { AdminTopbar } from "@/components/admin/Topbar";
 import { useToast } from "@/hooks/use-toast";
-import { listDocuments, createDocument, deleteDocument } from "@/services/admin";
+import {
+  useAdminDocumentsQuery,
+  useCreateDocumentMutation,
+  useDeleteDocumentMutation,
+} from "@/hooks/useAdminQueries";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage, auth } from "@/lib/firebase";
 import type { AdminDocument, DateRange, DocumentCategory } from "@/types/admin";
@@ -53,33 +57,20 @@ function formatBytes(bytes: number): string {
 export default function AdminDocuments() {
   const { toast } = useToast();
   const [range, setRange] = useState<DateRange>("30d");
-  const [docs, setDocs] = useState<AdminDocument[]>([]);
-  const [loading, setLoading] = useState(true);
   const [catFilter, setCatFilter] = useState<string>("");
   const [showUpload, setShowUpload] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await listDocuments(catFilter || undefined);
-      setDocs(res.data);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, [catFilter, toast]);
-
-  useEffect(() => { load(); }, [load]);
+  // React Query
+  const { data: docsRes, isLoading: loading, refetch } = useAdminDocumentsQuery(catFilter || undefined);
+  const docs = docsRes?.data ?? [];
+  const deleteMutation = useDeleteDocumentMutation();
 
   async function handleDelete(id: string, title: string) {
     if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
     setDeleting(id);
     try {
-      await deleteDocument(id);
-      setDocs((prev) => prev.filter((d) => d._id !== id));
+      await deleteMutation.mutateAsync(id);
       toast({ title: "Document deleted" });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed";
@@ -113,7 +104,7 @@ export default function AdminDocuments() {
             </SelectContent>
           </Select>
 
-          <Button variant="ghost" size="sm" onClick={load} disabled={loading} className="gap-1.5">
+          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={loading} className="gap-1.5">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           </Button>
 
@@ -220,7 +211,7 @@ export default function AdminDocuments() {
         <UploadDocumentDialog
           onClose={() => setShowUpload(false)}
           onUploaded={(doc) => {
-            setDocs((prev) => [doc, ...prev]);
+            refetch();
             setShowUpload(false);
             toast({ title: "Document uploaded", description: doc.title });
           }}
@@ -240,6 +231,7 @@ function UploadDocumentDialog({
   onUploaded: (doc: AdminDocument) => void;
 }) {
   const { toast } = useToast();
+  const createDocumentMutation = useCreateDocumentMutation();
   const fileRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -298,7 +290,7 @@ function UploadDocumentDialog({
         return;
       }
 
-      const res = await createDocument({ title, url, fileType, fileSize, category, description });
+      const res = await createDocumentMutation.mutateAsync({ title, url, fileType, fileSize, category, description });
       onUploaded(res.data);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Upload failed";

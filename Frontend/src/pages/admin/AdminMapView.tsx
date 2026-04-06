@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, RotateCcw, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CleanSightMap } from "@/components/maps/CleanSightMap";
+import { CleanSightMap } from "@/components/map/CleanSightMap";
 import { AdminMapFilters } from "@/components/admin/map/AdminMapFilters";
 import { AdminMapStats } from "@/components/admin/map/AdminMapStats";
 import { AdminReportDrawer } from "@/components/admin/map/AdminReportDrawer";

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   ClipboardList, RefreshCw, ChevronLeft, ChevronRight,
@@ -22,8 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AdminTopbar } from "@/components/admin/Topbar";
-import { useToast } from "@/hooks/use-toast";
-import { listAuditLogs } from "@/services/admin";
+import { useAuditLogsQuery } from "@/hooks/useAdminQueries";
 import type {
   AuditLog,
   AuditAction,
@@ -108,11 +107,7 @@ function metadataSummary(action: AuditAction, meta: Record<string, unknown>): st
 // ── Main Page ────────────────────────────────────────────────────────
 
 export default function AdminAuditLog() {
-  const { toast } = useToast();
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -133,46 +128,38 @@ export default function AdminAuditLog() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [search]);
 
+  // Build filters
+  const filters: AuditLogFilters = {
+    page,
+    limit: PAGE_SIZE,
+    search: debouncedSearch || undefined,
+    action: actionFilter || undefined,
+    entityType: entityFilter || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  };
+
+  // React Query
+  const { data: logsRes, isLoading: loading, refetch } = useAuditLogsQuery(filters);
+  const logs = logsRes?.data ?? [];
+  const total = logsRes?.pagination?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  const load = useCallback(async (pg = 1) => {
-    setLoading(true);
-    try {
-      const filters: AuditLogFilters = {
-        page: pg,
-        limit: PAGE_SIZE,
-        search: debouncedSearch || undefined,
-        action: actionFilter || undefined,
-        entityType: entityFilter || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo   || undefined,
-      };
-      const res = await listAuditLogs(filters);
-      setLogs(res.data);
-      setTotal(res.pagination.total);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedSearch, actionFilter, entityFilter, dateFrom, dateTo, toast]);
-
   // Reset to page 1 when filters change
-  const prevPage = useRef(page);
+  const prevFiltersRef = useRef({ debouncedSearch, actionFilter, entityFilter, dateFrom, dateTo });
   useEffect(() => {
-    prevPage.current = 1;
-    setPage(1);
-    load(1);
-  }, [debouncedSearch, actionFilter, entityFilter, dateFrom, dateTo, load]);
-
-  // Reload when page changes (but not when filters already reset to 1)
-  useEffect(() => {
-    if (prevPage.current !== page) {
-      prevPage.current = page;
-      load(page);
+    const prev = prevFiltersRef.current;
+    if (
+      prev.debouncedSearch !== debouncedSearch ||
+      prev.actionFilter !== actionFilter ||
+      prev.entityFilter !== entityFilter ||
+      prev.dateFrom !== dateFrom ||
+      prev.dateTo !== dateTo
+    ) {
+      setPage(1);
+      prevFiltersRef.current = { debouncedSearch, actionFilter, entityFilter, dateFrom, dateTo };
     }
-  }, [page, load]);
+  }, [debouncedSearch, actionFilter, entityFilter, dateFrom, dateTo]);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -249,7 +236,7 @@ export default function AdminAuditLog() {
             <X className="w-3.5 h-3.5" />
           </Button>
 
-          <Button variant="ghost" size="sm" onClick={() => load(page)} disabled={loading} className="h-9">
+          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={loading} className="h-9">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>

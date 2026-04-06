@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { RefreshCw, TrendingUp, Users, Clock, BarChart2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,50 +7,29 @@ import { RANGE_LABELS } from "@/components/admin/Topbar";
 import { ActivityChart } from "@/components/admin/Charts/ActivityChart";
 import { WasteTypeChart } from "@/components/admin/Charts/WasteTypeChart";
 import { VolunteerChart } from "@/components/admin/Charts/VolunteerChart";
-import { useToast } from "@/hooks/use-toast";
 import {
-  getAdminOverview,
-  getAdminTrends,
-  getVolunteerPerformance,
-} from "@/services/admin";
-import type {
-  AdminAnalyticsOverview,
-  TrendDataPoint,
-  VolunteerPerformance,
-  DateRange,
-} from "@/types/admin";
+  useAdminOverviewQuery,
+  useAdminTrendsQuery,
+  useVolunteerPerformanceQuery,
+} from "@/hooks/useAdminQueries";
+import type { DateRange } from "@/types/admin";
 
 export default function AdminAnalytics() {
-  const { toast } = useToast();
   const [range, setRange] = useState<DateRange>("30d");
   const [customDates, setCustomDates] = useState({ from: "", to: "" });
-  const [overview, setOverview] = useState<AdminAnalyticsOverview | null>(null);
-  const [trends, setTrends] = useState<TrendDataPoint[]>([]);
-  const [volPerf, setVolPerf] = useState<VolunteerPerformance[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const from = customDates.from || undefined;
-      const to = customDates.to || undefined;
-      const [ovRes, trRes, vpRes] = await Promise.all([
-        getAdminOverview(range, from, to),
-        getAdminTrends(range, from, to),
-        getVolunteerPerformance(range),
-      ]);
-      setOverview(ovRes.data);
-      setTrends(trRes.data);
-      setVolPerf(vpRes.data);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load analytics";
-      toast({ title: "Analytics Error", description: msg, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, [range, customDates, toast]);
+  const from = customDates.from || undefined;
+  const to = customDates.to || undefined;
 
-  useEffect(() => { load(); }, [load]);
+  // React Query hooks
+  const { data: overviewRes, isLoading: overviewLoading, refetch } = useAdminOverviewQuery(range, from, to);
+  const { data: trendsRes, isLoading: trendsLoading } = useAdminTrendsQuery(range, from, to);
+  const { data: volPerfRes, isLoading: volPerfLoading } = useVolunteerPerformanceQuery(range);
+
+  const overview = overviewRes?.data ?? null;
+  const trends = trendsRes?.data ?? [];
+  const volPerf = volPerfRes?.data ?? [];
+  const loading = overviewLoading || trendsLoading || volPerfLoading;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -67,7 +46,7 @@ export default function AdminAnalytics() {
           <p className="text-sm text-muted-foreground">
             {loading ? "Loading…" : `Showing data: ${RANGE_LABELS[range]}`}
           </p>
-          <Button variant="ghost" size="sm" onClick={load} disabled={loading} className="gap-1.5">
+          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={loading} className="gap-1.5">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>

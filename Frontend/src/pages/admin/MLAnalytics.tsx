@@ -1,16 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { RefreshCw, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, Brain } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AdminTopbar, RANGE_LABELS } from "@/components/admin/Topbar";
-import { useToast } from "@/hooks/use-toast";
 import {
-  getMLSummary,
-  getPhase1Metrics,
-  getPhase2Metrics,
-  getMLTrends,
-  getWeakPoints,
-} from "@/services/mlAnalytics";
+  useMLSummaryQuery,
+  usePhase1MetricsQuery,
+  usePhase2MetricsQuery,
+  useMLTrendsQuery,
+  useWeakPointsQuery,
+} from "@/hooks/useAdminQueries";
 import {
   BarChart,
   Bar,
@@ -26,13 +25,6 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import type {
-  MLSummary,
-  Phase1Metrics,
-  Phase2Metrics,
-  MLTrendPoint,
-  WeakPointData,
-} from "@/types/mlAnalytics";
 
 type DateRange = "7d" | "30d" | "90d" | "custom";
 
@@ -54,47 +46,25 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function MLAnalytics() {
-  const { toast } = useToast();
   const [range, setRange] = useState<DateRange>("30d");
   const [customDates, setCustomDates] = useState({ from: "", to: "" });
-  const [loading, setLoading] = useState(true);
 
-  const [summary, setSummary] = useState<MLSummary | null>(null);
-  const [phase1, setPhase1] = useState<Phase1Metrics | null>(null);
-  const [phase2, setPhase2] = useState<Phase2Metrics | null>(null);
-  const [trends, setTrends] = useState<MLTrendPoint[]>([]);
-  const [weakPoints, setWeakPoints] = useState<WeakPointData[]>([]);
+  const from = range === "custom" && customDates.from ? customDates.from : undefined;
+  const to = range === "custom" && customDates.to ? customDates.to : undefined;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const from = range === "custom" && customDates.from ? customDates.from : undefined;
-      const to = range === "custom" && customDates.to ? customDates.to : undefined;
+  // React Query hooks
+  const { data: summaryRes, isLoading: summaryLoading, refetch } = useMLSummaryQuery(range, from, to);
+  const { data: phase1Res, isLoading: phase1Loading } = usePhase1MetricsQuery(range, from, to);
+  const { data: phase2Res, isLoading: phase2Loading } = usePhase2MetricsQuery(range, from, to);
+  const { data: trendsRes, isLoading: trendsLoading } = useMLTrendsQuery(range, from, to);
+  const { data: weakRes, isLoading: weakLoading } = useWeakPointsQuery(range, from, to);
 
-      const [summaryRes, phase1Res, phase2Res, trendsRes, weakRes] = await Promise.all([
-        getMLSummary(range, from, to),
-        getPhase1Metrics(range, from, to),
-        getPhase2Metrics(range, from, to),
-        getMLTrends(range, from, to),
-        getWeakPoints(range, from, to),
-      ]);
-
-      setSummary(summaryRes.data);
-      setPhase1(phase1Res.data);
-      setPhase2(phase2Res.data);
-      setTrends(trendsRes.data.trends);
-      setWeakPoints(weakRes.data.categories);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load ML analytics";
-      toast({ title: "ML Analytics Error", description: msg, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, [range, customDates, toast]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const summary = summaryRes?.data ?? null;
+  const phase1 = phase1Res?.data ?? null;
+  const phase2 = phase2Res?.data ?? null;
+  const trends = trendsRes?.data?.trends ?? [];
+  const weakPoints = weakRes?.data?.categories ?? [];
+  const loading = summaryLoading || phase1Loading || phase2Loading || trendsLoading || weakLoading;
 
   // Prepare chart data
   const phase1LabelData = phase1?.labelDistribution.map((item) => ({
@@ -139,7 +109,7 @@ export default function MLAnalytics() {
           <p className="text-sm text-muted-foreground">
             {loading ? "Loading…" : `Showing data: ${RANGE_LABELS[range]}`}
           </p>
-          <Button variant="ghost" size="sm" onClick={load} disabled={loading} className="gap-1.5">
+          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={loading} className="gap-1.5">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>

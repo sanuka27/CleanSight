@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   MapPin, Users, CheckCircle, Clock,
@@ -15,13 +15,12 @@ import { WasteTypeChart } from "@/components/admin/Charts/WasteTypeChart";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getAdminOverview,
-  getAdminTrends,
-} from "@/services/admin";
+  useAdminOverviewQuery,
+  useAdminTrendsQuery,
+  useAdminReportsQuery,
+} from "@/hooks/useAdminQueries";
 import type {
-  AdminAnalyticsOverview,
   AdminReport,
-  TrendDataPoint,
   DateRange,
 } from "@/types/admin";
 import { exportToCsv } from "@/utils/exportCsv";
@@ -41,38 +40,31 @@ export default function AdminOverview() {
   const navigate = useNavigate();
   const [range, setRange] = useState<DateRange>("7d");
   const [customDates, setCustomDates] = useState({ from: "", to: "" });
-  const [overview, setOverview] = useState<AdminAnalyticsOverview | null>(null);
-  const [trends, setTrends] = useState<TrendDataPoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [recentReports, setRecentReports] = useState<AdminReport[]>([]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const from = customDates.from || undefined;
-      const to = customDates.to || undefined;
-      const [ovRes, trRes] = await Promise.all([
-        getAdminOverview(range, from, to),
-        getAdminTrends(range, from, to),
-      ]);
-      setOverview(ovRes.data);
-      setTrends(trRes.data);
+  // React Query hooks
+  const from = customDates.from || undefined;
+  const to = customDates.to || undefined;
+  
+  const { data: overviewData, isLoading: overviewLoading, refetch: refetchOverview } = useAdminOverviewQuery(range, from, to);
+  const { data: trendsData, isLoading: trendsLoading, refetch: refetchTrends } = useAdminTrendsQuery(range, from, to);
+  const { data: reportsData, isLoading: reportsLoading, refetch: refetchReports } = useAdminReportsQuery({ 
+    limit: 8, 
+    sortBy: "updatedAt", 
+    sortOrder: "desc" 
+  });
 
-      // Load recent reports via the reports endpoint
-      const { listAdminReports } = await import("@/services/admin");
-      const repRes = await listAdminReports({ limit: 8, sortBy: "updatedAt", sortOrder: "desc" });
-      setRecentReports(repRes.data);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load";
-      toast({ title: "Error loading overview", description: msg, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, [range, customDates, toast]);
+  const overview = overviewData?.data ?? null;
+  const trends = trendsData?.data ?? [];
+  const recentReports = reportsData?.data ?? [];
+  const loading = overviewLoading || trendsLoading || reportsLoading;
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const handleRefresh = () => {
+    refetchOverview();
+    refetchTrends();
+    refetchReports();
+  };
 
-  const stats = overview
+  const stats = useMemo(() => overview
     ? [
         {
           label: "Total Reports",
@@ -116,7 +108,7 @@ export default function AdminOverview() {
         { label: "Pending",       value: 0, icon: Clock, color: "warning" as const, loading: true },
         { label: "In Progress",   value: 0, icon: Users, color: "info" as const, loading: true },
         { label: "Resolved",      value: 0, icon: CheckCircle, color: "success" as const, loading: true },
-      ];
+      ], [overview, loading]);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -148,7 +140,7 @@ export default function AdminOverview() {
           <p className="text-sm text-muted-foreground">
             {loading ? "Loading data…" : `Showing data: ${RANGE_LABELS[range]}`}
           </p>
-          <Button variant="ghost" size="sm" onClick={loadData} disabled={loading} className="gap-1.5">
+          <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loading} className="gap-1.5">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>

@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { useVolunteerDashboard } from "@/hooks/useDashboard";
+import { useVolunteerDashboardQuery } from "@/hooks/useDashboardQueries";
+import { useAssignSelfMutation, useUpdateReportStatusMutation } from "@/hooks/useReportsQueries";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +20,9 @@ import { VolunteerMapDrawer } from "@/components/volunteer/VolunteerMapDrawer";
 
 const VolunteerDashboard = () => {
   const { appUser } = useAuth();
-  const { data, isLoading, error, fetch } = useVolunteerDashboard();
+  const { data, isLoading, error, refetch } = useVolunteerDashboardQuery();
+  const assignSelfMutation = useAssignSelfMutation();
+  const updateStatusMutation = useUpdateReportStatusMutation();
   const { toast } = useToast();
 
   // Action loading: tracks which reportId is being mutated
@@ -41,21 +44,19 @@ const VolunteerDashboard = () => {
   // Tasks section ref for scroll
   const tasksRef = useRef<HTMLDivElement>(null);
 
-  // Initial fetch
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
+  // Convert error to string for display
+  const errorMessage = error instanceof Error ? error.message : error ? String(error) : null;
 
   // Show error toast
   useEffect(() => {
-    if (error) {
+    if (errorMessage) {
       toast({
         title: "Failed to load dashboard",
-        description: error,
+        description: errorMessage,
         variant: "destructive",
       });
     }
-  }, [error, toast]);
+  }, [errorMessage, toast]);
 
   /* ── Data derivations ───────────────────────────────────────────── */
   const assignedToMe = data?.assignedToMe ?? [];
@@ -143,8 +144,8 @@ const VolunteerDashboard = () => {
       if (actionLoading) return;
       setActionLoading(reportId);
       try {
-        await api.assignSelf(reportId);
-        await fetch();
+        await assignSelfMutation.mutateAsync(reportId);
+        await refetch();
         toast({ title: "Task accepted!", description: "It has been moved to your active tasks." });
       } catch {
         toast({
@@ -156,7 +157,7 @@ const VolunteerDashboard = () => {
         setActionLoading(null);
       }
     },
-    [actionLoading, fetch, toast]
+    [actionLoading, refetch, toast, assignSelfMutation]
   );
 
   const handleResolve = useCallback(
@@ -164,8 +165,8 @@ const VolunteerDashboard = () => {
       if (actionLoading) return;
       setActionLoading(reportId);
       try {
-        await api.updateReportStatus(reportId, "resolved");
-        await fetch();
+        await updateStatusMutation.mutateAsync({ reportId, status: "resolved" });
+        await refetch();
         toast({ title: "Task resolved!", description: "Well done! The report is now marked resolved." });
       } catch {
         toast({
@@ -177,7 +178,7 @@ const VolunteerDashboard = () => {
         setActionLoading(null);
       }
     },
-    [actionLoading, fetch, toast]
+    [actionLoading, refetch, toast, updateStatusMutation]
   );
 
   /* ── Open detail / map for report ──────────────────────────────── */

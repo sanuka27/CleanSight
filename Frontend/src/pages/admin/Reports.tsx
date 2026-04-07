@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useTransition } from "react";
+import { useState, useCallback, useRef, useTransition, useMemo, useEffect } from "react";
 import { AdminTopbar } from "@/components/admin/Topbar";
 import { ReportsTable } from "@/components/admin/ReportsTable";
 import { ReportDrawer } from "@/components/admin/ReportDrawer";
@@ -12,19 +12,19 @@ import {
 import { BulkResultSummary } from "@/components/admin/BulkResultSummary";
 import { useToast } from "@/hooks/use-toast";
 import {
-  listAdminReports,
-  listAdminVolunteers,
+  useAdminReportsQuery,
+  useAdminVolunteersQuery,
+  useBulkAssignMutation,
+  useBulkUpdateStatusMutation,
+  useBulkRejectMutation,
+} from "@/hooks/useAdminQueries";
+import {
   exportReportsCsv,
-  bulkAssignReports,
-  bulkUpdateReportStatus,
-  bulkRejectReports,
   bulkExportReports,
 } from "@/services/admin";
 import type {
   AdminReport,
-  AdminVolunteer,
   DateRange,
-  ReportFilters,
   ReportStatus,
   BulkActionResult,
 } from "@/types/admin";
@@ -48,10 +48,7 @@ export default function AdminReports() {
   const { toast } = useToast();
   const [range, setRange] = useState<DateRange>("30d");
   const [customDates, setCustomDates] = useState({ from: "", to: "" });
-  const [reports, setReports] = useState<AdminReport[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [wasteTypeFilter, setWasteTypeFilter] = useState("");
@@ -60,7 +57,6 @@ export default function AdminReports() {
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
-  const [volunteers, setVolunteers] = useState<AdminVolunteer[]>([]);
 
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -68,59 +64,54 @@ export default function AdminReports() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [, startTransition] = useTransition();
 
-  const loadReports = useCallback(async (opts: ReportFilters & { pg?: number } = {}) => {
-    setLoading(true);
-    try {
-      const currentPage = opts.pg ?? page;
-      const dates = rangeToFromTo(range, customDates);
-      const res = await listAdminReports({
-        page: currentPage,
-        limit: PAGE_SIZE,
-        search,
-        status: statusFilter,
-        wasteType: wasteTypeFilter,
-        urgency: urgencyFilter,
-        aiReviewStatus: aiReviewStatusFilter,
-        sortBy,
-        sortOrder,
-        from: dates.from,
-        to: dates.to,
-        ...opts,
-      });
-      setReports(res.data);
-      setTotal(res.pagination.total);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setLoading(false);
+  // Build filters for React Query
+  const dates = useMemo(() => rangeToFromTo(range, customDates), [range, customDates]);
+  const filters = useMemo(() => ({
+    page,
+    limit: PAGE_SIZE,
+    search,
+    status: statusFilter,
+    wasteType: wasteTypeFilter,
+    urgency: urgencyFilter,
+    aiReviewStatus: aiReviewStatusFilter,
+    sortBy,
+    sortOrder,
+    from: dates.from,
+    to: dates.to,
+  }), [page, search, statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter, sortBy, sortOrder, dates]);
+
+  // React Query hooks
+  const { data: reportsData, isLoading: loading, refetch: refetchReports } = useAdminReportsQuery(filters);
+  const { data: volunteersData } = useAdminVolunteersQuery({ limit: 200 });
+  
+  const reports = reportsData?.data ?? [];
+  const total = reportsData?.pagination?.total ?? 0;
+  const volunteers = volunteersData?.data ?? [];
+
+  // Bulk mutations
+  const bulkAssignMutation = useBulkAssignMutation();
+  const bulkUpdateStatusMutation = useBulkUpdateStatusMutation();
+  const bulkRejectMutation = useBulkRejectMutation();
+
+  // Reset page and selection when filters change
+  const prevFiltersRef = useRef({ search, statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter, sortBy, sortOrder, range });
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    if (
+      prev.search !== search ||
+      prev.statusFilter !== statusFilter ||
+      prev.wasteTypeFilter !== wasteTypeFilter ||
+      prev.urgencyFilter !== urgencyFilter ||
+      prev.aiReviewStatusFilter !== aiReviewStatusFilter ||
+      prev.sortBy !== sortBy ||
+      prev.sortOrder !== sortOrder ||
+      prev.range !== range
+    ) {
+      setPage(1);
+      setSelectedIds(new Set());
+      prevFiltersRef.current = { search, statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter, sortBy, sortOrder, range };
     }
-}, [page, search, statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter, sortBy, sortOrder, range, customDates, toast]);
-
-  // Load volunteers for assignment dropdown
-  useEffect(() => {
-    listAdminVolunteers({ limit: 200 })
-      .then((res) => setVolunteers(res.data))
-      .catch(() => {});
-  }, []);
-
-  // Reload when filters change, reset to p1, clear selection
-  useEffect(() => {
-    setPage(1);
-    setSelectedIds(new Set());
-    loadReports({ pg: 1 });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, statusFilter, wasteTypeFilter, urgencyFilter, aiReviewStatusFilter, sortBy, sortOrder, range]);
-
-  // Reload when page changes
-  const prevPage = useRef(page);
-  useEffect(() => {
-    if (prevPage.current !== page) {
-      prevPage.current = page;
-      loadReports({ pg: page });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
 
   function handleSort(field: string) {
     if (sortBy === field) {
@@ -132,9 +123,7 @@ export default function AdminReports() {
   }
 
   function handleReportUpdated(updated: AdminReport) {
-    setReports((prev) =>
-      prev.map((r) => (r._id === updated._id ? updated : r))
-    );
+    refetchReports();
     setSelectedReport(updated);
   }
 
@@ -197,7 +186,7 @@ export default function AdminReports() {
     }
 
     // Reload table to reflect changes
-    loadReports({ pg: page });
+    refetchReports();
   }
 
   // ── Bulk action handlers ──────────────────────────────────────────
@@ -221,7 +210,7 @@ export default function AdminReports() {
     setBulkLoading(true);
     try {
       const ids = Array.from(selectedIds);
-      const result = await bulkAssignReports(ids, volunteerUid, note || undefined);
+      const result = await bulkAssignMutation.mutateAsync({ reportIds: ids, volunteerUid, note: note || undefined });
       setActiveDialog(null);
       handleBulkResult(result, "Bulk Assign");
     } catch (e: unknown) {
@@ -237,7 +226,7 @@ export default function AdminReports() {
     setBulkLoading(true);
     try {
       const ids = Array.from(selectedIds);
-      const result = await bulkUpdateReportStatus(ids, status);
+      const result = await bulkUpdateStatusMutation.mutateAsync({ reportIds: ids, status });
       setActiveDialog(null);
       handleBulkResult(result, "Bulk Status Update");
     } catch (e: unknown) {
@@ -253,7 +242,7 @@ export default function AdminReports() {
     setBulkLoading(true);
     try {
       const ids = Array.from(selectedIds);
-      const result = await bulkRejectReports(ids, reason);
+      const result = await bulkRejectMutation.mutateAsync({ reportIds: ids, reason });
       setActiveDialog(null);
       handleBulkResult(result, "Bulk Reject");
     } catch (e: unknown) {

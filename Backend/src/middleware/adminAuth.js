@@ -1,6 +1,6 @@
 import { verifyToken } from './verifyToken.js';
 import User from '../models/User.js';
-import ROLES from '../constants/roles.js';
+import { ROLES } from '../constants/roles.js';
 
 /**
  * Admin-only middleware.

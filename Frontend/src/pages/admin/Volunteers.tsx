@@ -1,64 +1,29 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  User, CheckCircle, Clock, Star,
+  User, CheckCircle, Star,
   ChevronDown, ChevronUp, BarChart2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { AdminTopbar } from "@/components/admin/Topbar";
-import { useToast } from "@/hooks/use-toast";
-import { listAdminVolunteers, getAdminVolunteer } from "@/services/admin";
+import { useAdminVolunteersQuery, useAdminVolunteerDetailQuery } from "@/hooks/useAdminQueries";
 import type { AdminVolunteer, AdminReport, DateRange } from "@/types/admin";
 
 export default function AdminVolunteers() {
-  const { toast } = useToast();
   const [range, setRange] = useState<DateRange>("30d");
-  const [volunteers, setVolunteers] = useState<AdminVolunteer[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [expandedData, setExpandedData] = useState<Record<string, { user: AdminVolunteer; tasks: AdminReport[]; stats: { total: number; resolved: number; inProgress: number; completionRate: number } }>>({});
-  const [expandLoading, setExpandLoading] = useState<string | null>(null);
 
-  const load = useCallback(async (q: string) => {
-    setLoading(true);
-    try {
-      const res = await listAdminVolunteers({ limit: 50, search: q });
-      setVolunteers(res.data);
-      setTotal(res.pagination.total);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  // React Query for volunteers list
+  const { data: volunteersData, isLoading: loading } = useAdminVolunteersQuery({ limit: 50, search });
 
-  useEffect(() => {
-    load(search);
-  }, [search, load]);
+  const volunteers = volunteersData?.data ?? [];
+  const total = volunteersData?.pagination?.total ?? 0;
 
-  async function toggleExpand(uid: string) {
-    if (expanded === uid) {
-      setExpanded(null);
-      return;
-    }
-    setExpanded(uid);
-    if (!expandedData[uid]) {
-      setExpandLoading(uid);
-      try {
-        const res = await getAdminVolunteer(uid);
-        setExpandedData((prev) => ({ ...prev, [uid]: res.data }));
-      } catch {
-        // silently fail — row still expand without task list
-      } finally {
-        setExpandLoading(null);
-      }
-    }
+  function toggleExpand(uid: string) {
+    setExpanded((prev) => (prev === uid ? null : uid));
   }
 
   return (
@@ -93,118 +58,143 @@ export default function AdminVolunteers() {
               <p className="text-muted-foreground">No volunteers found</p>
             </Card>
           )}
-          {!loading && volunteers.map((vol, i) => {
-            const isOpen = expanded === vol.firebaseUid;
-            const detail = expandedData[vol.firebaseUid];
-            return (
-              <motion.div
-                key={vol.firebaseUid}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
-                className="bg-card border border-border/60 rounded-xl overflow-hidden"
-              >
-                {/* Main row */}
-                <div
-                  className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors"
-                  onClick={() => toggleExpand(vol.firebaseUid)}
-                >
-                  {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center font-bold text-primary text-sm shrink-0">
-                    {vol.name?.[0]?.toUpperCase() || "V"}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-sm">{vol.name}</p>
-                      <Badge variant="outline" className={`text-xs ${vol.isActive ? "text-emerald-600 border-emerald-300 bg-emerald-50" : "text-muted-foreground"}`}>
-                        {vol.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">{vol.email}</p>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="hidden sm:flex items-center gap-6 shrink-0">
-                    <StatPill icon={BarChart2} label="Assigned" value={vol.stats.assigned} color="text-primary" />
-                    <StatPill icon={CheckCircle} label="Resolved" value={vol.stats.resolved} color="text-emerald-600" />
-                    <StatPill icon={Star} label="Rate" value={`${vol.stats.completionRate}%`} color="text-amber-600" />
-                  </div>
-
-                  {/* Toggle */}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 ml-2">
-                    {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </Button>
-                </div>
-
-                {/* Expanded */}
-                {isOpen && (
-                  <div className="border-t border-border/60 px-5 py-4 space-y-4 bg-muted/20">
-                    {expandLoading === vol.firebaseUid ? (
-                      <div className="flex items-center gap-2 py-4">
-                        <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
-                        <span className="text-sm text-muted-foreground">Loading tasks…</span>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Profile info */}
-                        {vol.volunteerProfile?.bio && (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Bio</p>
-                            <p className="text-sm">{vol.volunteerProfile.bio}</p>
-                          </div>
-                        )}
-
-                        {/* Skills */}
-                        {vol.volunteerProfile?.skills && vol.volunteerProfile.skills.length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Skills</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {vol.volunteerProfile.skills.map((s) => (
-                                <Badge key={s} variant="secondary" className="text-xs capitalize">{s.replace(/-/g, " ")}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Recent tasks */}
-                        {detail?.tasks && detail.tasks.length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                              Recent Tasks ({detail.tasks.length})
-                            </p>
-                            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                              {detail.tasks.slice(0, 10).map((task) => (
-                                <div key={task._id} className="flex items-center gap-3 text-sm p-2 rounded-lg bg-background">
-                                  <div className={`w-2 h-2 rounded-full shrink-0 ${
-                                    task.status === "resolved" ? "bg-emerald-500" :
-                                    task.status === "in_progress" ? "bg-violet-500" :
-                                    "bg-amber-500"
-                                  }`} />
-                                  <span className="flex-1 truncate text-xs">
-                                    {task.title || task.description?.slice(0, 50) || "Untitled"}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground capitalize shrink-0">{task.status}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {detail?.tasks?.length === 0 && (
-                          <p className="text-sm text-muted-foreground">No tasks assigned yet.</p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
+          {!loading && volunteers.map((vol, i) => (
+            <VolunteerRow
+              key={vol.firebaseUid}
+              volunteer={vol}
+              index={i}
+              isExpanded={expanded === vol.firebaseUid}
+              onToggle={() => toggleExpand(vol.firebaseUid)}
+            />
+          ))}
         </div>
       </div>
     </div>
+  );
+}
+
+// Volunteer row with detail query
+function VolunteerRow({
+  volunteer: vol,
+  index,
+  isExpanded,
+  onToggle,
+}: {
+  volunteer: AdminVolunteer;
+  index: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  // Only fetch details when expanded
+  const { data: detailData, isLoading: detailLoading } = useAdminVolunteerDetailQuery(
+    vol.firebaseUid,
+    { enabled: isExpanded }
+  );
+  const detail = detailData?.data;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.04 }}
+      className="bg-card border border-border/60 rounded-xl overflow-hidden"
+    >
+      {/* Main row */}
+      <div
+        className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors"
+        onClick={onToggle}
+      >
+        {/* Avatar */}
+        <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center font-bold text-primary text-sm shrink-0">
+          {vol.name?.[0]?.toUpperCase() || "V"}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-sm">{vol.name}</p>
+            <Badge variant="outline" className={`text-xs ${vol.isActive ? "text-emerald-600 border-emerald-300 bg-emerald-50" : "text-muted-foreground"}`}>
+              {vol.isActive ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground truncate">{vol.email}</p>
+        </div>
+
+        {/* Stats */}
+        <div className="hidden sm:flex items-center gap-6 shrink-0">
+          <StatPill icon={BarChart2} label="Assigned" value={vol.stats.assigned} color="text-primary" />
+          <StatPill icon={CheckCircle} label="Resolved" value={vol.stats.resolved} color="text-emerald-600" />
+          <StatPill icon={Star} label="Rate" value={`${vol.stats.completionRate}%`} color="text-amber-600" />
+        </div>
+
+        {/* Toggle */}
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 ml-2">
+          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </Button>
+      </div>
+
+      {/* Expanded detail section */}
+      {isExpanded && (
+        <div className="border-t border-border/60 px-5 py-4 space-y-4 bg-muted/20">
+          {detailLoading ? (
+            <div className="flex items-center gap-2 py-4">
+              <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+              <span className="text-sm text-muted-foreground">Loading tasks…</span>
+            </div>
+          ) : (
+            <>
+              {/* Profile info */}
+              {vol.volunteerProfile?.bio && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Bio</p>
+                  <p className="text-sm">{vol.volunteerProfile.bio}</p>
+                </div>
+              )}
+
+              {/* Skills */}
+              {vol.volunteerProfile?.skills && vol.volunteerProfile.skills.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Skills</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {vol.volunteerProfile.skills.map((s) => (
+                      <Badge key={s} variant="secondary" className="text-xs capitalize">{s.replace(/-/g, " ")}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent tasks */}
+              {detail?.tasks && detail.tasks.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                    Recent Tasks ({detail.tasks.length})
+                  </p>
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    {detail.tasks.slice(0, 10).map((task: AdminReport) => (
+                      <div key={task._id} className="flex items-center gap-3 text-sm p-2 rounded-lg bg-background">
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${
+                          task.status === "resolved" ? "bg-emerald-500" :
+                          task.status === "in_progress" ? "bg-violet-500" :
+                          "bg-amber-500"
+                        }`} />
+                        <span className="flex-1 truncate text-xs">
+                          {task.title || task.description?.slice(0, 50) || "Untitled"}
+                        </span>
+                        <span className="text-xs text-muted-foreground capitalize shrink-0">{task.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {detail?.tasks?.length === 0 && (
+                <p className="text-sm text-muted-foreground">No tasks assigned yet.</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 }
 

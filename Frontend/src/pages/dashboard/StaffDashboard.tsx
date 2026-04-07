@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Card } from "@/components/ui/card";
@@ -16,9 +16,9 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
-import { useStaffDashboard } from "@/hooks/useDashboard";
+import { useStaffDashboardQuery } from "@/hooks/useDashboardQueries";
+import { useAssignReportMutation } from "@/hooks/useReportsQueries";
 import { useAuth } from "@/context/AuthContext";
-import { api } from "@/lib/api";
 import type { DashboardReport, AvailableVolunteer } from "@/types/dashboard";
 
 const statusColor: Record<string, string> = {
@@ -29,13 +29,10 @@ const statusColor: Record<string, string> = {
 
 const StaffDashboard = () => {
   const { user } = useAuth();
-  const { data, isLoading, error, fetch } = useStaffDashboard();
+  const { data, isLoading, error, refetch } = useStaffDashboardQuery();
+  const assignReportMutation = useAssignReportMutation();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [assignMenuOpen, setAssignMenuOpen] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
 
   const pendingReports = data?.pendingReports ?? [];
   const assignedReports = data?.assignedReports ?? [];
@@ -46,9 +43,9 @@ const StaffDashboard = () => {
   const handleAssign = async (reportId: string, volunteerUid: string) => {
     setActionLoading(reportId);
     try {
-      await api.assignReport(reportId, volunteerUid);
+      await assignReportMutation.mutateAsync({ reportId, volunteerUid });
       setAssignMenuOpen(null);
-      await fetch();
+      await refetch();
     } catch (err) {
       console.error("Failed to assign:", err);
     } finally {

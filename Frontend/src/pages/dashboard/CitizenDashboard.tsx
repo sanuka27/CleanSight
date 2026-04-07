@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { useCitizenDashboard } from "@/hooks/useDashboard";
+import { useCitizenDashboardQuery } from "@/hooks/useDashboardQueries";
 import { DashboardHeader } from "@/components/citizen/DashboardHeader";
 import { StatsCards } from "@/components/citizen/StatsCards";
 import { InsightCards } from "@/components/citizen/InsightCards";
@@ -15,7 +15,7 @@ import { motion } from "framer-motion";
 import type { DashboardReport } from "@/types/dashboard";
 
 const CitizenDashboard = () => {
-  const { data, isLoading, error, fetch } = useCitizenDashboard();
+  const { data, isLoading, error, refetch } = useCitizenDashboardQuery();
 
   // Report details modal state
   const [selectedReport, setSelectedReport] = useState<DashboardReport | null>(null);
@@ -25,9 +25,8 @@ const CitizenDashboard = () => {
   const reportsRef = useRef<HTMLDivElement>(null);
   const [pendingFilterActive, setPendingFilterActive] = useState(false);
 
-  useEffect(() => {
-    fetch();
-  }, [fetch]);
+  // Convert error to string for display
+  const errorMessage = error instanceof Error ? error.message : error ? String(error) : null;
 
   const totals = data?.myTotals ?? {
     total: 0,
@@ -65,18 +64,18 @@ const CitizenDashboard = () => {
       <main className="flex-1 pt-24 pb-12 px-4 lg:px-8">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Error banner */}
-          {error && (
+          {errorMessage && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm"
             >
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <span className="flex-1">{error}</span>
+              <span className="flex-1">{errorMessage}</span>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => fetch()}
+                onClick={() => refetch()}
                 className="gap-1.5 text-destructive hover:text-destructive"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -88,7 +87,7 @@ const CitizenDashboard = () => {
           {/* Hero header */}
           <DashboardHeader
             isLoading={isLoading}
-            error={error}
+            error={errorMessage}
             totalReports={totals.total}
           />
 

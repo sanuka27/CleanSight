@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ChevronLeft, ChevronRight, MoreVertical,
@@ -26,10 +26,12 @@ import {
 import { AdminTopbar } from "@/components/admin/Topbar";
 import { useToast } from "@/hooks/use-toast";
 import {
-  listAdminUsers,
-  getAdminUserDetail,
-  updateUserRole,
-  updateUserSuspension,
+  useAdminUsersQuery,
+  useAdminUserDetailQuery,
+  useUpdateUserRoleMutation,
+  useUpdateUserSuspensionMutation,
+} from "@/hooks/useAdminQueries";
+import {
   getAdminUserReports,
   getAdminUserTasks,
 } from "@/services/admin";
@@ -325,8 +327,6 @@ interface DrawerProps {
 }
 
 function UserDetailDrawer({ userId, onClose, onRoleChange, onSuspend }: DrawerProps) {
-  const [detail, setDetail] = useState<AdminUserDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "reports" | "tasks">("overview");
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [tasks, setTasks] = useState<AdminReport[]>([]);
@@ -340,23 +340,11 @@ function UserDetailDrawer({ userId, onClose, onRoleChange, onSuspend }: DrawerPr
   const [showSuspendDialog, setShowSuspendDialog] = useState(false);
   const { toast } = useToast();
 
+  // React Query for user detail
+  const { data: detailRes, isLoading: loading, refetch: refetchDetail } = useAdminUserDetailQuery(userId);
+  const detail = detailRes?.data ?? null;
+
   const LIMIT = 10;
-
-  const loadDetail = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await getAdminUserDetail(userId);
-      setDetail(res.data);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load user";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-      onClose();
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, onClose, toast]);
-
-  useEffect(() => { loadDetail(); }, [loadDetail]);
 
   async function loadReports(page: number) {
     if (!detail) return;
@@ -397,14 +385,14 @@ function UserDetailDrawer({ userId, onClose, onRoleChange, onSuspend }: DrawerPr
   async function handleRoleChange(role: AppRole) {
     if (!detail) return;
     await onRoleChange(detail.user, role);
-    await loadDetail();
+    await refetchDetail();
     setShowRoleDialog(false);
   }
 
   async function handleSuspend(isSuspended: boolean, reason?: string) {
     if (!detail) return;
     await onSuspend(detail.user, isSuspended, reason);
-    await loadDetail();
+    await refetchDetail();
     setShowSuspendDialog(false);
   }
 
@@ -772,34 +760,20 @@ function UserRow({ user, onView, onChangeRole, onSuspend }: RowProps) {
 export default function AdminUsers() {
   const { toast } = useToast();
   const [filters, setFilters] = useState<UserFilters>({ sort: "newest", page: 1, limit: 20 });
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [quickRoleUser, setQuickRoleUser] = useState<AdminUser | null>(null);
   const [quickSuspendUser, setQuickSuspendUser] = useState<AdminUser | null>(null);
 
+  // React Query
+  const { data: usersRes, isLoading: loading, refetch } = useAdminUsersQuery(filters);
+  const users = usersRes?.data ?? [];
+  const total = usersRes?.pagination?.total ?? 0;
+  const updateRoleMutation = useUpdateUserRoleMutation();
+  const updateSuspensionMutation = useUpdateUserSuspensionMutation();
+
   const LIMIT = filters.limit ?? 20;
   const currentPage = filters.page ?? 1;
   const totalPages = Math.ceil(total / LIMIT);
-
-  const loadUsers = useCallback(async (f: UserFilters) => {
-    setLoading(true);
-    try {
-      const res = await listAdminUsers(f);
-      setUsers(res.data);
-      setTotal(res.pagination.total);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load users";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    loadUsers(filters);
-  }, [filters, loadUsers]);
 
   function setFilter(partial: Partial<UserFilters>) {
     setFilters((prev) => ({ ...prev, ...partial }));
@@ -807,9 +781,8 @@ export default function AdminUsers() {
 
   async function handleRoleChange(user: AdminUser, newRole: AppRole) {
     try {
-      await updateUserRole(user._id, newRole);
+      await updateRoleMutation.mutateAsync({ id: user._id, role: newRole });
       toast({ title: "Role Updated", description: `${user.name} is now a ${newRole}.` });
-      loadUsers(filters);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to update role";
       toast({ title: "Error", description: msg, variant: "destructive" });
@@ -819,14 +792,13 @@ export default function AdminUsers() {
 
   async function handleSuspend(user: AdminUser, isSuspended: boolean, reason?: string) {
     try {
-      await updateUserSuspension(user._id, isSuspended, reason);
+      await updateSuspensionMutation.mutateAsync({ id: user._id, isSuspended, reason });
       toast({
         title: isSuspended ? "Account Suspended" : "Account Restored",
         description: isSuspended
           ? `${user.name} can no longer access CleanSight.`
           : `${user.name}'s access has been restored.`,
       });
-      loadUsers(filters);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to update suspension";
       toast({ title: "Error", description: msg, variant: "destructive" });

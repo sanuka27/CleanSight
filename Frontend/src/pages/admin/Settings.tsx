@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { AdminTopbar } from "@/components/admin/Topbar";
 import { useToast } from "@/hooks/use-toast";
-import { getSettings, updateSettings } from "@/services/admin";
+import { useAdminSettingsQuery, useUpdateSettingsMutation } from "@/hooks/useAdminQueries";
 import type { SystemSettings, DateRange } from "@/types/admin";
 
 const DEFAULT_SETTINGS: SystemSettings = {
@@ -25,24 +25,19 @@ export default function AdminSettings() {
   const { toast } = useToast();
   const [range, setRange] = useState<DateRange>("30d");
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
+  // React Query
+  const { data: settingsRes, isLoading: loading, refetch } = useAdminSettingsQuery();
+  const updateMutation = useUpdateSettingsMutation();
+
+  // Sync settings from query to local state
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await getSettings();
-        setSettings(res.data);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Failed to load settings";
-        toast({ title: "Error", description: msg, variant: "destructive" });
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [toast]);
+    if (settingsRes?.data) {
+      setSettings(settingsRes.data);
+      setIsDirty(false);
+    }
+  }, [settingsRes]);
 
   function patch(partial: Partial<SystemSettings>) {
     setSettings((prev) => ({ ...prev, ...partial }));
@@ -58,18 +53,17 @@ export default function AdminSettings() {
   }
 
   async function handleSave() {
-    setSaving(true);
     try {
-      await updateSettings(settings);
+      await updateMutation.mutateAsync(settings);
       setIsDirty(false);
       toast({ title: "Settings saved", description: "Changes applied successfully." });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to save";
       toast({ title: "Save failed", description: msg, variant: "destructive" });
-    } finally {
-      setSaving(false);
     }
   }
+
+  const saving = updateMutation.isPending;
 
   return (
     <div className="flex flex-col min-h-screen">

@@ -340,12 +340,12 @@ export default function AdminReports() {
           onUrgencyFilter={setUrgencyFilter}
           onAiReviewStatusFilter={setAiReviewStatusFilter}
           selectedIds={selectedIds}
-          onToggleSelect={onToggleSelect}
-          onToggleSelectAll={onToggleSelectAll}
+          onToggleSelect={handleToggleSelect}
+          onToggleSelectAll={handleToggleSelectAll}
         />
         <BulkActionBar
           selectedCount={selectedIds.size}
-          onClearSelection={onClearSelection}
+          onClearSelection={clearSelection}
           onAssign={() => setActiveDialog("assign")}
           onStatus={() => setActiveDialog("status")}
           onReject={() => setActiveDialog("reject")}

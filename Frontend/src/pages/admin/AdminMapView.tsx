@@ -196,18 +196,9 @@ export default function AdminMapView() {
       {/* ── Main content ──────────────────────────────────────────── */}
       <div className="flex-1 flex min-h-0 relative">
         {/* Left: Filters + Map */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Filters */}
-          <div className="shrink-0 px-4 py-3">
-            <AdminMapFilters
-              filters={filters}
-              onChange={setFilters}
-              onReset={handleReset}
-            />
-          </div>
-
-          {/* Map */}
-          <div className="flex-1 relative min-h-0">
+        <div className="flex-1 relative min-w-0">
+          {/* Map (background) */}
+          <div className="absolute inset-0 z-0">
             {isLoading && !mapData && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm">
                 <div className="flex flex-col items-center gap-3">
@@ -225,6 +216,15 @@ export default function AdminMapView() {
               onViewportChange={handleViewportChange}
               clusterThreshold={30}
               className="w-full h-full"
+            />
+          </div>
+
+          {/* Filters (floating) */}
+          <div className="absolute top-4 left-4 z-10 w-[340px] max-w-[calc(100vw-32px)]">
+            <AdminMapFilters
+              filters={filters}
+              onChange={setFilters}
+              onReset={handleReset}
             />
           </div>
         </div>

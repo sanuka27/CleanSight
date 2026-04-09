@@ -4,18 +4,18 @@ import Report from '../models/Report.js';
 import User from '../models/User.js';
 import verifyToken from '../middleware/verifyToken.js';
 import { validateImageWithML } from '../services/mlService.js';
-
-// Helper: Valid status transitions
-const isValidTransition = (currentStatus, newStatus) => {
-  const transitions = {
-    pending: ['assigned'],
-    assigned: ['resolved'],
-    resolved: []
-  };
-  return transitions[currentStatus]?.includes(newStatus);
-};
+import { 
+  REPORT_STATUS, 
+  isValidTransition, 
+  ACTIVE_STATUSES 
+} from '../constants/reportStatus.js';
+import { ROLES } from '../constants/roles.js';
 
 const router = express.Router();
+
+// Valid waste types and urgency levels
+const VALID_WASTE_TYPES = ['general', 'recyclable', 'organic', 'construction', 'hazardous'];
+const VALID_URGENCY_LEVELS = ['low', 'medium', 'high'];
 
 // @route   POST /api/reports
 // @desc    Create a new report
@@ -26,14 +26,63 @@ router.post('/', verifyToken, async (req, res) => {
     const { imageUrl, description, location, wasteType, urgency, title } = req.body;
 
     // Validate required fields
-    if (!imageUrl) {
+    if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.trim()) {
       return res.status(400).json({ success: false, message: 'Image URL is required' });
     }
-    if (!description) {
-      return res.status(400).json({ success: false, message: 'Description is required' });
+    
+    // Basic URL validation
+    try {
+      const url = new URL(imageUrl);
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        return res.status(400).json({ success: false, message: 'Image URL must use http or https' });
+      }
+    } catch {
+      return res.status(400).json({ success: false, message: 'Invalid image URL format' });
     }
-    if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
-      return res.status(400).json({ success: false, message: 'Valid location (lat, lng) is required' });
+    
+    if (!description || typeof description !== 'string' || description.trim().length < 10) {
+      return res.status(400).json({ success: false, message: 'Description is required (minimum 10 characters)' });
+    }
+    
+    if (description.length > 500) {
+      return res.status(400).json({ success: false, message: 'Description cannot exceed 500 characters' });
+    }
+    
+    // Validate location
+    if (!location || typeof location !== 'object') {
+      return res.status(400).json({ success: false, message: 'Location is required' });
+    }
+    
+    const lat = location.lat ?? location.latitude;
+    const lng = location.lng ?? location.longitude;
+    
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      return res.status(400).json({ success: false, message: 'Valid location (lat, lng) is required as numbers' });
+    }
+    
+    if (lat < -90 || lat > 90) {
+      return res.status(400).json({ success: false, message: 'Latitude must be between -90 and 90' });
+    }
+    
+    if (lng < -180 || lng > 180) {
+      return res.status(400).json({ success: false, message: 'Longitude must be between -180 and 180' });
+    }
+    
+    // Validate optional fields
+    const finalWasteType = wasteType ? String(wasteType).toLowerCase() : 'general';
+    if (!VALID_WASTE_TYPES.includes(finalWasteType)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid waste type. Must be one of: ${VALID_WASTE_TYPES.join(', ')}` 
+      });
+    }
+    
+    const finalUrgency = urgency ? String(urgency).toLowerCase() : 'medium';
+    if (!VALID_URGENCY_LEVELS.includes(finalUrgency)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid urgency level. Must be one of: ${VALID_URGENCY_LEVELS.join(', ')}` 
+      });
     }
 
     // Call ML service before saving
@@ -47,7 +96,7 @@ router.post('/', verifyToken, async (req, res) => {
       imageValidationConfidence = mlValidation.confidence;
       aiReviewStatus = mlValidation.recommendation === 'manual_review' ? 'manual_review' : 'approved';
       
-      // If prediction label is strongly non-trash, you could also reject or flag immediately
+      // If prediction label is strongly non-trash, flag for review
       if (imageValidationLabel === 'non-trash') {
         aiReviewStatus = 'flagged';
       }
@@ -57,16 +106,16 @@ router.post('/', verifyToken, async (req, res) => {
 
     const report = await Report.create({
       firebaseUid,
-      title: title || null,
-      imageUrl,
-      description,
+      title: title ? String(title).trim().slice(0, 120) : null,
+      imageUrl: imageUrl.trim(),
+      description: description.trim(),
       location: {
         type: 'Point',
-        coordinates: [location.lng, location.lat]  // GeoJSON: [lng, lat]
+        coordinates: [lng, lat]  // GeoJSON: [lng, lat]
       },
-      wasteType: wasteType || 'general',
-      urgency: urgency || 'medium',
-      status: 'pending',
+      wasteType: finalWasteType,
+      urgency: finalUrgency,
+      status: REPORT_STATUS.PENDING,
       imageValidationLabel,
       imageValidationConfidence,
       aiReviewStatus
@@ -338,8 +387,18 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid report ID' });
     }
-    if (!newStatus || !['assigned', 'resolved'].includes(newStatus)) {
-      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    
+    // Validate against allowed statuses for this endpoint
+    const allowedStatuses = [
+      REPORT_STATUS.ASSIGNED, 
+      REPORT_STATUS.IN_PROGRESS, 
+      REPORT_STATUS.RESOLVED
+    ];
+    if (!newStatus || !allowedStatuses.includes(newStatus)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid status value. Allowed: ${allowedStatuses.join(', ')}` 
+      });
     }
 
     // Always verify role from DB
@@ -349,7 +408,7 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
     }
 
     // Citizens cannot update status
-    if (user.role === 'citizen') {
+    if (user.role === ROLES.CITIZEN) {
       return res.status(403).json({ success: false, message: 'Citizens cannot update report status' });
     }
 
@@ -358,7 +417,7 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Report not found' });
     }
 
-    // Validate transition
+    // Validate transition using centralized logic
     if (!isValidTransition(report.status, newStatus)) {
       return res.status(400).json({
         success: false,
@@ -367,17 +426,18 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
     }
 
     // Permission checks
-    if (newStatus === 'assigned') {
-      if (!['staff', 'admin'].includes(user.role)) {
+    if (newStatus === REPORT_STATUS.ASSIGNED) {
+      if (![ROLES.STAFF, ROLES.ADMIN].includes(user.role)) {
         return res.status(403).json({ success: false, message: 'Only staff or admin can assign reports via status update' });
       }
     }
 
-    if (newStatus === 'resolved') {
-      if (user.role === 'volunteer' && report.assignedTo !== firebaseUid) {
+    if (newStatus === REPORT_STATUS.RESOLVED) {
+      if (user.role === ROLES.VOLUNTEER && report.assignedTo !== firebaseUid) {
         return res.status(403).json({ success: false, message: 'You can only resolve reports assigned to you' });
       }
-      // staff/admin can resolve any report
+      // Set resolvedAt timestamp
+      report.resolvedAt = new Date();
     }
 
     report.status = newStatus;

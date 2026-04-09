@@ -8,6 +8,9 @@ import Document from '../models/Document.js';
 import Settings from '../models/Settings.js';
 import AuditLog from '../models/AuditLog.js';
 import { logAdminAction } from '../services/auditLogService.js';
+import { resolveDateRange } from '../utils/dateRange.js';
+import { REPORT_STATUS, isValidTransition } from '../constants/reportStatus.js';
+import { ALL_ROLES } from '../constants/roles.js';
 
 const router = express.Router();
 
@@ -2066,20 +2069,5 @@ router.get('/audit-logs/:id', async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
-/* ═══════════════════════════════════════════════════════════════════
-   HELPER
-═══════════════════════════════════════════════════════════════════ */
-
-function resolveDateRange(range, from, to) {
-  if (from && to) {
-    return { start: new Date(from), end: new Date(to) };
-  }
-  const end = new Date();
-  const start = new Date();
-  const days = range === '90d' ? 90 : range === '30d' ? 30 : 7;
-  start.setDate(start.getDate() - days);
-  return { start, end };
-}
 
 export default router;

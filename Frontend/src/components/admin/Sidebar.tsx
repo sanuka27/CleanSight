@@ -74,37 +74,43 @@ export function AdminSidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Nav */}
       <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto overflow-x-hidden">
         {NAV_ITEMS.map((item) => {
-          const active = isActive(item);
           return (
-            <NavLink key={item.path} to={item.path} end={item.end} onClick={() => { if (collapsed) onToggle(); }}>
-              <div
-                className={cn(
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.end}
+              className={({ isActive }) =>
+                cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group cursor-pointer",
-                  active
+                  isActive
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <item.icon className="w-5 h-5 shrink-0" />
-                <AnimatePresence>
-                  {!collapsed && (
-                    <motion.span
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="font-medium text-sm whitespace-nowrap overflow-hidden"
-                    >
-                      {item.label}
-                    </motion.span>
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <item.icon className="w-5 h-5 shrink-0" />
+                  <AnimatePresence>
+                    {!collapsed && (
+                      <motion.span
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="font-medium text-sm whitespace-nowrap overflow-hidden"
+                      >
+                        {item.label}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                  {isActive && !collapsed && (
+                    <motion.div
+                      layoutId="active-indicator"
+                      className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-foreground/80"
+                    />
                   )}
-                </AnimatePresence>
-                {active && !collapsed && (
-                  <motion.div
-                    layoutId="active-indicator"
-                    className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-foreground/80"
-                  />
-                )}
-              </div>
+                </>
+              )}
             </NavLink>
           );
         })}

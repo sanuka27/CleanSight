@@ -41,6 +41,33 @@ export function parseDateRange(query = {}) {
 }
 
 /**
+ * Resolve date range from query params (alternative interface).
+ * Used by admin routes with `range` param instead of `preset`.
+ *
+ * @param {string} range - '7d' | '30d' | '90d' | 'custom'
+ * @param {string|Date} from - Start date (ISO string or Date)
+ * @param {string|Date} to - End date (ISO string or Date)
+ * @returns {{ start: Date, end: Date }}
+ */
+export function resolveDateRange(range = '7d', from, to) {
+  // If explicit from/to provided, use them
+  if (from && to) {
+    return {
+      start: new Date(from),
+      end: new Date(to),
+    };
+  }
+
+  // Otherwise use range preset
+  const end = new Date();
+  const start = new Date();
+  const days = range === '90d' ? 90 : range === '30d' ? 30 : 7;
+  start.setDate(start.getDate() - days);
+  
+  return { start, end };
+}
+
+/**
  * Subtract `n` days from a date.
  * @param {Date} date
  * @param {number} n
@@ -72,6 +99,21 @@ function endOfDayUTC(date) {
   const d = new Date(date);
   d.setUTCHours(23, 59, 59, 999);
   return d;
+}
+
+/**
+ * Get a human-readable date string.
+ */
+export function formatDate(date) {
+  return new Date(date).toISOString().split('T')[0];
+}
+
+/**
+ * Check if a date string is valid.
+ */
+export function isValidDateString(dateString) {
+  const date = new Date(dateString);
+  return !isNaN(date.getTime());
 }
 
 export { PRESET_DAYS, startOfDayUTC, endOfDayUTC, subtractDays };

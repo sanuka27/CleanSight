@@ -1,5 +1,16 @@
 import mongoose from 'mongoose';
 import { REPORT_STATUS, isValidTransition, isTerminalStatus } from '../constants/reportStatus.js';
+import { 
+  WASTE_TYPES, 
+  URGENCY_LEVELS, 
+  AI_REVIEW_STATUSES, 
+  IMAGE_VALIDATION_LABELS, 
+  FINAL_VALIDATION_DECISIONS,
+  PREDICTED_LABELS,
+  CONFIDENCE_LEVELS,
+  CATEGORY_REVIEW_STATUSES,
+  WASTE_CATEGORIES
+} from '../constants/reportEnums.js';
 
 const reportSchema = new mongoose.Schema({
   firebaseUid: {
@@ -42,9 +53,8 @@ const reportSchema = new mongoose.Schema({
       required: [true, 'Coordinates are required'],
       validate: {
         validator: function (v) {
-          return v.length === 2 &&
-            v[0] >= -180 && v[0] <= 180 &&
-            v[1] >= -90 && v[1] <= 90;
+          if (!Array.isArray(v) || v.length !== 2) return false;
+          return v[0] >= -180 && v[0] <= 180 && v[1] >= -90 && v[1] <= 90;
         },
         message: 'Coordinates must be [longitude, latitude] with valid ranges'
       }
@@ -53,7 +63,7 @@ const reportSchema = new mongoose.Schema({
   wasteType: {
     type: String,
     enum: {
-      values: ['general', 'recyclable', 'organic', 'construction', 'hazardous'],
+      values: WASTE_TYPES,
       message: '{VALUE} is not a valid waste type'
     },
     default: 'general'
@@ -61,7 +71,7 @@ const reportSchema = new mongoose.Schema({
   urgency: {
     type: String,
     enum: {
-      values: ['low', 'medium', 'high'],
+      values: URGENCY_LEVELS,
       message: '{VALUE} is not a valid urgency level'
     },
     default: 'medium'
@@ -79,6 +89,14 @@ const reportSchema = new mongoose.Schema({
     default: null,
     index: true
   },
+  assignedAt: {
+    type: Date,
+    default: null
+  },
+  assignedByUid: {
+    type: String,
+    default: null
+  },
   adminNote: {
     type: String,
     default: null,
@@ -91,17 +109,25 @@ const reportSchema = new mongoose.Schema({
     maxlength: [500, 'Rejection reason cannot exceed 500 characters'],
     trim: true
   },
+  rejectedAt: {
+    type: Date,
+    default: null
+  },
+  rejectedByUid: {
+    type: String,
+    default: null
+  },
   // ─────────────────────────────────────────────────────────────────────
   // ML Phase 1: Trash/Non-trash Classification
   // ─────────────────────────────────────────────────────────────────────
   aiReviewStatus: {
     type: String,
-    enum: ['approved', 'flagged', 'manual_review', 'pending', 'rejected', 'overridden'],
+    enum: AI_REVIEW_STATUSES,
     default: 'pending'
   },
   imageValidationLabel: {
     type: String,
-    enum: ['trash', 'non-trash', 'error', 'pending'],
+    enum: IMAGE_VALIDATION_LABELS,
     default: 'pending'
   },
   imageValidationConfidence: {
@@ -112,7 +138,7 @@ const reportSchema = new mongoose.Schema({
   },
   finalValidationDecision: {
     type: String,
-    enum: ['approved', 'rejected', 'overridden', null],
+    enum: FINAL_VALIDATION_DECISIONS,
     default: null
   },
   reviewedBy: {
@@ -134,7 +160,7 @@ const reportSchema = new mongoose.Schema({
   // ─────────────────────────────────────────────────────────────────────
   wasteCategoryPredictedLabel: {
     type: String,
-    enum: ['glass', 'mixed', 'paper', 'plastic', 'pending', 'error'],
+    enum: PREDICTED_LABELS,
     default: 'pending'
   },
   wasteCategoryConfidence: {
@@ -150,7 +176,7 @@ const reportSchema = new mongoose.Schema({
   },
   wasteCategoryConfidenceLevel: {
     type: String,
-    enum: ['HIGH', 'MODERATE', 'LOW', 'VERY LOW', null],
+    enum: CONFIDENCE_LEVELS,
     default: null
   },
   wasteCategoryAllPredictions: {
@@ -162,12 +188,12 @@ const reportSchema = new mongoose.Schema({
   },
   wasteCategoryReviewStatus: {
     type: String,
-    enum: ['auto_accepted', 'flagged', 'manual_review', 'pending', 'approved', 'overridden', 'rejected'],
+    enum: CATEGORY_REVIEW_STATUSES,
     default: 'pending'
   },
   wasteCategoryFinalLabel: {
     type: String,
-    enum: ['glass', 'mixed', 'paper', 'plastic', null],
+    enum: [...WASTE_CATEGORIES, null],
     default: null
   },
   wasteCategoryReviewedBy: {
@@ -190,6 +216,16 @@ const reportSchema = new mongoose.Schema({
   resolvedAt: {
     type: Date,
     default: null
+  },
+  resolvedByUid: {
+    type: String,
+    default: null
+  },
+  resolutionNote: {
+    type: String,
+    default: null,
+    maxlength: [1000, 'Resolution note cannot exceed 1000 characters'],
+    trim: true
   },
   isDeleted: {
     type: Boolean,
@@ -297,13 +333,35 @@ reportSchema.statics.findInBbox = function(west, south, east, north) {
 // Pre-save hooks
 // ─────────────────────────────────────────────────────────────────────
 
-/**
- * Set resolvedAt when status changes to resolved
- */
 reportSchema.pre('save', function(next) {
-  if (this.isModified('status') && this.status === REPORT_STATUS.RESOLVED && !this.resolvedAt) {
-    this.resolvedAt = new Date();
+  const now = new Date();
+
+  // Track status transitions
+  if (this.isModified('status')) {
+    if (this.status === REPORT_STATUS.RESOLVED && !this.resolvedAt) {
+      this.resolvedAt = now;
+    }
+    if (this.status === REPORT_STATUS.REJECTED && !this.rejectedAt) {
+      this.rejectedAt = now;
+    }
+    if (this.status === REPORT_STATUS.ASSIGNED && !this.assignedAt) {
+      this.assignedAt = now;
+    }
   }
+
+  // Ensure soft deletes are timestamped
+  if (this.isModified('isDeleted') && this.isDeleted && !this.deletedAt) {
+    this.deletedAt = now;
+  }
+
+  // Cross-field validations
+  if (this.status === REPORT_STATUS.ASSIGNED && !this.assignedTo) {
+    return next(new Error('Cannot assign a report without specifying assignedTo'));
+  }
+  if (this.status === REPORT_STATUS.REJECTED && !this.rejectionReason) {
+    return next(new Error('Cannot reject a report without a rejection reason (rejectionReason is required)'));
+  }
+
   next();
 });
 

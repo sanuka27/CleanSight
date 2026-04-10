@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { ALL_ROLES } from '../constants/roles.js';
 
 const userSchema = new mongoose.Schema({
   firebaseUid: {
@@ -24,7 +25,7 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: {
-      values: ['citizen', 'volunteer', 'staff', 'admin'],
+      values: ALL_ROLES,
       message: '{VALUE} is not a valid role'
     },
     default: 'citizen',
@@ -90,7 +91,7 @@ userSchema.methods.canPerformAction = function(action) {
   const rolePermissions = {
     citizen: ['view_own_reports', 'create_report', 'update_profile'],
     volunteer: ['view_own_reports', 'create_report', 'update_profile', 'claim_reports', 'resolve_reports'],
-    staff: ['view_all_reports', 'assign_reports', 'manage_volunteers', 'view_analytics'],
+    staff: ['view_all_reports', 'assign_reports', 'manage_volunteers', 'view_analytics', 'resolve_reports'],
     admin: ['all']
   };
 

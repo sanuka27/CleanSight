@@ -329,6 +329,73 @@ reportSchema.statics.findInBbox = function(west, south, east, north) {
   });
 };
 
+function getUpdatedFieldValue(update, field) {
+  if (update.$set && Object.prototype.hasOwnProperty.call(update.$set, field)) {
+    return update.$set[field];
+  }
+  if (Object.prototype.hasOwnProperty.call(update, field)) {
+    return update[field];
+  }
+  return undefined;
+}
+
+function hasUnsetField(update, field) {
+  return !!(update.$unset && Object.prototype.hasOwnProperty.call(update.$unset, field));
+}
+
+async function applyQueryLifecycleRules(next) {
+  try {
+    const update = this.getUpdate();
+    if (!update || Array.isArray(update)) return next();
+
+    update.$set = update.$set || {};
+
+    const now = new Date();
+    const nextStatus = getUpdatedFieldValue(update, 'status');
+    const nextIsDeleted = getUpdatedFieldValue(update, 'isDeleted');
+
+    if (nextStatus === REPORT_STATUS.RESOLVED && !getUpdatedFieldValue(update, 'resolvedAt') && !hasUnsetField(update, 'resolvedAt')) {
+      update.$set.resolvedAt = now;
+    }
+    if (nextStatus === REPORT_STATUS.REJECTED && !getUpdatedFieldValue(update, 'rejectedAt') && !hasUnsetField(update, 'rejectedAt')) {
+      update.$set.rejectedAt = now;
+    }
+    if (nextStatus === REPORT_STATUS.ASSIGNED && !getUpdatedFieldValue(update, 'assignedAt') && !hasUnsetField(update, 'assignedAt')) {
+      update.$set.assignedAt = now;
+    }
+
+    if (nextIsDeleted === true && !getUpdatedFieldValue(update, 'deletedAt') && !hasUnsetField(update, 'deletedAt')) {
+      update.$set.deletedAt = now;
+    }
+
+    if (nextStatus === REPORT_STATUS.ASSIGNED || nextStatus === REPORT_STATUS.REJECTED) {
+      const currentDoc = await this.model.findOne(this.getQuery()).select('assignedTo rejectionReason').lean();
+
+      if (nextStatus === REPORT_STATUS.ASSIGNED) {
+        const assignedTo = getUpdatedFieldValue(update, 'assignedTo');
+        const effectiveAssignedTo = assignedTo !== undefined ? assignedTo : currentDoc?.assignedTo;
+        if (!effectiveAssignedTo) {
+          return next(new Error('Cannot assign a report without specifying assignedTo'));
+        }
+      }
+
+      if (nextStatus === REPORT_STATUS.REJECTED) {
+        const rejectionReason = getUpdatedFieldValue(update, 'rejectionReason');
+        const effectiveRejectionReason = rejectionReason !== undefined ? rejectionReason : currentDoc?.rejectionReason;
+        if (!effectiveRejectionReason || !String(effectiveRejectionReason).trim()) {
+          return next(new Error('Cannot reject a report without a rejection reason (rejectionReason is required)'));
+        }
+      }
+    }
+
+    this.setUpdate(update);
+    this.setOptions({ ...this.getOptions(), runValidators: true, context: 'query' });
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Pre-save hooks
 // ─────────────────────────────────────────────────────────────────────
@@ -364,6 +431,9 @@ reportSchema.pre('save', function(next) {
 
   next();
 });
+
+reportSchema.pre('findOneAndUpdate', applyQueryLifecycleRules);
+reportSchema.pre('updateOne', applyQueryLifecycleRules);
 
 const Report = mongoose.model('Report', reportSchema);
 

@@ -144,7 +144,7 @@ router.get('/reports', async (req, res) => {
 ═══════════════════════════════════════════════════════════════════ */
 
 const MAX_BULK = 200;
-const VALID_STATUSES_BULK = ['pending', 'verified', 'assigned', 'in_progress', 'resolved', 'rejected'];
+const VALID_STATUSES_BULK = Object.values(REPORT_STATUS);
 
 /**
  * Validate and deduplicate an array of report IDs.
@@ -191,6 +191,7 @@ router.post('/reports/bulk/assign', async (req, res) => {
 
     const succeeded = [];
     const failed = [];
+    const now = new Date();
 
     const bulkOps = [];
     for (const id of uniqueIds) {
@@ -203,9 +204,23 @@ router.post('/reports/bulk/assign', async (req, res) => {
         failed.push({ id, reason: `Cannot assign a ${report.status} report` });
         continue;
       }
-      const $set = { assignedTo: volunteerUid, status: 'assigned', updatedAt: new Date() };
+      const $set = {
+        assignedTo: volunteerUid,
+        status: REPORT_STATUS.ASSIGNED,
+        assignedAt: now,
+        assignedByUid: req.adminUser?.firebaseUid || null,
+        updatedAt: now,
+      };
       if (note) $set.adminNote = String(note).slice(0, 1000);
-      bulkOps.push({ updateOne: { filter: { _id: new mongoose.Types.ObjectId(id) }, update: { $set, $unset: { rejectionReason: '' } } } });
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: new mongoose.Types.ObjectId(id) },
+          update: {
+            $set,
+            $unset: { rejectionReason: '', rejectedAt: '', rejectedByUid: '' },
+          },
+        },
+      });
       succeeded.push(id);
     }
 
@@ -242,7 +257,7 @@ router.post('/reports/bulk/assign', async (req, res) => {
  */
 router.post('/reports/bulk/status', async (req, res) => {
   try {
-    const { reportIds, status } = req.body;
+    const { reportIds, status, rejectionReason } = req.body;
 
     const { error: idErr, ids: uniqueIds } = validateBulkIds(reportIds);
     if (idErr) return res.status(400).json({ success: false, message: idErr });
@@ -253,15 +268,19 @@ router.post('/reports/bulk/status', async (req, res) => {
       });
     }
 
-    // Keyed by CURRENT status: lists of target statuses that are NOT allowed.
-    // Prevents re-opening resolved/rejected reports into active workflow states.
-    const BLOCKED_TRANSITIONS = {
-      resolved: ['pending', 'verified', 'assigned', 'in_progress'],
-      rejected: ['pending', 'verified', 'assigned', 'in_progress'],
-    };
+    const safeRejectionReason = status === REPORT_STATUS.REJECTED
+      ? String(rejectionReason || '').trim().slice(0, 500)
+      : null;
+
+    if (status === REPORT_STATUS.REJECTED && safeRejectionReason.length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'rejectionReason is required (min 5 characters) when status is rejected',
+      });
+    }
 
     const objectIds = uniqueIds.map(id => new mongoose.Types.ObjectId(id));
-    const existing = await Report.find({ _id: { $in: objectIds } }).select('_id status').lean();
+    const existing = await Report.find({ _id: { $in: objectIds } }).select('_id status assignedTo').lean();
     const existingMap = Object.fromEntries(existing.map(r => [r._id.toString(), r]));
 
     const succeeded = [];
@@ -279,17 +298,42 @@ router.post('/reports/bulk/status', async (req, res) => {
         succeeded.push(id);
         continue;
       }
-      const blockedTargets = BLOCKED_TRANSITIONS[report.status] || [];
-      if (blockedTargets.includes(status)) {
-        failed.push({ id, reason: `Transition from '${report.status}' to '${status}' is not allowed` });
+
+      if (!isValidTransition(report.status, status)) {
+        failed.push({ id, reason: `Invalid transition from '${report.status}' to '${status}'` });
         continue;
       }
 
-      const $set = { status, updatedAt: new Date() };
+      if (status === REPORT_STATUS.ASSIGNED && !report.assignedTo) {
+        failed.push({ id, reason: 'Cannot set status to assigned without assignedTo' });
+        continue;
+      }
+
+      const now = new Date();
+      const $set = { status, updatedAt: now };
       const $unset = {};
-      if (status === 'resolved') $set.resolvedAt = new Date();
-      else $unset.resolvedAt = '';
-      if (status !== 'rejected') $unset.rejectionReason = '';
+
+      if (status === REPORT_STATUS.RESOLVED) {
+        $set.resolvedAt = now;
+        $set.resolvedByUid = req.adminUser?.firebaseUid || null;
+      }
+
+      if (status === REPORT_STATUS.REJECTED) {
+        $set.rejectionReason = safeRejectionReason;
+        $set.rejectedAt = now;
+        $set.rejectedByUid = req.adminUser?.firebaseUid || null;
+        $unset.resolvedAt = '';
+        $unset.resolvedByUid = '';
+        $unset.resolutionNote = '';
+      } else {
+        $unset.rejectionReason = '';
+        $unset.rejectedAt = '';
+        $unset.rejectedByUid = '';
+      }
+
+      if (status === REPORT_STATUS.ASSIGNED) {
+        $set.assignedAt = now;
+      }
 
       const update = Object.keys($unset).length ? { $set, $unset } : { $set };
       bulkOps.push({ updateOne: { filter: { _id: new mongoose.Types.ObjectId(id) }, update } });
@@ -311,6 +355,7 @@ router.post('/reports/bulk/status', async (req, res) => {
         countSucceeded: succeeded.length,
         countFailed: failed.length,
         status,
+        ...(status === REPORT_STATUS.REJECTED ? { rejectionReason: safeRejectionReason.slice(0, 100) } : {}),
         firstNReportIds: uniqueIds.slice(0, 20),
       },
     });
@@ -344,6 +389,7 @@ router.post('/reports/bulk/reject', async (req, res) => {
     const succeeded = [];
     const failed = [];
     const bulkOps = [];
+    const now = new Date();
 
     for (const id of uniqueIds) {
       const report = existingMap[id];
@@ -356,12 +402,24 @@ router.post('/reports/bulk/reject', async (req, res) => {
         succeeded.push(id);
         continue;
       }
+
+      if (!isValidTransition(report.status, REPORT_STATUS.REJECTED)) {
+        failed.push({ id, reason: `Invalid transition from '${report.status}' to 'rejected'` });
+        continue;
+      }
+
       bulkOps.push({
         updateOne: {
           filter: { _id: new mongoose.Types.ObjectId(id) },
           update: {
-            $set: { status: 'rejected', rejectionReason: safeReason, updatedAt: new Date() },
-            $unset: { resolvedAt: '' },
+            $set: {
+              status: REPORT_STATUS.REJECTED,
+              rejectionReason: safeReason,
+              rejectedAt: now,
+              rejectedByUid: req.adminUser?.firebaseUid || null,
+              updatedAt: now,
+            },
+            $unset: { resolvedAt: '', resolvedByUid: '', resolutionNote: '' },
           },
         },
       });
@@ -710,26 +768,51 @@ router.patch('/reports/:id/status', async (req, res) => {
       });
     }
 
-    // Fetch old status for metadata before updating
-    const oldReport = await Report.findById(id).lean();
-    const statusFrom = oldReport?.status || null;
-
-    const $set = { status };
-    const $unset = {};
-    if (status === 'rejected') {
-      $set.rejectionReason = rejectionReason || 'No reason provided';
-    } else {
-      $unset.rejectionReason = '';
-    }
-    if (status === 'resolved') {
-      $set.resolvedAt = new Date();
-    } else {
-      $unset.resolvedAt = '';
-    }
-    const update = Object.keys($unset).length ? { $set, $unset } : { $set };
-
-    const report = await Report.findByIdAndUpdate(id, update, { new: true }).lean();
+    const report = await Report.findById(id);
     if (!report) return res.status(404).json({ success: false, message: 'Report not found' });
+
+    const statusFrom = report.status;
+
+    if (statusFrom !== status && !isValidTransition(statusFrom, status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid transition from '${statusFrom}' to '${status}'`,
+      });
+    }
+
+    if (status === REPORT_STATUS.ASSIGNED && !report.assignedTo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot set status to assigned without assignedTo. Use the assign endpoint first.',
+      });
+    }
+
+    let safeRejectionReason = null;
+    report.status = status;
+
+    if (status === REPORT_STATUS.REJECTED) {
+      safeRejectionReason = String(rejectionReason || '').trim() || 'No reason provided';
+      report.rejectionReason = safeRejectionReason.slice(0, 500);
+      report.rejectedByUid = req.adminUser?.firebaseUid || null;
+      report.resolvedAt = null;
+      report.resolvedByUid = null;
+      report.resolutionNote = null;
+    } else {
+      report.rejectionReason = null;
+      report.rejectedAt = null;
+      report.rejectedByUid = null;
+    }
+
+    if (status === REPORT_STATUS.RESOLVED) {
+      report.resolvedByUid = req.adminUser?.firebaseUid || null;
+    }
+
+    if (status === REPORT_STATUS.ASSIGNED && !report.assignedByUid) {
+      report.assignedByUid = req.adminUser?.firebaseUid || null;
+    }
+
+    await report.save();
+    const reportData = report.toObject();
 
     logAdminAction({
       req,
@@ -740,11 +823,11 @@ router.patch('/reports/:id/status', async (req, res) => {
       metadata: {
         statusFrom,
         statusTo: status,
-        ...(status === 'rejected' && { rejectionReason: $set.rejectionReason }),
+        ...(status === REPORT_STATUS.REJECTED && { rejectionReason: safeRejectionReason }),
       },
     });
 
-    res.json({ success: true, data: report });
+    res.json({ success: true, data: reportData });
   } catch (err) {
     console.error('Admin update status error:', err);
     res.status(500).json({ success: false, message: err.message });
@@ -1035,16 +1118,28 @@ router.patch('/reports/:id/assign', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Volunteer not found' });
     }
 
-    const report = await Report.findByIdAndUpdate(
-      id,
-      {
-        $set: { assignedTo: volunteerUid, status: 'assigned' },
-        $unset: { rejectionReason: '', resolvedAt: '' },
-      },
-      { new: true }
-    ).lean();
-
+    const report = await Report.findById(id);
     if (!report) return res.status(404).json({ success: false, message: 'Report not found' });
+
+    const canMoveToAssigned =
+      report.status === REPORT_STATUS.ASSIGNED || isValidTransition(report.status, REPORT_STATUS.ASSIGNED);
+
+    if (!canMoveToAssigned) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot assign a report currently in '${report.status}' state`,
+      });
+    }
+
+    report.assignedTo = volunteerUid;
+    report.status = REPORT_STATUS.ASSIGNED;
+    report.assignedByUid = req.adminUser?.firebaseUid || null;
+    report.rejectionReason = null;
+    report.rejectedAt = null;
+    report.rejectedByUid = null;
+    await report.save();
+
+    const reportData = report.toObject();
 
     logAdminAction({
       req,
@@ -1059,7 +1154,7 @@ router.patch('/reports/:id/assign', async (req, res) => {
       },
     });
 
-    res.json({ success: true, data: report });
+    res.json({ success: true, data: reportData });
   } catch (err) {
     console.error('Admin assign report error:', err);
     res.status(500).json({ success: false, message: err.message });

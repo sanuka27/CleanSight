@@ -90,6 +90,7 @@ ML/models/logs/
 ML/artifacts/
 ML/reports/
 ML/venv/
+ML/venv311/
 ML/.env
 ML/__pycache__/
 ML/**/*.pyc

@@ -8,6 +8,7 @@ import Document from '../models/Document.js';
 import Settings from '../models/Settings.js';
 import AuditLog from '../models/AuditLog.js';
 import { logAdminAction } from '../services/auditLogService.js';
+import { predictCategoryWithML } from '../services/mlService.js';
 import { resolveDateRange } from '../utils/dateRange.js';
 import { REPORT_STATUS, isValidTransition } from '../constants/reportStatus.js';
 import { ALL_ROLES } from '../constants/roles.js';
@@ -858,7 +859,16 @@ router.patch('/reports/:id/review', async (req, res) => {
     const report = await Report.findById(id);
     if (!report) return res.status(404).json({ success: false, message: 'Report not found' });
 
+    if (action === 'approve' && report.imageValidationLabel !== 'trash') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only trash-labeled images can be approved. Use reject or override for non-trash/error labels.',
+      });
+    }
+
     const aiReviewStatusFrom = report.aiReviewStatus;
+    let phase2Triggered = false;
+    let phase2Error = null;
     
     let decision = null;
     let newAiReviewStatus = report.aiReviewStatus;
@@ -872,6 +882,15 @@ router.patch('/reports/:id/review', async (req, res) => {
       // Auto-reject the full report when it's marked as invalid non-trash
       report.status = 'rejected';
       report.rejectionReason = 'Auto-rejected: invalid image determined during admin review.';
+
+      // Clear Phase 2 prediction fields because image has been deemed invalid.
+      report.wasteCategoryPredictedLabel = 'pending';
+      report.wasteCategoryConfidence = null;
+      report.wasteCategoryEntropy = null;
+      report.wasteCategoryConfidenceLevel = null;
+      report.wasteCategoryAllPredictions = null;
+      report.wasteCategoryReviewStatus = 'pending';
+      report.wasteCategoryFinalLabel = null;
     } else if (action === 'override') {
       decision = 'overridden';
       newAiReviewStatus = 'overridden';
@@ -887,6 +906,30 @@ router.patch('/reports/:id/review', async (req, res) => {
       report.reviewNote = reviewNote;
     }
 
+    // For approved/overridden valid trash reports, ensure Phase 2 prediction exists.
+    const needsCategoryPrediction =
+      report.imageValidationLabel === 'trash'
+      && ['pending', 'error', null, undefined].includes(report.wasteCategoryPredictedLabel);
+
+    if ((action === 'approve' || action === 'override') && needsCategoryPrediction) {
+      const categoryPrediction = await predictCategoryWithML(report.imageUrl);
+
+      if (categoryPrediction.success) {
+        report.wasteCategoryPredictedLabel = categoryPrediction.predictedLabel;
+        report.wasteCategoryConfidence = categoryPrediction.confidence;
+        report.wasteCategoryEntropy = categoryPrediction.entropy;
+        report.wasteCategoryConfidenceLevel = categoryPrediction.confidenceLevel;
+        report.wasteCategoryAllPredictions = categoryPrediction.allPredictions;
+        report.wasteCategoryReviewStatus = categoryPrediction.reviewStatus;
+        phase2Triggered = true;
+      } else {
+        report.wasteCategoryPredictedLabel = 'error';
+        report.wasteCategoryReviewStatus = 'manual_review';
+        phase2Error = categoryPrediction.error || 'Phase 2 prediction failed';
+        console.warn('Phase 2 prediction during admin review failed:', phase2Error);
+      }
+    }
+
     await report.save();
 
     logAdminAction({
@@ -899,6 +942,8 @@ router.patch('/reports/:id/review', async (req, res) => {
         aiReviewStatusFrom,
         aiReviewStatusTo: newAiReviewStatus,
         decision,
+        phase2Triggered,
+        phase2Error,
       },
     });
 

@@ -1,218 +1,94 @@
-"""
-CleanSight ML Phase 2 - Category Classification Service (FastAPI)
+"""FastAPI app for Phase 2 waste category classification."""
 
-Provides REST API for waste category prediction (glass, mixed, paper, plastic).
+from __future__ import annotations
 
-Run with: uvicorn ML.category_service.main:app --host 0.0.0.0 --port 8001
-"""
-
-import os
-import ipaddress
-import socket
-from urllib.parse import urlparse
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from typing import Optional
-import httpx
 import logging
+import os
+import sys
+from typing import Optional
 
-from .schemas import CategoryPredictionResponse, CategoryPrediction
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+
 from .model_loader import load_model, predict_category
+from .schemas import CategoryPrediction, CategoryPredictionResponse
+
+
+try:
+    from ML.config.settings import settings
+    from ML.service.image_input import extract_image_bytes
+except ImportError:
+    PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
+    from ML.config.settings import settings
+    from ML.service.image_input import extract_image_bytes
+
 
 app = FastAPI(
     title="CleanSight ML Phase 2 - Category Classification",
     description="Waste category classification service (glass, mixed, paper, plastic)",
-    version="1.0.0"
+    version="1.1.0",
 )
-
-
-def _is_private_ip(hostname: str) -> bool:
-    """Check if hostname resolves to private IP."""
-    try:
-        addrinfos = socket.getaddrinfo(hostname, None)
-    except socket.gaierror:
-        raise HTTPException(status_code=400, detail="Invalid image URL host")
-
-    for family, _, _, _, sockaddr in addrinfos:
-        ip_str = sockaddr[0]
-        try:
-            ip_obj = ipaddress.ip_address(ip_str)
-        except ValueError:
-            continue
-
-        if (
-            ip_obj.is_private
-            or ip_obj.is_loopback
-            or ip_obj.is_link_local
-            or ip_obj.is_multicast
-            or ip_obj.is_reserved
-            or ip_obj.is_unspecified
-        ):
-            return True
-    return False
-
-
-def validate_image_url(image_url: str) -> str:
-    """Validate image URL for security."""
-    parsed = urlparse(image_url)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        raise HTTPException(status_code=400, detail="Invalid image URL")
-
-    hostname = parsed.hostname
-    if not hostname:
-        raise HTTPException(status_code=400, detail="Invalid image URL host")
-
-    if _is_private_ip(hostname):
-        raise HTTPException(status_code=400, detail="Image URL host is not allowed")
-
-    return image_url
 
 
 @app.on_event("startup")
 async def startup_event():
-    """Load model on startup."""
     load_model()
 
 
 @app.post("/predict-category", response_model=CategoryPredictionResponse)
 async def predict_category_endpoint(
     image: Optional[UploadFile] = File(None),
-    image_url: Optional[str] = Form(None)
+    image_url: Optional[str] = Form(None),
 ):
-    """
-    Predict waste category from image file or URL.
-
-    Returns predicted category (glass, mixed, paper, plastic) with confidence,
-    entropy-based uncertainty, and all class predictions.
-    """
-    logging.info(f"Category prediction request. URL: {image_url}")
-
-    # Maximum image size for both file upload and URL download
-    MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
+    """Predict waste category from uploaded image or remote URL."""
+    logging.info("Phase 2 category prediction request received")
 
     try:
-        image_bytes = None
+        image_bytes = await extract_image_bytes(
+            image=image,
+            image_url=image_url,
+            max_image_bytes=settings.max_image_bytes,
+        )
 
-        if image:
-            # Read file upload with size limit
-            image_bytes = await image.read()
-            if len(image_bytes) > MAX_IMAGE_SIZE:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Uploaded image too large. Maximum size is {MAX_IMAGE_SIZE / 1024 / 1024:.1f}MB"
-                )
-        elif image_url:
-            safe_url = validate_image_url(image_url)
-            MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
-
-            try:
-                async with httpx.AsyncClient() as client:
-                    async with client.stream(
-                        "GET", safe_url, timeout=10.0, follow_redirects=False
-                    ) as response:
-                        # SSRF protection: check peer IP
-                        network_stream = response.extensions.get("network_stream") if hasattr(response, "extensions") else None
-                        if network_stream is not None:
-                            peername = network_stream.get_extra_info("peername")
-                            if peername:
-                                peer_ip = peername[0]
-                                try:
-                                    peer_ip_obj = ipaddress.ip_address(peer_ip)
-                                    if (
-                                        peer_ip_obj.is_private
-                                        or peer_ip_obj.is_loopback
-                                        or peer_ip_obj.is_link_local
-                                        or peer_ip_obj.is_reserved
-                                        or peer_ip_obj.is_multicast
-                                    ):
-                                        raise HTTPException(
-                                            status_code=400,
-                                            detail="Could not retrieve image from provided URL"
-                                        )
-                                except ValueError:
-                                    raise HTTPException(
-                                        status_code=400,
-                                        detail="Could not retrieve image from provided URL"
-                                    )
-
-                        if response.status_code != 200:
-                            raise HTTPException(
-                                status_code=400,
-                                detail="Could not retrieve image from provided URL"
-                            )
-
-                        content_type = response.headers.get("content-type", "")
-                        if not content_type.lower().startswith("image/"):
-                            raise HTTPException(
-                                status_code=400,
-                                detail="URL does not point to a valid image"
-                            )
-
-                        data = bytearray()
-                        async for chunk in response.aiter_bytes():
-                            if not chunk:
-                                break
-                            data.extend(chunk)
-                            if len(data) > MAX_IMAGE_SIZE:
-                                raise HTTPException(
-                                    status_code=400,
-                                    detail="Image too large"
-                                )
-
-                        image_bytes = bytes(data)
-
-            except httpx.RequestError:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Could not retrieve image from provided URL"
-                )
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Must provide 'image' file or 'image_url'"
-            )
-
-        # Run prediction
         result = predict_category(image_bytes)
-
-        if not result["success"]:
+        if not result.get("success"):
             return CategoryPredictionResponse(
                 success=False,
-                error=result.get("error", "Prediction failed")
+                isWaste=True,
+                category=None,
+                predicted_class=None,
+                confidence=0.0,
+                entropy=1.0,
+                confidence_level="VERY LOW",
+                review_status="manual_review",
+                all_predictions=[],
+                error=result.get("error", "Prediction failed"),
             )
 
-        # Build all_predictions list
-        all_preds = [
-            CategoryPrediction(
-                class_name=p["class_name"],
-                confidence=p["confidence"]
-            )
-            for p in result.get("all_predictions", [])
+        all_predictions = [
+            CategoryPrediction(class_name=item["class_name"], confidence=item["confidence"])
+            for item in result.get("all_predictions", [])
         ]
 
         return CategoryPredictionResponse(
             success=True,
-            predicted_class=result["predicted_class"],
-            confidence=result["confidence"],
-            entropy=result["entropy"],
-            confidence_level=result["confidence_level"],
-            all_predictions=all_preds
+            isWaste=True,
+            category=result.get("category"),
+            predicted_class=result.get("predicted_class"),
+            confidence=result.get("confidence"),
+            entropy=result.get("entropy"),
+            confidence_level=result.get("confidence_level"),
+            review_status=result.get("review_status"),
+            all_predictions=all_predictions,
         )
-
     except HTTPException:
         raise
-    except RuntimeError as re:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Category model service unavailable: {str(re)}"
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal service error: {str(e)}"
-        )
+    except Exception as exc:
+        logging.exception("Phase 2 category prediction failed")
+        raise HTTPException(status_code=500, detail=f"Internal service error: {exc}") from exc
 
 
 @app.get("/health")
 def health_endpoint():
-    """Health check endpoint."""
     return {"status": "ok", "service": "category-classification"}

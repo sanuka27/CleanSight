@@ -1,11 +1,96 @@
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
-const ML_CATEGORY_SERVICE_URL = process.env.ML_CATEGORY_SERVICE_URL || 'http://localhost:8001';
-const ML_SERVICE_TIMEOUT_DEFAULT_MS = 10000;
-const mlServiceTimeoutRaw = process.env.ML_SERVICE_TIMEOUT_MS;
-const mlServiceTimeoutParsed = Number(mlServiceTimeoutRaw);
-const ML_SERVICE_TIMEOUT_MS = Number.isFinite(mlServiceTimeoutParsed) && mlServiceTimeoutRaw != null && mlServiceTimeoutRaw.trim() !== ''
-  ? mlServiceTimeoutParsed
-  : ML_SERVICE_TIMEOUT_DEFAULT_MS;
+import config from '../config/app.js';
+
+const DEFAULT_PHASE1_URL = 'http://localhost:8000';
+const DEFAULT_PHASE2_URL = 'http://localhost:8001';
+
+const ML_SERVICE_URL = (config.ml.serviceUrl || DEFAULT_PHASE1_URL).replace(/\/+$/, '');
+const ML_CATEGORY_SERVICE_URL = (config.ml.categoryServiceUrl || DEFAULT_PHASE2_URL).replace(/\/+$/, '');
+const ML_SERVICE_TIMEOUT_MS = Number.isFinite(config.ml.timeoutMs) ? config.ml.timeoutMs : 10000;
+
+const VALID_BINARY_LABELS = new Set(['trash', 'non-trash']);
+const VALID_CATEGORIES = new Set(['glass', 'mixed', 'paper', 'plastic']);
+const VALID_CONFIDENCE_LEVELS = new Set(['HIGH', 'MODERATE', 'LOW', 'VERY LOW']);
+const VALID_REVIEW_STATUSES = new Set(['auto_accepted', 'flagged', 'manual_review', 'pending']);
+
+function clampConfidence(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.max(0, Math.min(1, numeric));
+}
+
+function normalizeBinaryLabel(rawLabel) {
+  const normalized = String(rawLabel || '')
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '-');
+
+  if (normalized === 'trash' || normalized === 'waste') return 'trash';
+  if (normalized === 'non-trash' || normalized === 'nontrash' || normalized === 'clean') return 'non-trash';
+  return normalized;
+}
+
+function inferConfidenceLevel(confidence) {
+  if (confidence >= config.ml.categoryHighConfidenceThreshold) return 'HIGH';
+  if (confidence >= 0.5) return 'MODERATE';
+  if (confidence >= 0.3) return 'LOW';
+  return 'VERY LOW';
+}
+
+function inferReviewStatus(confidenceLevel) {
+  if (confidenceLevel === 'HIGH') return 'auto_accepted';
+  if (confidenceLevel === 'MODERATE') return 'flagged';
+  return 'manual_review';
+}
+
+async function safeReadError(response) {
+  try {
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const body = await response.json();
+      if (body && typeof body.detail === 'string') return body.detail;
+      if (body && typeof body.error === 'string') return body.error;
+      return JSON.stringify(body).slice(0, 500);
+    }
+
+    const textBody = await response.text();
+    return textBody ? textBody.slice(0, 500) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function callMlEndpoint(baseUrl, path, imageUrl) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ML_SERVICE_TIMEOUT_MS);
+
+  try {
+    const params = new URLSearchParams();
+    params.append('image_url', imageUrl);
+
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const detail = await safeReadError(response);
+      const baseMessage = `ML service returned HTTP ${response.status}`;
+      return { ok: false, error: detail ? `${baseMessage}: ${detail}` : baseMessage };
+    }
+
+    const payload = await response.json();
+    return { ok: true, payload };
+  } catch (error) {
+    if (error && error.name === 'AbortError') {
+      return { ok: false, error: 'ML service request timed out' };
+    }
+    return { ok: false, error: 'ML service unavailable or prediction failed' };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 /**
  * Call the Phase 1 Binary Classifier ML Service.
@@ -13,80 +98,40 @@ const ML_SERVICE_TIMEOUT_MS = Number.isFinite(mlServiceTimeoutParsed) && mlServi
  * @returns {Promise<Object>} The prediction result (label, confidence, recommendation, error)
  */
 export const validateImageWithML = async (imageUrl) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, ML_SERVICE_TIMEOUT_MS);
+  const response = await callMlEndpoint(ML_SERVICE_URL, '/predict', imageUrl);
+  if (!response.ok) {
+    return { success: false, error: response.error };
+  }
 
-  try {
-    const params = new URLSearchParams();
-    params.append('image_url', imageUrl);
-
-    // Using native fetch logic with explicit timeout via AbortController
-    const url = `${ML_SERVICE_URL}/predict`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params,
-      signal: controller.signal,
-    });
-
-    if (response.ok) {
-        const data = await response.json();
-        return {
-            success: true,
-            label: data.label,
-            confidence: data.confidence,
-            recommendation: data.recommendation,
-        };
-    } else {
-        let errorDetail;
-        try {
-            const contentType = response.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-                const errorBody = await response.json();
-                if (errorBody && typeof errorBody.detail === 'string') {
-                    errorDetail = errorBody.detail;
-                }
-            } else {
-                const textBody = await response.text();
-                if (textBody) {
-                    errorDetail = textBody.slice(0, 500);
-                }
-            }
-        } catch (parseError) {
-            // Swallow parsing errors; we still log status below.
-        }
-        
-        console.warn('ML Service HTTP Error', {
-            status: response.status,
-            statusText: response.statusText,
-            detail: errorDetail,
-        });
-
-        const baseMessage = `ML service returned an error (status ${response.status})`;
-
-        return {
-            success: false,
-            error: errorDetail ? `${baseMessage}: ${errorDetail}` : baseMessage,
-        };
-    }
-  } catch (error) {
-    if (error && error.name === 'AbortError') {
-      console.warn('ML Service Error: request timed out');
-      return {
-        success: false,
-        error: 'ML service request timed out'
-      };
-    }
-    console.warn('ML Service Error: ' + error.message);
+  const payload = response.payload || {};
+  if (payload.success === false) {
     return {
       success: false,
-      error: 'ML service unavailable or prediction failed'
+      error: typeof payload.error === 'string' ? payload.error : 'Phase 1 prediction failed',
     };
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  const label = normalizeBinaryLabel(payload.label ?? (payload.isWaste ? 'trash' : 'non-trash'));
+  const confidence = clampConfidence(payload.confidence);
+
+  if (!VALID_BINARY_LABELS.has(label) || confidence === null) {
+    return { success: false, error: 'Invalid Phase 1 response contract from ML service' };
+  }
+
+  const recommendation = payload.recommendation === 'automated_approval'
+    ? 'automated_approval'
+    : confidence >= config.ml.binaryConfidenceThreshold
+      ? 'automated_approval'
+      : 'manual_review';
+
+  return {
+    success: true,
+    isWaste: label === 'trash',
+    category: null,
+    label,
+    confidence,
+    recommendation,
+  };
 };
 
 /**
@@ -95,109 +140,58 @@ export const validateImageWithML = async (imageUrl) => {
  * @returns {Promise<Object>} The category prediction result
  */
 export const predictCategoryWithML = async (imageUrl) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, ML_SERVICE_TIMEOUT_MS);
-
-  try {
-    const params = new URLSearchParams();
-    params.append('image_url', imageUrl);
-
-    const url = `${ML_CATEGORY_SERVICE_URL}/predict-category`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params,
-      signal: controller.signal,
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-
-      // Check if prediction actually succeeded
-      if (!data.success) {
-        console.warn('ML Category Service returned success=false', {
-          error: data.error
-        });
-        return {
-          success: false,
-          error: data.error || 'ML category service prediction failed'
-        };
-      }
-
-      // Determine review status based on confidence level
-      let reviewStatus = 'pending';
-      if (data.confidence_level === 'HIGH') {
-        reviewStatus = 'auto_accepted';
-      } else if (data.confidence_level === 'MODERATE') {
-        reviewStatus = 'flagged';
-      } else {
-        reviewStatus = 'manual_review';
-      }
-
-      // Normalize all_predictions field names: class_name → class
-      const rawPredictions = Array.isArray(data.all_predictions) ? data.all_predictions : [];
-      const normalizedPredictions = rawPredictions.map((prediction) => ({
-        class: prediction.class_name || prediction.class,
-        confidence: prediction.confidence,
-      }));
-
-      return {
-        success: true,
-        predictedLabel: data.predicted_class,
-        confidence: data.confidence,
-        entropy: data.entropy,
-        confidenceLevel: data.confidence_level,
-        allPredictions: normalizedPredictions,
-        reviewStatus,
-      };
-    } else {
-      let errorDetail;
-      try {
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          const errorBody = await response.json();
-          if (errorBody && typeof errorBody.detail === 'string') {
-            errorDetail = errorBody.detail;
-          }
-        } else {
-          const textBody = await response.text();
-          if (textBody) {
-            errorDetail = textBody.slice(0, 500);
-          }
-        }
-      } catch (parseError) {
-        // Swallow parsing errors
-      }
-
-      console.warn('ML Category Service HTTP Error', {
-        status: response.status,
-        statusText: response.statusText,
-        detail: errorDetail,
-      });
-
-      const baseMessage = `ML category service returned an error (status ${response.status})`;
-
-      return {
-        success: false,
-        error: errorDetail ? `${baseMessage}: ${errorDetail}` : baseMessage,
-      };
-    }
-  } catch (error) {
-    if (error && error.name === 'AbortError') {
-      console.warn('ML Category Service Error: request timed out');
-      return {
-        success: false,
-        error: 'ML category service request timed out'
-      };
-    }
-    console.warn('ML Category Service Error: ' + error.message);
+  const response = await callMlEndpoint(ML_CATEGORY_SERVICE_URL, '/predict-category', imageUrl);
+  if (!response.ok) {
     return {
       success: false,
-      error: 'ML category service unavailable or prediction failed'
+      error: response.error,
     };
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  const payload = response.payload || {};
+  if (payload.success === false) {
+    return {
+      success: false,
+      error: typeof payload.error === 'string' ? payload.error : 'Phase 2 prediction failed',
+    };
+  }
+
+  const predictedLabel = String(payload.category ?? payload.predicted_class ?? '').trim().toLowerCase();
+  const confidence = clampConfidence(payload.confidence);
+  const entropy = clampConfidence(payload.entropy ?? 0);
+
+  if (!VALID_CATEGORIES.has(predictedLabel) || confidence === null) {
+    return { success: false, error: 'Invalid Phase 2 response contract from ML service' };
+  }
+
+  const confidenceLevel = VALID_CONFIDENCE_LEVELS.has(payload.confidence_level)
+    ? payload.confidence_level
+    : inferConfidenceLevel(confidence);
+
+  const reviewStatus = VALID_REVIEW_STATUSES.has(payload.review_status)
+    ? payload.review_status
+    : inferReviewStatus(confidenceLevel);
+
+  const allPredictions = Array.isArray(payload.all_predictions)
+    ? payload.all_predictions
+        .map((prediction) => {
+          const className = String(prediction.class_name ?? prediction.class ?? '').trim().toLowerCase();
+          const classConfidence = clampConfidence(prediction.confidence);
+          if (!VALID_CATEGORIES.has(className) || classConfidence === null) return null;
+          return { class: className, confidence: classConfidence };
+        })
+        .filter(Boolean)
+    : [];
+
+  return {
+    success: true,
+    isWaste: true,
+    category: predictedLabel,
+    predictedLabel,
+    confidence,
+    entropy,
+    confidenceLevel,
+    reviewStatus,
+    allPredictions,
+  };
 };

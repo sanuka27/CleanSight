@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Report from '../models/Report.js';
 import User from '../models/User.js';
 import verifyToken from '../middleware/verifyToken.js';
-import { validateImageWithML } from '../services/mlService.js';
+import { predictCategoryWithML, validateImageWithML } from '../services/mlService.js';
 import { 
   REPORT_STATUS, 
   isValidTransition, 
@@ -85,23 +85,49 @@ router.post('/', verifyToken, async (req, res) => {
       });
     }
 
-    // Call ML service before saving
+    // Run Phase 1 validation first.
     const mlValidation = await validateImageWithML(imageUrl);
-    let imageValidationLabel = 'pending';
+    let imageValidationLabel = 'error';
     let imageValidationConfidence = null;
-    let aiReviewStatus = 'pending';
+    let aiReviewStatus = 'manual_review';
+
+    // Phase 2 prediction fields (predicted-only, not final reviewed values)
+    let wasteCategoryPredictedLabel = 'pending';
+    let wasteCategoryConfidence = null;
+    let wasteCategoryEntropy = null;
+    let wasteCategoryConfidenceLevel = null;
+    let wasteCategoryAllPredictions = null;
+    let wasteCategoryReviewStatus = 'pending';
 
     if (mlValidation.success) {
       imageValidationLabel = mlValidation.label;
       imageValidationConfidence = mlValidation.confidence;
-      aiReviewStatus = mlValidation.recommendation === 'manual_review' ? 'manual_review' : 'approved';
-      
-      // If prediction label is strongly non-trash, flag for review
+
       if (imageValidationLabel === 'non-trash') {
         aiReviewStatus = 'flagged';
+      } else if (mlValidation.recommendation === 'manual_review') {
+        aiReviewStatus = 'manual_review';
+      } else {
+        aiReviewStatus = 'approved';
       }
-    } else {
-      imageValidationLabel = 'error';
+
+      // Run Phase 2 only when Phase 1 is auto-approved as trash.
+      if (imageValidationLabel === 'trash' && aiReviewStatus === 'approved') {
+        const categoryPrediction = await predictCategoryWithML(imageUrl);
+
+        if (categoryPrediction.success) {
+          wasteCategoryPredictedLabel = categoryPrediction.predictedLabel;
+          wasteCategoryConfidence = categoryPrediction.confidence;
+          wasteCategoryEntropy = categoryPrediction.entropy;
+          wasteCategoryConfidenceLevel = categoryPrediction.confidenceLevel;
+          wasteCategoryAllPredictions = categoryPrediction.allPredictions;
+          wasteCategoryReviewStatus = categoryPrediction.reviewStatus;
+        } else {
+          console.warn('Phase 2 prediction failed:', categoryPrediction.error);
+          wasteCategoryPredictedLabel = 'error';
+          wasteCategoryReviewStatus = 'manual_review';
+        }
+      }
     }
 
     const report = await Report.create({
@@ -118,7 +144,13 @@ router.post('/', verifyToken, async (req, res) => {
       status: REPORT_STATUS.PENDING,
       imageValidationLabel,
       imageValidationConfidence,
-      aiReviewStatus
+      aiReviewStatus,
+      wasteCategoryPredictedLabel,
+      wasteCategoryConfidence,
+      wasteCategoryEntropy,
+      wasteCategoryConfidenceLevel,
+      wasteCategoryAllPredictions,
+      wasteCategoryReviewStatus,
     });
 
     // Increment user's report count

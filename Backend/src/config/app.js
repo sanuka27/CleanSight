@@ -41,6 +41,18 @@ function getEnvInt(key, defaultValue) {
 }
 
 /**
+ * Get environment variable as float.
+ */
+function getEnvFloat(key, defaultValue) {
+  const value = getEnv(key, defaultValue?.toString());
+  const parsed = parseFloat(value);
+  if (isNaN(parsed)) {
+    throw new Error(`Environment variable ${key} must be a float`);
+  }
+  return parsed;
+}
+
+/**
  * Get environment variable as boolean.
  */
 function getEnvBool(key, defaultValue = false) {
@@ -109,7 +121,10 @@ const config = {
   // ML Service
   ml: {
     serviceUrl: getEnv('ML_SERVICE_URL', ''),
-    timeout: getEnvInt('ML_SERVICE_TIMEOUT', 30000), // 30 seconds
+    categoryServiceUrl: getEnv('ML_CATEGORY_SERVICE_URL', ''),
+    timeoutMs: getEnvInt('ML_SERVICE_TIMEOUT_MS', getEnvInt('ML_SERVICE_TIMEOUT', 30000)),
+    binaryConfidenceThreshold: getEnvFloat('BINARY_CONFIDENCE_THRESHOLD', 0.70),
+    categoryHighConfidenceThreshold: getEnvFloat('CATEGORY_HIGH_CONFIDENCE_THRESHOLD', 0.80),
   },
 
   // Logging

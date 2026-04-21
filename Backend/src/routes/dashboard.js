@@ -159,7 +159,7 @@ router.get(
       // Tasks assigned to me (active)
       const assignedToMe = await Report.find({
         assignedTo: firebaseUid,
-        status: 'assigned',
+        status: { $in: ['assigned', 'in_progress'] },
       })
         .sort({ createdAt: -1 })
         .limit(30)
@@ -395,7 +395,7 @@ router.get(
         ? parseFloat(((totals.resolved / totals.total) * 100).toFixed(1))
         : 0;
       const assignmentRate = totals.total > 0
-        ? parseFloat(((totals.assigned / totals.total) * 100).toFixed(1))
+        ? parseFloat((((totals.assigned + totals.in_progress) / totals.total) * 100).toFixed(1))
         : 0;
 
       res.json({

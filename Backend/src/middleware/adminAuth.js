@@ -46,6 +46,14 @@ export async function adminOnly(req, res, next) {
   const headerKey = req.headers['x-admin-key'];
 
   if (adminKey && headerKey && headerKey === adminKey) {
+    // Provide a sentinel adminUser so downstream routes can safely
+    // access req.adminUser.firebaseUid for audit logging / ownership fields.
+    req.adminUser = {
+      firebaseUid: 'system-api-key',
+      role: 'admin',
+      name: 'API Key',
+      email: null,
+    };
     return next();
   }
 

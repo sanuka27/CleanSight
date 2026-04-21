@@ -69,15 +69,18 @@ router.get('/summary', verifyToken, validateAnalyticsQuery, async (req, res) => 
     ]);
 
     const resolutionRate = rate(totals.resolved, totals.total);
-    const assignmentRate = rate(totals.assigned + totals.resolved, totals.total);
+    const assignmentRate = rate(totals.assigned + totals.in_progress, totals.total);
 
     const payload = {
       range: { from, to },
       totals: {
         total: totals.total,
         pending: totals.pending,
+        verified: totals.verified,
         assigned: totals.assigned,
+        inProgress: totals.in_progress,
         resolved: totals.resolved,
+        rejected: totals.rejected,
       },
       rates: { resolutionRate, assignmentRate },
       series,
@@ -92,7 +95,7 @@ router.get('/summary', verifyToken, validateAnalyticsQuery, async (req, res) => 
       payload.myAssigned = {
         total: myTotals.total,
         resolved: myTotals.resolved,
-        pending: myTotals.assigned, // still assigned = not yet resolved
+        pending: myTotals.assigned + myTotals.in_progress, // active assigned work
       };
     }
 

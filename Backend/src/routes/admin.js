@@ -714,6 +714,148 @@ router.get('/reports/map', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/reports/category-review-queue
+ * Get reports that need Phase 2 category review.
+ * Includes: flagged, manual_review, pending (with Phase 1 approved)
+ * NOTE: Must be defined BEFORE /reports/:id to prevent Express matching as :id param
+ */
+router.get('/reports/category-review-queue', async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      reviewStatus,
+      predictedCategory,
+      lowConfidenceOnly,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = req.query;
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Base filter: Phase 1 must be approved/overridden
+    const filter = {
+      $or: [
+        { aiReviewStatus: 'approved' },
+        { aiReviewStatus: 'overridden' },
+      ],
+    };
+
+    // Review status filter
+    if (reviewStatus) {
+      const statuses = String(reviewStatus).split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length) filter.wasteCategoryReviewStatus = { $in: statuses };
+    } else {
+      // Default: show items needing review
+      filter.wasteCategoryReviewStatus = { $in: ['flagged', 'manual_review', 'pending'] };
+    }
+
+    // Category filter
+    if (predictedCategory) {
+      const categories = String(predictedCategory).split(',').map(s => s.trim()).filter(Boolean);
+      if (categories.length) filter.wasteCategoryPredictedLabel = { $in: categories };
+    }
+
+    // Low confidence filter (confidence < 0.5)
+    if (lowConfidenceOnly === 'true') {
+      filter.wasteCategoryConfidence = { $lt: 0.5 };
+    }
+
+    const sortDir = sortOrder === 'asc' ? 1 : -1;
+    const sortField = ['createdAt', 'updatedAt', 'wasteCategoryConfidence'].includes(String(sortBy))
+      ? String(sortBy)
+      : 'createdAt';
+
+    const [reports, total] = await Promise.all([
+      Report.find(filter)
+        .sort({ [sortField]: sortDir })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Report.countDocuments(filter),
+    ]);
+
+    // Enrich with reporter info
+    const uids = [...new Set(reports.map(r => r.firebaseUid))];
+    const users = await User.find({ firebaseUid: { $in: uids } })
+      .select('firebaseUid name email avatar')
+      .lean();
+    const userMap = Object.fromEntries(users.map(u => [u.firebaseUid, u]));
+
+    const enriched = reports.map(r => ({
+      ...r,
+      reporter: userMap[r.firebaseUid] || null,
+    }));
+
+    res.json({
+      success: true,
+      data: enriched,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (err) {
+    console.error('Admin category review queue error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/reports/export/csv
+ * Export reports as CSV (returns JSON array for frontend to render).
+ * NOTE: Must be defined BEFORE /reports/:id to prevent Express matching as :id param
+ */
+router.get('/reports/export/csv', async (req, res) => {
+  try {
+    const { from, to, status, wasteType } = req.query;
+    const filter = {};
+
+    if (status) {
+      const statuses = String(status).split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length) filter.status = { $in: statuses };
+    }
+    if (wasteType) {
+      const types = String(wasteType).split(',').map(s => s.trim()).filter(Boolean);
+      if (types.length) filter.wasteType = { $in: types };
+    }
+    if (from || to) {
+      filter.createdAt = {};
+      if (from) filter.createdAt.$gte = new Date(String(from));
+      if (to)   filter.createdAt.$lte = new Date(String(to));
+    }
+
+    const reports = await Report.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(5000)
+      .lean();
+
+    const rows = reports.map(r => ({
+      id: r._id.toString(),
+      title: r.title || '',
+      description: r.description,
+      status: r.status,
+      wasteType: r.wasteType,
+      urgency: r.urgency,
+      lat: r.location?.coordinates?.[1] ?? '',
+      lng: r.location?.coordinates?.[0] ?? '',
+      reporterUid: r.firebaseUid,
+      assignedTo: r.assignedTo || '',
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      resolvedAt: r.resolvedAt || '',
+    }));
+
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('Admin export error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * GET /api/admin/reports/:id
  * Full report details with reporter info.
  */
@@ -798,6 +940,13 @@ router.patch('/reports/:id/status', async (req, res) => {
       report.resolvedAt = null;
       report.resolvedByUid = null;
       report.resolutionNote = null;
+      // Clear ML Phase 2 prediction data to prevent stale data on rejected reports
+      report.wasteCategoryPredictedLabel = null;
+      report.wasteCategoryConfidence = null;
+      report.wasteCategoryEntropy = null;
+      report.wasteCategoryConfidenceLevel = null;
+      report.wasteCategoryReviewStatus = null;
+      report.wasteCategoryAllPredictions = [];
     } else {
       report.rejectionReason = null;
       report.rejectedAt = null;
@@ -1052,94 +1201,7 @@ router.patch('/reports/:id/category-review', async (req, res) => {
   }
 });
 
-/**
- * GET /api/admin/reports/category-review-queue
- * Get reports that need Phase 2 category review.
- * Includes: flagged, manual_review, pending (with Phase 1 approved)
- */
-router.get('/reports/category-review-queue', async (req, res) => {
-  try {
-    const {
-      page = 1,
-      limit = 20,
-      reviewStatus,
-      predictedCategory,
-      lowConfidenceOnly,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-    } = req.query;
-
-    const skip = (Number(page) - 1) * Number(limit);
-
-    // Base filter: Phase 1 must be approved/overridden
-    const filter = {
-      $or: [
-        { aiReviewStatus: 'approved' },
-        { aiReviewStatus: 'overridden' },
-      ],
-    };
-
-    // Review status filter
-    if (reviewStatus) {
-      const statuses = String(reviewStatus).split(',').map(s => s.trim()).filter(Boolean);
-      if (statuses.length) filter.wasteCategoryReviewStatus = { $in: statuses };
-    } else {
-      // Default: show items needing review
-      filter.wasteCategoryReviewStatus = { $in: ['flagged', 'manual_review', 'pending'] };
-    }
-
-    // Category filter
-    if (predictedCategory) {
-      const categories = String(predictedCategory).split(',').map(s => s.trim()).filter(Boolean);
-      if (categories.length) filter.wasteCategoryPredictedLabel = { $in: categories };
-    }
-
-    // Low confidence filter (confidence < 0.5)
-    if (lowConfidenceOnly === 'true') {
-      filter.wasteCategoryConfidence = { $lt: 0.5 };
-    }
-
-    const sortDir = sortOrder === 'asc' ? 1 : -1;
-    const sortField = ['createdAt', 'updatedAt', 'wasteCategoryConfidence'].includes(String(sortBy))
-      ? String(sortBy)
-      : 'createdAt';
-
-    const [reports, total] = await Promise.all([
-      Report.find(filter)
-        .sort({ [sortField]: sortDir })
-        .skip(skip)
-        .limit(Number(limit))
-        .lean(),
-      Report.countDocuments(filter),
-    ]);
-
-    // Enrich with reporter info
-    const uids = [...new Set(reports.map(r => r.firebaseUid))];
-    const users = await User.find({ firebaseUid: { $in: uids } })
-      .select('firebaseUid name email avatar')
-      .lean();
-    const userMap = Object.fromEntries(users.map(u => [u.firebaseUid, u]));
-
-    const enriched = reports.map(r => ({
-      ...r,
-      reporter: userMap[r.firebaseUid] || null,
-    }));
-
-    res.json({
-      success: true,
-      data: enriched,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        pages: Math.ceil(total / Number(limit)),
-      },
-    });
-  } catch (err) {
-    console.error('Admin category review queue error:', err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+// NOTE: GET /reports/category-review-queue moved above GET /reports/:id (route ordering fix)
 
 /**
  * PATCH /api/admin/reports/:id/assign
@@ -1243,56 +1305,7 @@ router.post('/reports/:id/note', async (req, res) => {
   }
 });
 
-/**
- * GET /api/admin/reports/export/csv
- * Export reports as CSV (returns JSON array for frontend to render).
- */
-router.get('/reports/export/csv', async (req, res) => {
-  try {
-    const { from, to, status, wasteType } = req.query;
-    const filter = {};
-
-    if (status) {
-      const statuses = String(status).split(',').map(s => s.trim()).filter(Boolean);
-      if (statuses.length) filter.status = { $in: statuses };
-    }
-    if (wasteType) {
-      const types = String(wasteType).split(',').map(s => s.trim()).filter(Boolean);
-      if (types.length) filter.wasteType = { $in: types };
-    }
-    if (from || to) {
-      filter.createdAt = {};
-      if (from) filter.createdAt.$gte = new Date(String(from));
-      if (to)   filter.createdAt.$lte = new Date(String(to));
-    }
-
-    const reports = await Report.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(5000)
-      .lean();
-
-    const rows = reports.map(r => ({
-      id: r._id.toString(),
-      title: r.title || '',
-      description: r.description,
-      status: r.status,
-      wasteType: r.wasteType,
-      urgency: r.urgency,
-      lat: r.location?.coordinates?.[1] ?? '',
-      lng: r.location?.coordinates?.[0] ?? '',
-      reporterUid: r.firebaseUid,
-      assignedTo: r.assignedTo || '',
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-      resolvedAt: r.resolvedAt || '',
-    }));
-
-    res.json({ success: true, data: rows });
-  } catch (err) {
-    console.error('Admin export error:', err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+// NOTE: GET /reports/export/csv moved above GET /reports/:id (route ordering fix)
 
 /* ═══════════════════════════════════════════════════════════════════
    VOLUNTEERS

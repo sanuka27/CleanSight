@@ -18,6 +18,17 @@ function clampConfidence(value) {
   return Math.max(0, Math.min(1, numeric));
 }
 
+/**
+ * Entropy is normalized [0, 1] by our ML service, but we only enforce
+ * non-negative here to avoid silently losing information if a raw
+ * (unnormalized) value ever arrives.
+ */
+function clampEntropy(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, numeric);
+}
+
 function normalizeBinaryLabel(rawLabel) {
   const normalized = String(rawLabel || '')
     .trim()
@@ -158,7 +169,7 @@ export const predictCategoryWithML = async (imageUrl) => {
 
   const predictedLabel = String(payload.category ?? payload.predicted_class ?? '').trim().toLowerCase();
   const confidence = clampConfidence(payload.confidence);
-  const entropy = clampConfidence(payload.entropy ?? 0);
+  const entropy = clampEntropy(payload.entropy ?? 0);
 
   if (!VALID_CATEGORIES.has(predictedLabel) || confidence === null) {
     return { success: false, error: 'Invalid Phase 2 response contract from ML service' };

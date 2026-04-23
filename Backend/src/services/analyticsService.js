@@ -37,13 +37,16 @@ export async function getStatusBreakdown(from, to, filter = {}) {
         _id: null,
         total: { $sum: 1 },
         pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+        verified: { $sum: { $cond: [{ $eq: ['$status', 'verified'] }, 1, 0] } },
         assigned: { $sum: { $cond: [{ $eq: ['$status', 'assigned'] }, 1, 0] } },
+        in_progress: { $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] } },
         resolved: { $sum: { $cond: [{ $eq: ['$status', 'resolved'] }, 1, 0] } },
+        rejected: { $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] } },
       },
     },
   ]);
 
-  return result || { total: 0, pending: 0, assigned: 0, resolved: 0 };
+  return result || { total: 0, pending: 0, verified: 0, assigned: 0, in_progress: 0, resolved: 0, rejected: 0 };
 }
 
 /* ------------------------------------------------------------------ */
@@ -81,10 +84,8 @@ export async function getReportsPerDay(from, to, filter = {}) {
  * Returns { avgHours, medianHours, count } for reports that moved
  * from assigned → resolved inside the range.
  *
- * Because the current schema has no `resolvedAt` / `assignedAt`
- * timestamps beyond `createdAt`, we use `updatedAt` as a proxy for
- * the most-recent status change.  If timestamps are not available,
- * returns nulls.
+ * Uses `resolvedAt` when present and falls back to `updatedAt`
+ * for older data.
  */
 export async function getResolutionTimes(from, to, filter = {}) {
   const match = {
@@ -93,7 +94,7 @@ export async function getResolutionTimes(from, to, filter = {}) {
     ...filter,
   };
 
-  const docs = await Report.find(match).select('createdAt updatedAt').lean();
+  const docs = await Report.find(match).select('createdAt updatedAt resolvedAt').lean();
 
   if (docs.length === 0) {
     return { avgHours: null, medianHours: null, count: 0 };
@@ -101,9 +102,10 @@ export async function getResolutionTimes(from, to, filter = {}) {
 
   const hours = docs
     .map((d) => {
-      // updatedAt is the last change (resolve); createdAt is report creation
-      if (!d.updatedAt || !d.createdAt) return null;
-      return (new Date(d.updatedAt) - new Date(d.createdAt)) / (1000 * 60 * 60);
+      // Prefer resolvedAt (set by pre-save hook), fall back to updatedAt
+      const resolveTime = d.resolvedAt || d.updatedAt;
+      if (!resolveTime || !d.createdAt) return null;
+      return (new Date(resolveTime) - new Date(d.createdAt)) / (1000 * 60 * 60);
     })
     .filter((h) => h !== null && h >= 0);
 
@@ -194,26 +196,28 @@ export async function getVolunteerStats(from, to) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Proxy: for reports that are at least "assigned", measure
- * createdAt → updatedAt where status !== 'pending'.
+ * For reports that are at least "assigned", measure
+ * createdAt → assignedAt (fallback: updatedAt).
  * Returns { avgHours } or null.
  */
 export async function getTimeToAssign(from, to, filter = {}) {
   const docs = await Report.find({
-    status: { $in: ['assigned', 'resolved'] },
+    status: { $in: ['assigned', 'in_progress', 'resolved'] },
     assignedTo: { $ne: null },
     createdAt: { $gte: from, $lte: to },
     ...filter,
   })
-    .select('createdAt updatedAt')
+    .select('createdAt assignedAt updatedAt')
     .lean();
 
   if (docs.length === 0) return { avgHours: null, count: 0 };
 
   const hours = docs
     .map((d) => {
-      if (!d.updatedAt || !d.createdAt) return null;
-      return (new Date(d.updatedAt) - new Date(d.createdAt)) / (1000 * 60 * 60);
+      // Prefer assignedAt (set by pre-save hook), fall back to updatedAt
+      const assignTime = d.assignedAt || d.updatedAt;
+      if (!assignTime || !d.createdAt) return null;
+      return (new Date(assignTime) - new Date(d.createdAt)) / (1000 * 60 * 60);
     })
     .filter((h) => h !== null && h >= 0);
 

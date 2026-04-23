@@ -1,6 +1,6 @@
 import { Leaf, Heart } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { getUserRole } from "@/lib/role";
 import { useToast } from "@/hooks/use-toast";
 import {

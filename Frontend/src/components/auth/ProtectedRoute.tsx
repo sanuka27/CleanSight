@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { getUserRole } from "@/lib/role";
 import type { AppRole } from "@/lib/role";
 import { ONBOARDING_ROUTE, dashboardRouteForRole } from "@/constants/roles";

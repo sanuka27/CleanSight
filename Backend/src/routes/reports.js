@@ -179,7 +179,7 @@ router.get('/my', verifyToken, async (req, res) => {
   try {
     const { firebaseUid } = req.user;
 
-    const reports = await Report.find({ firebaseUid })
+    const reports = await Report.find({ firebaseUid, isDeleted: { $ne: true } })
       .sort({ createdAt: -1 });
 
     res.json({
@@ -193,6 +193,25 @@ router.get('/my', verifyToken, async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+});
+
+// @route   GET /api/reports/volunteers
+// @desc    Get volunteer users for assignment (staff/admin only)
+// @access  Private (staff/admin)
+// NOTE: Must be defined BEFORE /:id to prevent Express matching 'volunteers' as an :id param
+router.get('/volunteers', verifyToken, async (req, res) => {
+  try {
+    const { firebaseUid } = req.user;
+    const user = await User.findOne({ firebaseUid });
+    if (!user || !['staff', 'admin'].includes(user.role)) {
+      return res.status(403).json({ success: false, message: 'Only staff or admin can view volunteers' });
+    }
+    const volunteers = await User.find({ role: 'volunteer' }).select('firebaseUid name email');
+    res.json({ success: true, data: volunteers });
+  } catch (error) {
+    console.error('Get volunteers error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -229,7 +248,8 @@ router.get('/', verifyToken, async (req, res) => {
     const user = await User.findOne({ firebaseUid });
     const role = user?.role || 'citizen';
 
-    let query = {};
+    // Exclude soft-deleted reports
+    let query = { isDeleted: { $ne: true } };
 
     // "mine" filter: citizen sees only own reports when mine=true or by default
     if (req.query.mine === 'true' || role === 'citizen') {
@@ -299,23 +319,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-// @route   GET /api/reports/volunteers
-// @desc    Get volunteer users for assignment (staff/admin only)
-// @access  Private (staff/admin)
-router.get('/volunteers', verifyToken, async (req, res) => {
-  try {
-    const { firebaseUid } = req.user;
-    const user = await User.findOne({ firebaseUid });
-    if (!user || !['staff', 'admin'].includes(user.role)) {
-      return res.status(403).json({ success: false, message: 'Only staff or admin can view volunteers' });
-    }
-    const volunteers = await User.find({ role: 'volunteer' }).select('firebaseUid name email');
-    res.json({ success: true, data: volunteers });
-  } catch (error) {
-    console.error('Get volunteers error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
+// NOTE: GET /api/reports/volunteers is defined above GET /:id (see above)
 
 // @route   PATCH /api/reports/:id/assign-self
 // @desc    Volunteer self-assigns a pending report

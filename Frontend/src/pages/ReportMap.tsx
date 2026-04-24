@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useReports } from "@/hooks/useReports";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import api from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 

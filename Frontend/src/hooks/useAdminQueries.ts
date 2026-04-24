@@ -198,10 +198,12 @@ export function useBulkUpdateStatusMutation() {
     mutationFn: ({
       reportIds,
       status,
+      rejectionReason,
     }: {
       reportIds: string[];
       status: ReportStatus;
-    }) => bulkUpdateReportStatus(reportIds, status),
+      rejectionReason?: string;
+    }) => bulkUpdateReportStatus(reportIds, status, rejectionReason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.reports.all() });
     },

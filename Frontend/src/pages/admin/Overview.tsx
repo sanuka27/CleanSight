@@ -13,7 +13,7 @@ import { StatsGrid } from "@/components/admin/StatsGrid";
 import { ActivityChart } from "@/components/admin/Charts/ActivityChart";
 import { WasteTypeChart } from "@/components/admin/Charts/WasteTypeChart";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import {
   useAdminOverviewQuery,
   useAdminTrendsQuery,

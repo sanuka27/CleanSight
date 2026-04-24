@@ -39,7 +39,7 @@ import {
   useVolunteerAnalyticsQuery,
 } from "@/hooks/useAnalyticsQueries";
 import { useAdminDashboardQuery } from "@/hooks/useDashboardQueries";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { fromPreset } from "@/lib/dateRange";
 import { canViewVolunteerAnalytics } from "@/lib/role";
 import type { AnalyticsPreset } from "@/types/analytics";
@@ -91,16 +91,17 @@ const Dashboard = () => {
     const queryParams = useMemo(() => fromPreset(preset), [preset]);
     
     // React Query hooks for analytics
-    const { data: summary, isLoading: summaryLoading } = useAnalyticsSummaryQuery(queryParams);
-    const { data: performance, isLoading: perfLoading } = useAnalyticsPerformanceQuery(queryParams);
-    const { data: volunteers } = useVolunteerAnalyticsQuery(queryParams, {
+    const { data: summary, isLoading: summaryLoading, isError: summaryIsError } = useAnalyticsSummaryQuery(queryParams);
+    const { data: performance, isLoading: perfLoading, isError: perfIsError } = useAnalyticsPerformanceQuery(queryParams);
+    useVolunteerAnalyticsQuery(queryParams, {
       enabled: canViewVolunteerAnalytics("staff"),
     });
     
     // Admin dashboard data (recent activity, etc.)
-    const { data: adminData } = useAdminDashboardQuery();
+    const { data: adminData, isError: adminIsError } = useAdminDashboardQuery();
     
     const isLoading = summaryLoading || perfLoading;
+    const hasError = summaryIsError || perfIsError || adminIsError || (!summaryLoading && !summary);
 
     /* ── Derived display data (falls back to zeros while loading) ── */
 
@@ -231,7 +232,7 @@ const Dashboard = () => {
                                         Hello, <span className="text-gradient">{user?.displayName?.split(' ')[0] || 'there'}</span>
                                     </h1>
                                     <p className="text-muted-foreground">
-                                        {isLoading ? 'Loading analytics…' : error ? 'Could not load analytics.' : "Here's what's happening in your area today."}
+                                        {isLoading ? 'Loading analytics…' : hasError ? 'Could not load analytics.' : "Here's what's happening in your area today."}
                                     </p>
                                 </div>
                                 <div className="flex gap-3">

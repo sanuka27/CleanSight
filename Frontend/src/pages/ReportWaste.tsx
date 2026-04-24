@@ -8,7 +8,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useToast } from "@/hooks/use-toast";
 import { useReports } from "@/hooks/useReports";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { MeshGradient } from "@/components/shared/MeshGradient";
 
 import { steps, MAX_FILE_SIZE, isLocationInRange } from "@/components/report/constants";

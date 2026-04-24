@@ -10,7 +10,7 @@ import { fromGeoJSONPoint, bboxFromViewport } from "@/utils/geo";
 import { DEFAULT_CENTER, DEFAULT_ZOOM, VIEWPORT_DEBOUNCE_MS } from "@/constants/map";
 import { URGENCY_CONFIG, LEGEND_ITEMS } from "@/constants/mapUi";
 import type { StatusFilterValue, SortValue } from "@/constants/mapUi";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useMapReportsQuery } from "@/hooks/useReportsQueries";
 import api from "@/lib/api";

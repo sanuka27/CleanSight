@@ -8,7 +8,7 @@ import { Leaf, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { MeshGradient } from "@/components/shared/MeshGradient";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { getUserProfile } from "@/services/userProfile";
 import { signInWithSocial, type SocialProvider } from "@/services/socialAuth";
 import { mapFirebaseAuthErrorToMessage } from "@/utils/authErrors";

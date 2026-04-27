@@ -12,8 +12,11 @@ export interface DateRange {
 export interface StatusTotals {
   total: number;
   pending: number;
+  verified: number;
   assigned: number;
+  inProgress: number;
   resolved: number;
+  rejected: number;
 }
 
 /** Rates expressed as percentages 0–100. */

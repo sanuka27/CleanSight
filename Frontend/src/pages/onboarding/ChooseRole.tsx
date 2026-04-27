@@ -4,7 +4,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Leaf, ArrowRight } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { RoleSelector } from "@/components/auth/RoleSelector";
 import { createUserProfile } from "@/services/userProfile";
 import { toast } from "sonner";

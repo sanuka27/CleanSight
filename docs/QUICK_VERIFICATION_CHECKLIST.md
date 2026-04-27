@@ -37,10 +37,10 @@ Use this before demos, presentations, or submission to confirm everything is wor
   ```bash
   pnpm install   # from project root
   ```
-- [ ] Python venv created inside `ML/`:
+- [ ] Python 3.11 venv created inside `ML/` (required for TensorFlow Phase 1):
   ```bash
   cd ML
-  python -m venv venv
+  py -3.11 -m venv venv
   .\venv\Scripts\Activate.ps1
   pip install -r requirements_service.txt
   ```
@@ -70,7 +70,7 @@ python -m uvicorn service.main:app --host 0.0.0.0 --port 8000 --reload
 ```bash
 cd ML
 .\venv\Scripts\Activate.ps1
-python -m uvicorn ML.category_service.main:app --host 0.0.0.0 --port 8001 --reload
+python -m uvicorn category_service.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 ✅ Expected: `Uvicorn running on http://0.0.0.0:8001` + `Category model loaded successfully`
 
@@ -150,8 +150,6 @@ Open these in your browser or run with curl:
 - [ ] [README.md](../README.md) — accurate and up to date
 - [ ] [ML/README.md](../ML/README.md) — Phase 1 + Phase 2 both documented
 - [ ] [docs/LOCAL_DEPLOYMENT.md](LOCAL_DEPLOYMENT.md) — setup commands are correct
-- [ ] [docs/ML_TEST_FLOW.md](ML_TEST_FLOW.md) — ML test flow documented
-- [ ] [docs/PROJECT_WALKTHROUGH.md](PROJECT_WALKTHROUGH.md) — walkthrough ready for demo
 
 ---
 
@@ -159,6 +157,7 @@ Open these in your browser or run with curl:
 
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
+| Phase 1 startup: `Warning: Binary model could not be loaded at startup: No module named 'tensorflow'` | Python 3.14 venv cannot install TensorFlow 2.15 wheel | Recreate `ML/venv` with Python 3.11: `py -3.11 -m venv venv`, then reinstall `requirements_service.txt` |
 | ML service: `Model file not found` | Model not trained | Run `python -m training.train_binary_model` from `ML/` |
 | Phase 2: `success: false` | `waste_category_classifier.pt` missing | Run `python -m ML.training.train_category_model` from project root |
 | Backend: `MongoNetworkError` | MONGODB_URI wrong or Atlas IP not allowed | Check `Backend/.env` and Atlas network access |

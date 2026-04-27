@@ -322,11 +322,12 @@ export async function bulkAssignReports(
 
 export async function bulkUpdateReportStatus(
   reportIds: string[],
-  status: ReportStatus
+  status: ReportStatus,
+  rejectionReason?: string
 ): Promise<BulkActionResult> {
   return adminFetch("/reports/bulk/status", {
     method: "POST",
-    body: JSON.stringify({ reportIds, status }),
+    body: JSON.stringify({ reportIds, status, ...(rejectionReason && { rejectionReason }) }),
   });
 }
 

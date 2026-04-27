@@ -18,7 +18,7 @@ import { motion } from "framer-motion";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
 import { useStaffDashboardQuery } from "@/hooks/useDashboardQueries";
 import { useAssignReportMutation } from "@/hooks/useReportsQueries";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import type { DashboardReport, AvailableVolunteer } from "@/types/dashboard";
 
 const statusColor: Record<string, string> = {

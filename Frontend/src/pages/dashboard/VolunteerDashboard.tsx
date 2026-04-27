@@ -3,7 +3,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useVolunteerDashboardQuery } from "@/hooks/useDashboardQueries";
 import { useAssignSelfMutation, useUpdateReportStatusMutation } from "@/hooks/useReportsQueries";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/useAuth";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { DashboardReport } from "@/types/dashboard";

@@ -25,7 +25,7 @@ pnpm install
 ### 3. Setup Python Environment
 ```bash
 cd ML
-python -m venv venv
+py -3.11 -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements_service.txt
 cd ..

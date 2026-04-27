@@ -112,7 +112,7 @@ Edit each `.env` with your real credentials. Never commit `.env` files.
 
 ```bash
 cd ML
-python -m venv venv
+py -3.11 -m venv venv            # TensorFlow 2.15 (Phase 1) needs Python 3.11 on Windows
 .\venv\Scripts\Activate.ps1       # Windows PowerShell
 pip install -r requirements_service.txt
 cd ..
@@ -135,7 +135,7 @@ python -m uvicorn service.main:app --host 0.0.0.0 --port 8000 --reload
 # Terminal 3 — ML Phase 2 Category Service
 cd ML
 .\venv\Scripts\Activate.ps1
-python -m uvicorn ML.category_service.main:app --host 0.0.0.0 --port 8001 --reload
+python -m uvicorn category_service.main:app --host 0.0.0.0 --port 8001 --reload
 # → http://localhost:8001
 
 # Terminal 4 — Frontend

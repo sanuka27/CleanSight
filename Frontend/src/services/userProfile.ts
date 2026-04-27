@@ -1,5 +1,5 @@
 import { api, ApiError } from "@/lib/api";
-import type { AppUser } from "@/context/AuthContext";
+import type { AppUser } from "@/context/AuthContextShared";
 import type { User as FirebaseUser } from "firebase/auth";
 
 /**

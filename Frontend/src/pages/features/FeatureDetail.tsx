@@ -13,10 +13,12 @@ import {
   type FeatureId,
 } from "@/constants/features";
 
+const isFeatureId = (value: string): value is FeatureId => value in FEATURE_DETAILS;
+
 const FeatureDetail = () => {
   const { featureId } = useParams();
-  const detail = featureId
-    ? FEATURE_DETAILS[featureId as FeatureId]
+  const detail = featureId && isFeatureId(featureId)
+    ? FEATURE_DETAILS[featureId]
     : undefined;
 
   const related = useMemo(
@@ -73,24 +75,26 @@ const FeatureDetail = () => {
 
               <RevealOnScroll>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Link to={detail.cta.primaryHref}>
-                    <Button
-                      size="lg"
-                      className="gap-2 px-8 py-6 text-base rounded-xl gradient-primary text-white shadow-glow hover:shadow-glow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
-                    >
+                  <Button
+                    asChild
+                    size="lg"
+                    className="gap-2 px-8 py-6 text-base rounded-xl gradient-primary text-white shadow-glow hover:shadow-glow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <Link to={detail.cta.primaryHref}>
                       {detail.cta.primaryLabel}
                       <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </Link>
-                  <Link to={detail.cta.secondaryHref}>
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      className="gap-2 px-8 py-6 text-base rounded-xl glass-premium border border-border/60 hover:bg-card/60"
-                    >
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="gap-2 px-8 py-6 text-base rounded-xl glass-premium border border-border/60 hover:bg-card/60"
+                  >
+                    <Link to={detail.cta.secondaryHref}>
                       {detail.cta.secondaryLabel}
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </div>
               </RevealOnScroll>
             </div>
@@ -209,7 +213,7 @@ const FeatureDetail = () => {
                 Explore More <span className="text-gradient">Features</span>
               </h2>
               <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-                Pair this capability with other parts of the platform for full end to end coverage.
+                Pair this capability with other parts of the platform for full end-to-end coverage.
               </p>
             </RevealOnScroll>
 

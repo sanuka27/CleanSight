@@ -229,7 +229,7 @@ The ML service requires trained models to function. If models don't exist yet:
 
 ```bash
 cd ML
-python -m venv venv
+py -3.11 -m venv venv
 ```
 
 ### 2. Activate Virtual Environment
@@ -301,7 +301,7 @@ Expected output: `Uvicorn running on http://0.0.0.0:8000`
 ```bash
 cd ML
 .\venv\Scripts\Activate.ps1
-python -m uvicorn ML.category_service.main:app --host 0.0.0.0 --port 8001 --reload
+python -m uvicorn category_service.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 Expected output: `Uvicorn running on http://0.0.0.0:8001`
 
@@ -440,14 +440,14 @@ taskkill /PID 12345 /F
 **Windows PowerShell Solution**:
 ```powershell
 cd ML
-python -m venv venv
+py -3.11 -m venv venv
 .\venv\Scripts\Activate.ps1
 ```
 
 **Windows Command Prompt Solution**:
 ```cmd
 cd ML
-python -m venv venv
+py -3.11 -m venv venv
 .\venv\Scripts\activate.bat
 ```
 
@@ -772,10 +772,7 @@ After successful local deployment:
 ## Additional Resources
 
 - **Frontend Documentation**: `Frontend/README.md`
-- **Backend API Documentation**: `docs/DASHBOARD_API.md`
 - **ML Module Documentation**: `ML/README.md`
-- **Analytics API**: `docs/ANALYTICS_API.md`
-- **ML Admin Review Flow**: `docs/ML_ADMIN_REVIEW_FLOW.md`
 
 ---
 

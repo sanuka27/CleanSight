@@ -23,6 +23,11 @@ _model_lock = threading.Lock()
 _runtime_error = None
 
 
+def get_binary_runtime_error() -> str | None:
+    """Return the latest binary model load/runtime error."""
+    return _runtime_error
+
+
 def _load_binary_class_names() -> tuple[str, str]:
     class_names = json.loads(settings.binary_class_names_path.read_text(encoding="utf-8"))
     if not isinstance(class_names, list) or len(class_names) != 2:

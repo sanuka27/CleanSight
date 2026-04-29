@@ -1,60 +1,9 @@
 import { motion } from "framer-motion";
 import { memo } from "react";
-import { 
-  Camera, 
-  MapPin, 
-  Users, 
-  Zap, 
-  Shield, 
-  BarChart3,
-  ArrowRight 
-} from "lucide-react";
+import { ArrowRight, Zap } from "lucide-react";
+import { Link } from "react-router-dom";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
-
-const features = [
-  {
-    icon: Camera,
-    title: "AI-Powered Detection",
-    description: "Our advanced AI verifies waste reports instantly, ensuring accuracy and faster response times.",
-    color: "primary",
-    gradient: "from-primary to-emerald-400",
-  },
-  {
-    icon: MapPin,
-    title: "GPS Location Tracking",
-    description: "Precise geolocation tags every report, making it easy for cleanup crews to find exact locations.",
-    color: "info",
-    gradient: "from-info to-cyan-400",
-  },
-  {
-    icon: Users,
-    title: "Community Volunteers",
-    description: "Connect with local volunteers who are ready to take action and make a difference.",
-    color: "success",
-    gradient: "from-success to-emerald-400",
-  },
-  {
-    icon: Zap,
-    title: "Instant Notifications",
-    description: "Real-time alerts keep everyone informed about new reports and cleanup progress.",
-    color: "accent",
-    gradient: "from-accent to-yellow-400",
-  },
-  {
-    icon: Shield,
-    title: "Verified Reports",
-    description: "Multi-step verification ensures only legitimate reports reach cleanup teams.",
-    color: "primary",
-    gradient: "from-primary to-teal-400",
-  },
-  {
-    icon: BarChart3,
-    title: "Impact Analytics",
-    description: "Track community progress with detailed dashboards and environmental impact metrics.",
-    color: "info",
-    gradient: "from-info to-blue-400",
-  },
-];
+import { FEATURE_CARDS } from "@/constants/features";
 
 export const FeaturesSection = memo(function FeaturesSection() {
   return (
@@ -85,7 +34,7 @@ export const FeaturesSection = memo(function FeaturesSection() {
 
         {/* Features Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, index) => {
+          {FEATURE_CARDS.map((feature, index) => {
             const Icon = feature.icon;
             
             return (
@@ -120,11 +69,15 @@ export const FeaturesSection = memo(function FeaturesSection() {
                     {feature.description}
                   </p>
                   
-                  {/* Arrow indicator */}
-                  <div className="mt-4 flex items-center gap-2 text-primary opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-0 group-hover:translate-x-2">
-                    <span className="text-sm font-medium">Learn more</span>
+                  {/* Learn more button */}
+                  <Link
+                    to={feature.href}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 transform translate-x-0 md:group-hover:translate-x-2"
+                    aria-label={`Learn more about ${feature.title}`}
+                  >
+                    Learn more
                     <ArrowRight className="w-4 h-4" />
-                  </div>
+                  </Link>
                   
                   {/* Corner decoration */}
                   <div className="absolute -bottom-10 -right-10 w-32 h-32 rounded-full bg-gradient-to-br from-primary/10 to-transparent blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />

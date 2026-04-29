@@ -5,19 +5,28 @@ import sys
 
 
 try:
-    from ML.inference.binary_runtime import load_binary_model, predict_binary
+    from ML.inference.binary_runtime import (
+        get_binary_runtime_error,
+        load_binary_model,
+        predict_binary,
+    )
 except ImportError:
     PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     if PROJECT_ROOT not in sys.path:
         sys.path.insert(0, PROJECT_ROOT)
-    from ML.inference.binary_runtime import load_binary_model, predict_binary
+    from ML.inference.binary_runtime import (
+        get_binary_runtime_error,
+        load_binary_model,
+        predict_binary,
+    )
 
 
 def load_model() -> None:
     """Load and cache the Phase 1 model at startup."""
     if not load_binary_model():
         # Keep startup alive; endpoint returns structured error until model is available.
-        print("Warning: Binary model could not be loaded at startup")
+        reason = get_binary_runtime_error() or "Unknown reason"
+        print(f"Warning: Binary model could not be loaded at startup: {reason}")
 
 
 def predict_image_contract(image_bytes: bytes) -> dict:

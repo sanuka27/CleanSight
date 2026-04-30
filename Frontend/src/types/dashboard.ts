@@ -44,11 +44,44 @@ export interface VolunteerMyStats {
   resolvedCount: number;
 }
 
+export interface VolunteerBadge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  earnedAt: string;
+}
+
+export interface VolunteerBadgeCriteria {
+  totalCleanups?: number;
+  reportsResolved?: number;
+}
+
+export interface VolunteerBadgeDefinition {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  criteria?: VolunteerBadgeCriteria | null;
+}
+
+export interface VolunteerProfileSummary {
+  stats: {
+    totalCleanups: number;
+    hoursVolunteered: number;
+    reportsResolved: number;
+    rating: number;
+  };
+  badges: VolunteerBadge[];
+  badgeCatalog: VolunteerBadgeDefinition[];
+}
+
 export interface VolunteerDashboardData {
   assignedToMe: DashboardReport[];
   resolvedByMe: DashboardReport[];
   pendingNearby: DashboardReport[];
   myStats: VolunteerMyStats;
+  volunteerProfile: VolunteerProfileSummary | null;
 }
 
 export interface VolunteerDashboardResponse {

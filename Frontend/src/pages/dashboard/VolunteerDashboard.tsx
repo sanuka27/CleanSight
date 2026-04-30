@@ -13,6 +13,7 @@ import { DEFAULT_NEAR_RADIUS_KM } from "@/constants/map";
 // Volunteer dashboard components
 import { VolunteerDashboardHeader } from "@/components/volunteer/VolunteerDashboardHeader";
 import { VolunteerStatsGrid } from "@/components/volunteer/VolunteerStatsGrid";
+import { VolunteerBadgesPanel } from "@/components/volunteer/VolunteerBadgesPanel";
 import { MyTasksBoard } from "@/components/volunteer/MyTasksBoard";
 import { AvailableReportsFeed } from "@/components/volunteer/AvailableReportsFeed";
 import { TaskDetailsModal } from "@/components/volunteer/TaskDetailsModal";
@@ -63,6 +64,10 @@ const VolunteerDashboard = () => {
   const resolvedByMe = data?.resolvedByMe ?? [];
   const pendingNearby = data?.pendingNearby ?? [];
   const stats = data?.myStats ?? { assignedCount: 0, resolvedCount: 0 };
+  const volunteerProfile = data?.volunteerProfile ?? null;
+  const badges = volunteerProfile?.badges ?? [];
+  const badgeCatalog = volunteerProfile?.badgeCatalog ?? [];
+  const totalCleanups = volunteerProfile?.stats?.totalCleanups ?? 0;
   const volunteerName = appUser?.name?.split(" ")[0] ?? "Volunteer";
 
   /* ── Location helpers ───────────────────────────────────────────── */
@@ -189,18 +194,20 @@ const VolunteerDashboard = () => {
 
   const handleOpenMapFromCard = useCallback(
     (report: DashboardReport) => {
-      setSelectedMapId(report._id);
-      if (report.location?.coordinates) {
-        const [lng, lat] = report.location.coordinates;
-        setRouteTo({ lat, lng });
+      if (!report.location?.coordinates) {
+        toast({
+          title: "Location unavailable",
+          description: "This report does not include coordinates yet.",
+          variant: "destructive",
+        });
+        return;
       }
-      if (!mapOpen) {
-        setMapOpen(true);
-        requestLocation((loc) => fetchNearbyForMap(loc));
-      }
-      window.scrollTo({ top: 0, behavior: "smooth" });
+
+      const [lng, lat] = report.location.coordinates;
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+      window.open(url, "_blank", "noopener,noreferrer");
     },
-    [mapOpen, requestLocation, fetchNearbyForMap]
+    [toast]
   );
 
   const handleScrollToTasks = useCallback(() => {
@@ -221,7 +228,7 @@ const VolunteerDashboard = () => {
             activeTaskCount={assignedToMe.length}
             isLoading={isLoading}
             onOpenNearMap={handleOpenNearMap}
-            onRefresh={fetch}
+            onRefresh={refetch}
             onScrollToTasks={handleScrollToTasks}
           />
 
@@ -233,7 +240,15 @@ const VolunteerDashboard = () => {
             isLoading={isLoading}
           />
 
-          {/* 3. Map Drawer (collapsible) */}
+          {/* 3. Badge Case */}
+          <VolunteerBadgesPanel
+            badges={badges}
+            catalog={badgeCatalog}
+            totalCleanups={totalCleanups}
+            isLoading={isLoading}
+          />
+
+          {/* 4. Map Drawer (collapsible) */}
           <VolunteerMapDrawer
             open={mapOpen}
             onClose={() => setMapOpen(false)}
@@ -248,7 +263,7 @@ const VolunteerDashboard = () => {
             isLoading={nearLoading}
           />
 
-          {/* 4. Two-column Workboard */}
+          {/* 5. Two-column Workboard */}
           <div ref={tasksRef} className="grid lg:grid-cols-2 gap-6">
             {/* Left: My Tasks */}
             <MyTasksBoard

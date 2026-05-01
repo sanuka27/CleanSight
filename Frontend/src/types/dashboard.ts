@@ -62,16 +62,18 @@ export interface VolunteerBadgeDefinition {
   name: string;
   description: string;
   icon: string;
-  criteria?: VolunteerBadgeCriteria | null;
+  criteria?: VolunteerBadgeCriteria;
+}
+
+export interface VolunteerProfileStats {
+  totalCleanups: number;
+  hoursVolunteered: number;
+  reportsResolved: number;
+  rating: number;
 }
 
 export interface VolunteerProfileSummary {
-  stats: {
-    totalCleanups: number;
-    hoursVolunteered: number;
-    reportsResolved: number;
-    rating: number;
-  };
+  stats: VolunteerProfileStats;
   badges: VolunteerBadge[];
   badgeCatalog: VolunteerBadgeDefinition[];
 }

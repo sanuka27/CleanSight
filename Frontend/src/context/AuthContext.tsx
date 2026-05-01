@@ -11,6 +11,7 @@ import { AuthContext } from "./AuthContextShared";
 import type { AppUser, AuthContextType } from "./AuthContextShared";
 
 const isDev = import.meta.env.DEV;
+const enableVisibilityRefresh = import.meta.env.VITE_ENABLE_VISIBILITY_REFRESH === "true";
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -154,16 +155,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => unsubscribe();
   }, [fetchAppUser]);
 
-  // Refresh backend profile when window regains focus/visibility to detect MongoDB role changes
+  // Optional: refresh backend profile on visibility change (disabled by default).
   useEffect(() => {
+    if (!enableVisibilityRefresh) return;
+
     const THROTTLE_MS = 30_000; // Throttle to max 1 refresh per 30 seconds
 
     const handleVisibilityChange = () => {
-      // Only refresh if:
-      // 1. User is authenticated
-      // 2. Not currently loading
-      // 3. Document is now visible
-      // 4. Enough time has passed since last refresh (throttle)
       if (
         auth.currentUser &&
         !isAppUserLoading &&
@@ -172,7 +170,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       ) {
         const now = Date.now();
         const timeSinceLastRefresh = now - lastRefreshRef.current;
-        
+
         if (timeSinceLastRefresh >= THROTTLE_MS) {
           if (isDev) {
             console.log(`[AuthContext] Visibility change detected, refreshing profile (last refresh: ${Math.round(timeSinceLastRefresh / 1000)}s ago)`);

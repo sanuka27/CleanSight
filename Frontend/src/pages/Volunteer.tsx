@@ -1,11 +1,15 @@
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MeshGradient } from "@/components/shared/MeshGradient";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
 import { Users, Star, Medal, ArrowRight, Heart, Calendar, MapPin } from "lucide-react";
+import { useAuth } from "@/context/useAuth";
+import { getUserRole } from "@/lib/role";
+import { dashboardRouteForRole } from "@/constants/roles";
 
 const opportunities = [
   {
@@ -44,6 +48,16 @@ const benefits = [
 ];
 
 const Volunteer = () => {
+  const { appUser, isAuthenticated, isLoading, isAppUserLoading, needsOnboarding } = useAuth();
+  const role = getUserRole(appUser);
+  const isProfileLoading = isLoading || isAppUserLoading;
+  const dashboardPath = dashboardRouteForRole(role);
+  const showDashboardCta = isAuthenticated && !needsOnboarding && role !== "citizen";
+
+  if (!isProfileLoading && isAuthenticated && !needsOnboarding && role !== "citizen") {
+    return <Navigate to={dashboardPath} replace />;
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
@@ -71,9 +85,43 @@ const Volunteer = () => {
                 Join our community of volunteers transforming neighborhoods one cleanup at a time.
               </p>
               
-              <Button size="lg" className="gradient-primary text-white shadow-glow hover:shadow-glow-lg text-lg px-8 py-6 rounded-xl">
-                Sign Up as Volunteer
-              </Button>
+              {isProfileLoading ? (
+                <Button
+                  size="lg"
+                  disabled
+                  className="gradient-primary text-white shadow-glow text-lg px-8 py-6 rounded-xl"
+                >
+                  Loading profile...
+                </Button>
+              ) : showDashboardCta ? (
+                <Button
+                  asChild
+                  size="lg"
+                  className="gradient-primary text-white shadow-glow hover:shadow-glow-lg text-lg px-8 py-6 rounded-xl"
+                >
+                  <Link to={dashboardPath}>
+                    {role === "volunteer" ? "Go to Volunteer Dashboard" : "Go to Dashboard"}
+                  </Link>
+                </Button>
+              ) : needsOnboarding ? (
+                <Button
+                  asChild
+                  size="lg"
+                  className="gradient-primary text-white shadow-glow hover:shadow-glow-lg text-lg px-8 py-6 rounded-xl"
+                >
+                  <Link to="/onboarding/role">Complete Your Role Setup</Link>
+                </Button>
+              ) : (
+                <Button
+                  asChild
+                  size="lg"
+                  className="gradient-primary text-white shadow-glow hover:shadow-glow-lg text-lg px-8 py-6 rounded-xl"
+                >
+                  <Link to={isAuthenticated ? "/dashboard" : "/signup"}>
+                    Sign Up as Volunteer
+                  </Link>
+                </Button>
+              )}
             </RevealOnScroll>
           </div>
         </section>

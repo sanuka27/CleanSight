@@ -52,9 +52,11 @@ const volunteerSchema = new mongoose.Schema({
     rating: { type: Number, default: 5, min: 1, max: 5 }
   },
   badges: [{
+    id: String,
     name: String,
-    earnedAt: Date,
-    icon: String
+    description: String,
+    icon: String,
+    earnedAt: Date
   }],
   isActive: {
     type: Boolean,

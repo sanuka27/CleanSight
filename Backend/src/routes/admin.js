@@ -9,6 +9,7 @@ import Settings from '../models/Settings.js';
 import AuditLog from '../models/AuditLog.js';
 import { logAdminAction } from '../services/auditLogService.js';
 import { predictCategoryWithML } from '../services/mlService.js';
+import { recordVolunteerResolutions } from '../services/volunteerProgressService.js';
 import { resolveDateRange } from '../utils/dateRange.js';
 import { REPORT_STATUS, isValidTransition } from '../constants/reportStatus.js';
 import { ALL_ROLES } from '../constants/roles.js';
@@ -287,6 +288,7 @@ router.post('/reports/bulk/status', async (req, res) => {
     const succeeded = [];
     const failed = [];
     const bulkOps = [];
+    const resolvedAssignments = [];
 
     for (const id of uniqueIds) {
       const report = existingMap[id];
@@ -308,6 +310,10 @@ router.post('/reports/bulk/status', async (req, res) => {
       if (status === REPORT_STATUS.ASSIGNED && !report.assignedTo) {
         failed.push({ id, reason: 'Cannot set status to assigned without assignedTo' });
         continue;
+      }
+
+      if (status === REPORT_STATUS.RESOLVED && report.assignedTo) {
+        resolvedAssignments.push(report.assignedTo);
       }
 
       const now = new Date();
@@ -343,6 +349,10 @@ router.post('/reports/bulk/status', async (req, res) => {
 
     if (bulkOps.length > 0) {
       await Report.bulkWrite(bulkOps, { ordered: false });
+    }
+
+    if (resolvedAssignments.length > 0) {
+      await recordVolunteerResolutions(resolvedAssignments);
     }
 
     logAdminAction({
@@ -962,6 +972,10 @@ router.patch('/reports/:id/status', async (req, res) => {
     }
 
     await report.save();
+
+    if (status === REPORT_STATUS.RESOLVED && statusFrom !== REPORT_STATUS.RESOLVED) {
+      await recordVolunteerResolutions([report.assignedTo]);
+    }
     const reportData = report.toObject();
 
     logAdminAction({

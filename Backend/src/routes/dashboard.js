@@ -15,7 +15,9 @@ import express from 'express';
 import verifyToken from '../middleware/verifyToken.js';
 import User from '../models/User.js';
 import Report from '../models/Report.js';
+import Volunteer from '../models/Volunteer.js';
 import { ROLES } from '../constants/roles.js';
+import { VOLUNTEER_BADGES } from '../constants/volunteerBadges.js';
 import {
   getStatusBreakdown,
   getReportsPerDay,
@@ -207,6 +209,27 @@ router.get(
 
       const myStats = myStatsResult || { assignedCount: 0, resolvedCount: 0 };
 
+      const volunteerProfile = await Volunteer.findOne({ user: req.dbUser._id })
+        .select('stats badges')
+        .lean();
+
+      const volunteerStats = volunteerProfile?.stats || {
+        totalCleanups: 0,
+        hoursVolunteered: 0,
+        reportsResolved: 0,
+        rating: 5,
+      };
+
+      const earnedBadges = volunteerProfile?.badges || [];
+
+      const badgeCatalog = VOLUNTEER_BADGES.map((badge) => ({
+        id: badge.id,
+        name: badge.name,
+        description: badge.description,
+        icon: badge.icon,
+        criteria: badge.criteria || null,
+      }));
+
       res.json({
         success: true,
         data: {
@@ -216,6 +239,11 @@ router.get(
           myStats: {
             assignedCount: myStats.assignedCount,
             resolvedCount: myStats.resolvedCount,
+          },
+          volunteerProfile: {
+            stats: volunteerStats,
+            badges: earnedBadges,
+            badgeCatalog,
           },
         },
       });

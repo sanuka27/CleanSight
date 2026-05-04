@@ -4,6 +4,8 @@ import Report from '../models/Report.js';
 import User from '../models/User.js';
 import verifyToken from '../middleware/verifyToken.js';
 import { predictCategoryWithML, validateImageWithML } from '../services/mlService.js';
+import { awardCitizenBadges } from '../services/badgeService.js';
+import { recordVolunteerResolutions } from '../services/volunteerProgressService.js';
 import { 
   REPORT_STATUS, 
   isValidTransition, 
@@ -154,14 +156,21 @@ router.post('/', verifyToken, async (req, res) => {
     });
 
     // Increment user's report count
-    await User.findOneAndUpdate(
+    const updatedUser = await User.findOneAndUpdate(
       { firebaseUid },
-      { $inc: { reportsSubmitted: 1 } }
+      { $inc: { reportsSubmitted: 1 } },
+      { new: true }
     );
+
+    let newlyEarnedBadges = [];
+    if (updatedUser && updatedUser.role === ROLES.CITIZEN) {
+      newlyEarnedBadges = await awardCitizenBadges(updatedUser);
+    }
 
     res.status(201).json({
       success: true,
-      data: report
+      data: report,
+      newlyEarnedBadges
     });
   } catch (error) {
     console.error('Create report error:', error);
@@ -229,6 +238,8 @@ router.get('/:id', verifyToken, async (req, res) => {
     if (!report) {
       return res.status(404).json({ success: false, message: 'Report not found' });
     }
+
+    const previousStatus = report.status;
 
     res.json({ success: true, data: report });
   } catch (error) {
@@ -453,6 +464,8 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Report not found' });
     }
 
+    const previousStatus = report.status;
+
     // Validate transition using centralized logic
     if (!isValidTransition(report.status, newStatus)) {
       return res.status(400).json({
@@ -474,10 +487,15 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
       }
       // Set resolvedAt timestamp
       report.resolvedAt = new Date();
+      report.resolvedByUid = firebaseUid;
     }
 
     report.status = newStatus;
     await report.save();
+
+    if (newStatus === REPORT_STATUS.RESOLVED && previousStatus !== REPORT_STATUS.RESOLVED) {
+      await recordVolunteerResolutions([report.assignedTo]);
+    }
 
     res.json({ success: true, data: report });
   } catch (error) {

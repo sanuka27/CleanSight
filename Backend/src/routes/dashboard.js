@@ -17,6 +17,7 @@ import User from '../models/User.js';
 import Report from '../models/Report.js';
 import Volunteer from '../models/Volunteer.js';
 import { ROLES } from '../constants/roles.js';
+import { CITIZEN_BADGES } from '../constants/citizenBadges.js';
 import { VOLUNTEER_BADGES } from '../constants/volunteerBadges.js';
 import {
   getStatusBreakdown,
@@ -106,6 +107,7 @@ router.get(
   async (req, res) => {
     try {
       const { firebaseUid } = req.user;
+      const user = req.dbUser;
 
       // My report totals
       const myFilter = { firebaseUid };
@@ -132,11 +134,26 @@ router.get(
         .select('_id title status wasteType urgency createdAt updatedAt imageUrl location description')
         .lean();
 
+      const badgeCatalog = CITIZEN_BADGES.map((badge) => ({
+        id: badge.id,
+        name: badge.name,
+        description: badge.description,
+        icon: badge.icon,
+        criteria: badge.criteria || null,
+      }));
+
+      const citizenProfile = {
+        reportsSubmitted: user?.reportsSubmitted ?? myTotals.total,
+        badges: user?.badges || [],
+        badgeCatalog,
+      };
+
       res.json({
         success: true,
         data: {
           myTotals,
           recentReports,
+          citizenProfile,
         },
       });
     } catch (err) {

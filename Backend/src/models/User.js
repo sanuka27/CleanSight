@@ -73,6 +73,16 @@ const userSchema = new mongoose.Schema({
     default: 0,
     min: [0, 'Cleanups completed cannot be negative']
   },
+  badges: [{
+    id: String,
+    name: String,
+    description: String,
+    icon: String,
+    earnedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   lastActiveAt: {
     type: Date,
     default: null

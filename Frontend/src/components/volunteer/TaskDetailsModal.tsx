@@ -284,7 +284,7 @@ export function TaskDetailsModal({
                       onClick={() => { onOpenMap(report); onClose(); }}
                     >
                       <ExternalLink className="w-4 h-4" />
-                      Open on Map
+                      Open in Google Maps
                     </Button>
                   )}
                 </div>

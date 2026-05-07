@@ -74,6 +74,8 @@ router.post('/register', verifyToken, asyncHandler(async (req, res) => {
     });
   }
 
+  const normalizedEmail = email.toLowerCase().trim();
+
   // Check if user already exists with this Firebase UID
   const existingUser = await User.findOne({ firebaseUid });
   if (existingUser) {
@@ -94,11 +96,58 @@ router.post('/register', verifyToken, asyncHandler(async (req, res) => {
   }
 
   // Check if email is already taken by another account
-  const emailTaken = await User.findOne({ email: email.toLowerCase() });
+  const emailTaken = await User.findOne({ email: normalizedEmail });
   if (emailTaken) {
-    return res.status(409).json({
-      success: false,
-      message: 'An account with this email already exists',
+    // If the email belongs to the same Firebase UID, treat as already registered.
+    if (emailTaken.firebaseUid === firebaseUid) {
+      return res.status(200).json({
+        success: true,
+        message: 'User already registered',
+        data: {
+          user: {
+            id: emailTaken._id,
+            firebaseUid: emailTaken.firebaseUid,
+            name: emailTaken.name,
+            email: emailTaken.email,
+            role: emailTaken.role,
+            createdAt: emailTaken.createdAt,
+          },
+        },
+      });
+    }
+
+    const tokenEmail = req.user?.email ? req.user.email.toLowerCase().trim() : '';
+    if (!tokenEmail || tokenEmail !== emailTaken.email) {
+      return res.status(409).json({
+        success: false,
+        message: 'An account with this email already exists',
+      });
+    }
+
+    // Re-link the profile to the new Firebase UID (e.g., Firebase user deleted/recreated)
+    emailTaken.firebaseUid = firebaseUid;
+    emailTaken.name = name.trim();
+    emailTaken.email = normalizedEmail;
+
+    if (SELF_ASSIGNABLE_ROLES.includes(emailTaken.role) && SELF_ASSIGNABLE_ROLES.includes(role)) {
+      emailTaken.role = role;
+    }
+
+    await emailTaken.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'User re-linked successfully',
+      data: {
+        user: {
+          id: emailTaken._id,
+          firebaseUid: emailTaken.firebaseUid,
+          name: emailTaken.name,
+          email: emailTaken.email,
+          role: emailTaken.role,
+          createdAt: emailTaken.createdAt,
+        },
+      },
     });
   }
 
@@ -106,7 +155,7 @@ router.post('/register', verifyToken, asyncHandler(async (req, res) => {
   const user = await User.create({
     firebaseUid,
     name: name.trim(),
-    email: email.toLowerCase().trim(),
+    email: normalizedEmail,
     role,
   });
 

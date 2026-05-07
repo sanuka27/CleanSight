@@ -5,6 +5,7 @@ import { useCitizenDashboardQuery } from "@/hooks/useDashboardQueries";
 import { DashboardHeader } from "@/components/citizen/DashboardHeader";
 import { StatsCards } from "@/components/citizen/StatsCards";
 import { InsightCards } from "@/components/citizen/InsightCards";
+import { CitizenBadgesPanel } from "@/components/citizen/CitizenBadgesPanel";
 import { MyReportsTable } from "@/components/citizen/MyReportsTable";
 import { QuickActions } from "@/components/citizen/QuickActions";
 import { RecentActivityPanel } from "@/components/citizen/RecentActivityPanel";
@@ -35,6 +36,10 @@ const CitizenDashboard = () => {
     resolved: 0,
   };
   const reports = data?.recentReports ?? [];
+  const citizenProfile = data?.citizenProfile;
+  const citizenBadges = citizenProfile?.badges ?? [];
+  const badgeCatalog = citizenProfile?.badgeCatalog ?? [];
+  const reportsSubmitted = citizenProfile?.reportsSubmitted ?? totals.total;
 
   const handleViewDetails = useCallback((report: DashboardReport) => {
     setSelectedReport(report);
@@ -93,6 +98,14 @@ const CitizenDashboard = () => {
 
           {/* Stats cards row */}
           <StatsCards totals={totals} isLoading={isLoading} />
+
+          {/* Citizen badges */}
+          <CitizenBadgesPanel
+            badges={citizenBadges}
+            catalog={badgeCatalog}
+            reportsSubmitted={reportsSubmitted}
+            isLoading={isLoading}
+          />
 
           {/* Insight cards — computed metrics */}
           <InsightCards

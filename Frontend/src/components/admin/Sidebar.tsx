@@ -43,6 +43,12 @@ export function AdminSidebar({ collapsed, onToggle }: SidebarProps) {
     return location.pathname.startsWith(item.path);
   };
 
+  const handleNavClick = () => {
+    if (collapsed) {
+      onToggle();
+    }
+  };
+
   return (
     <motion.aside
       animate={{ width: collapsed ? 72 : 240 }}
@@ -79,6 +85,7 @@ export function AdminSidebar({ collapsed, onToggle }: SidebarProps) {
               key={item.path}
               to={item.path}
               end={item.end}
+              onClick={handleNavClick}
               className={({ isActive }) =>
                 cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group cursor-pointer",

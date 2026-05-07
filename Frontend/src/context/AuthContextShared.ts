@@ -30,7 +30,7 @@ export interface AuthContextType {
   /** Set when a forced logout is triggered by account suspension. */
   suspendedMessage: string | null;
   logout: () => Promise<void>;
-  refreshAppUser: () => Promise<void>;
+  refreshAppUser: () => Promise<AppUser | null>;
   /**
    * Call BEFORE a Firebase sign-in / sign-up method so that the concurrent
    * onAuthStateChanged -> fetchAppUser flow does not auto-sign-out the user

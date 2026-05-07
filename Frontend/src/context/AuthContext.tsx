@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   /** Fetch backend profile from /api/auth/me */
-  const fetchAppUser = useCallback(async () => {
+  const fetchAppUser = useCallback(async (): Promise<AppUser | null> => {
     setIsAppUserLoading(true);
     setAppUserError(null);
     try {
@@ -69,11 +69,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         // Profile found — any in-progress sign-in flow is complete.
         signingInRef.current = false;
+        return newUser;
       } else {
         // Profile not found — user may not have completed registration yet.
         // This is normal during signup (register hasn't been called yet).
         setAppUser(null);
         prevRoleRef.current = null;
+        return null;
       }
     } catch (err: unknown) {
       // Handle auth errors (token expired, forbidden, etc.)
@@ -94,7 +96,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           setAppUser(null);
           prevRoleRef.current = null;
           await firebaseSignOut(auth);
-          return;
+          return null;
         }
         
         // 404 means the backend has no profile for this Firebase user.
@@ -114,7 +116,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             prevRoleRef.current = null;
             await firebaseSignOut(auth);
           }
-          return;
+          return null;
         }
       }
       
@@ -124,16 +126,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setAppUserError(message);
       setAppUser(null);
       prevRoleRef.current = null;
+      return null;
     } finally {
       setIsAppUserLoading(false);
     }
   }, []);
 
   /** Public method to re-fetch the backend profile */
-  const refreshAppUser = useCallback(async () => {
+  const refreshAppUser = useCallback(async (): Promise<AppUser | null> => {
     if (auth.currentUser) {
-      await fetchAppUser();
+      return await fetchAppUser();
     }
+    return null;
   }, [fetchAppUser]);
 
   useEffect(() => {

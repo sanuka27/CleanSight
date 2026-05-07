@@ -140,7 +140,7 @@ export function VolunteerTaskCard({
                 onClick={() => onOpenMap(report)}
               >
                 <ExternalLink className="w-3 h-3" />
-                Open on Map
+                Open in Google Maps
               </Button>
             )}
           </div>

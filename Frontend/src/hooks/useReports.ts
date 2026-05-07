@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { uploadImage } from "@/lib/upload";
+import { queryKeys } from "@/lib/queryKeys";
 
 interface ReportLocation {
   lat: number;
@@ -42,6 +44,7 @@ interface CreateReportResponse {
 export function useReports() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   /**
    * Create a new report.
@@ -69,6 +72,10 @@ export function useReports() {
         wasteType,
         urgency,
       });
+
+      // Keep report lists + dashboards in sync with the new report
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
 
       return response.data;
     } catch (err: unknown) {
@@ -127,6 +134,10 @@ export function useReports() {
 
     try {
       const response = await api.assignSelf(reportId);
+
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+
       return response.data;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to assign report";
@@ -146,6 +157,10 @@ export function useReports() {
 
     try {
       const response = await api.assignReport(reportId, volunteerUid);
+
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+
       return response.data;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to assign report";
@@ -165,6 +180,10 @@ export function useReports() {
 
     try {
       const response = await api.updateReportStatus(reportId, status);
+
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+
       return response.data;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to update status";

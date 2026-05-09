@@ -8,7 +8,7 @@ import { Leaf, Mail, Lock, User, ArrowRight, Eye, EyeOff, Shield, Users, Globe }
 import { MeshGradient } from "@/components/shared/MeshGradient";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/context/useAuth";
 import { getUserProfile } from "@/services/userProfile";
 import { signInWithSocial, type SocialProvider } from "@/services/socialAuth";
@@ -57,7 +57,11 @@ const Signup = () => {
       navigate("/dashboard");
     } catch (error: unknown) {
       console.error("Signup error:", error);
-      toast.error(mapFirebaseAuthErrorToMessage(error, "Registration"));
+      if (error instanceof ApiError) {
+        toast.error(error.message);
+      } else {
+        toast.error(mapFirebaseAuthErrorToMessage(error, "Registration"));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +88,11 @@ const Signup = () => {
     } catch (error: unknown) {
       const label = AUTH_PROVIDERS[providerType]?.label ?? providerType;
       console.error(`${label} sign-up error:`, error);
-      toast.error(mapFirebaseAuthErrorToMessage(error, `${label} sign-up`));
+      if (error instanceof ApiError) {
+        toast.error(error.message);
+      } else {
+        toast.error(mapFirebaseAuthErrorToMessage(error, `${label} sign-up`));
+      }
     } finally {
       setIsLoading(false);
     }

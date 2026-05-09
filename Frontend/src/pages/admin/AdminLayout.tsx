@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AdminSidebar } from "@/components/admin/Sidebar";
@@ -7,8 +7,24 @@ export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const toggle = () => setCollapsed((c) => !c);
 
+  useEffect(() => {
+    // Warm admin route chunks to avoid full-page loading flashes on nav.
+    void Promise.allSettled([
+      import("./Overview"),
+      import("./Reports"),
+      import("./AdminMapView"),
+      import("./Volunteers"),
+      import("./Users"),
+      import("./Analytics"),
+      import("./MLAnalytics"),
+      import("./Documents"),
+      import("./AuditLog"),
+      import("./Settings"),
+    ]);
+  }, []);
+
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="h-screen flex bg-background overflow-hidden">
       {/* Sticky sidebar wrapper — overflow-visible so the toggle button can bleed out */}
       <div
         className="relative hidden lg:flex shrink-0 sticky top-0 h-screen"
@@ -32,7 +48,7 @@ export default function AdminLayout() {
       </div>
 
       {/* Main scroll area */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
+      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto overflow-x-hidden">
         <Outlet />
       </div>
     </div>

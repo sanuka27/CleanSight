@@ -9,7 +9,6 @@ import { MeshGradient } from "@/components/shared/MeshGradient";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/context/useAuth";
-import { getUserProfile } from "@/services/userProfile";
 import { signInWithSocial, type SocialProvider } from "@/services/socialAuth";
 import { mapFirebaseAuthErrorToMessage } from "@/utils/authErrors";
 import { AUTH_PROVIDERS } from "@/constants/authProviders";
@@ -33,11 +32,16 @@ const Login = () => {
       await signInWithEmailAndPassword(auth, email, password);
 
       // Ensure backend profile is loaded before navigating
-      await refreshAppUser();
+      const profile = await refreshAppUser();
 
       // A suspended account causes refreshAppUser to force a sign-out (403)
       // without throwing. Guard against navigating after a forced logout.
       if (!auth.currentUser) return;
+
+      if (!profile?.role) {
+        navigate(ONBOARDING_ROUTE);
+        return;
+      }
 
       toast.success("Welcome back!");
       navigate("/dashboard");
@@ -55,12 +59,12 @@ const Login = () => {
       markSigningIn();
       await signInWithSocial(providerType);
 
-      // Check whether the backend profile already exists
-      const profile = await getUserProfile();
+      // Hydrate backend profile once and route based on existence
+      const profile = await refreshAppUser();
+
+      if (!auth.currentUser) return;
 
       if (profile?.role) {
-        // Returning user — hydrate context and go to dashboard
-        await refreshAppUser();
         toast.success("Welcome back!");
         navigate("/dashboard");
       } else {

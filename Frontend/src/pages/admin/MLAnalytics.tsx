@@ -53,11 +53,11 @@ export default function MLAnalytics() {
   const to = range === "custom" && customDates.to ? customDates.to : undefined;
 
   // React Query hooks
-  const { data: summaryRes, isLoading: summaryLoading, refetch } = useMLSummaryQuery(range, from, to);
-  const { data: phase1Res, isLoading: phase1Loading } = usePhase1MetricsQuery(range, from, to);
-  const { data: phase2Res, isLoading: phase2Loading } = usePhase2MetricsQuery(range, from, to);
-  const { data: trendsRes, isLoading: trendsLoading } = useMLTrendsQuery(range, from, to);
-  const { data: weakRes, isLoading: weakLoading } = useWeakPointsQuery(range, from, to);
+  const { data: summaryRes, isLoading: summaryLoading, refetch: refetchSummary } = useMLSummaryQuery(range, from, to);
+  const { data: phase1Res, isLoading: phase1Loading, refetch: refetchPhase1 } = usePhase1MetricsQuery(range, from, to);
+  const { data: phase2Res, isLoading: phase2Loading, refetch: refetchPhase2 } = usePhase2MetricsQuery(range, from, to);
+  const { data: trendsRes, isLoading: trendsLoading, refetch: refetchTrends } = useMLTrendsQuery(range, from, to);
+  const { data: weakRes, isLoading: weakLoading, refetch: refetchWeakPoints } = useWeakPointsQuery(range, from, to);
 
   const summary = summaryRes?.data ?? null;
   const phase1 = phase1Res?.data ?? null;
@@ -109,7 +109,19 @@ export default function MLAnalytics() {
           <p className="text-sm text-muted-foreground">
             {loading ? "Loading…" : `Showing data: ${RANGE_LABELS[range]}`}
           </p>
-          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={loading} className="gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              refetchSummary();
+              refetchPhase1();
+              refetchPhase2();
+              refetchTrends();
+              refetchWeakPoints();
+            }}
+            disabled={loading}
+            className="gap-1.5"
+          >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>

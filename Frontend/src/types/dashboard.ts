@@ -27,9 +27,36 @@ export interface DashboardReport {
 
 /* ── Citizen Dashboard ───────────────────────────────────────────── */
 
+export interface CitizenBadge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  earnedAt: string;
+}
+
+export interface CitizenBadgeCriteria {
+  reportsSubmitted?: number;
+}
+
+export interface CitizenBadgeDefinition {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  criteria?: CitizenBadgeCriteria | null;
+}
+
+export interface CitizenProfileSummary {
+  reportsSubmitted: number;
+  badges: CitizenBadge[];
+  badgeCatalog: CitizenBadgeDefinition[];
+}
+
 export interface CitizenDashboardData {
   myTotals: StatusTotals;
   recentReports: DashboardReport[];
+  citizenProfile: CitizenProfileSummary;
 }
 
 export interface CitizenDashboardResponse {

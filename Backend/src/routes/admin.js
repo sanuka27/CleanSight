@@ -1,9 +1,11 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import { firebaseAdmin } from '../config/firebaseAdmin.js';
 import { adminOnly } from '../middleware/adminAuth.js';
 import Report from '../models/Report.js';
 import User from '../models/User.js';
 import Volunteer from '../models/Volunteer.js';
+import DeletedAccount from '../models/DeletedAccount.js';
 import Document from '../models/Document.js';
 import Settings from '../models/Settings.js';
 import AuditLog from '../models/AuditLog.js';
@@ -1909,7 +1911,7 @@ router.get('/users/:id', async (req, res) => {
     const user = await User.findById(id).select(USER_SAFE_FIELDS).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const [reportsCount, tasksCount, lastReport] = await Promise.all([
+    const [reportsCount, tasksCount, lastReport, deletedAccount] = await Promise.all([
       Report.countDocuments({ firebaseUid: user.firebaseUid }),
       user.role === 'volunteer'
         ? Report.countDocuments({ assignedTo: user.firebaseUid, status: 'resolved' })
@@ -1918,12 +1920,21 @@ router.get('/users/:id', async (req, res) => {
         .sort({ createdAt: -1 })
         .select('createdAt')
         .lean(),
+      DeletedAccount.findOne({ firebaseUid: user.firebaseUid })
+        .select('reason deletedAt')
+        .lean(),
     ]);
+
+    const userWithDeletion = {
+      ...user,
+      deletedReason: deletedAccount?.reason || null,
+      deletedAt: deletedAccount?.deletedAt || null,
+    };
 
     res.json({
       success: true,
       data: {
-        user,
+        user: userWithDeletion,
         stats: {
           reportsSubmitted: reportsCount,
           tasksCompleted: tasksCount,
@@ -2045,6 +2056,103 @@ router.patch('/users/:id/suspend', async (req, res) => {
     res.json({ success: true, data: safeUser });
   } catch (err) {
     console.error('Admin suspend user error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/users/:id
+ * Body: { reason: string }
+ */
+router.delete('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    const reasonText = typeof reason === 'string' ? reason.trim() : '';
+
+    if (!reasonText) {
+      return res.status(400).json({ success: false, message: 'Deletion reason is required' });
+    }
+    if (reasonText.length > 500) {
+      return res.status(400).json({ success: false, message: 'Deletion reason must be 500 characters or less' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
+    const target = await User.findById(id);
+    if (!target) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Prevent deleting your own account
+    if (target.firebaseUid === req.adminUser.firebaseUid) {
+      return res.status(400).json({ success: false, message: 'Cannot delete your own account.' });
+    }
+
+    // Prevent deleting the last admin account
+    if (target.role === 'admin') {
+      const otherAdminCount = await User.countDocuments({
+        role: 'admin',
+        _id: { $ne: target._id },
+      });
+      if (otherAdminCount === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot delete the only admin. Promote another user first.',
+        });
+      }
+    }
+
+    let firebaseWarning = null;
+    try {
+      await firebaseAdmin.auth().deleteUser(target.firebaseUid);
+    } catch (err) {
+      if (err?.code !== 'auth/user-not-found') {
+        firebaseWarning = err;
+      }
+    }
+
+    await DeletedAccount.findOneAndUpdate(
+      { firebaseUid: target.firebaseUid },
+      {
+        $set: {
+          firebaseUid: target.firebaseUid,
+          reason: reasonText,
+          deletedAt: new Date(),
+          deletedByUid: req.adminUser.firebaseUid,
+          deletedByEmail: req.adminUser.email || null,
+          targetEmail: target.email,
+          targetName: target.name,
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    await Promise.all([
+      User.deleteOne({ _id: target._id }),
+      Volunteer.deleteOne({ user: target._id }),
+    ]);
+
+    await logAdminAction({
+      req,
+      actor: req.adminUser,
+      action: 'USER_DELETED',
+      entityType: 'user',
+      entityId: target._id.toString(),
+      metadata: {
+        targetEmail: target.email,
+        targetUid: target.firebaseUid,
+        reason: reasonText,
+      },
+    });
+
+    const response = { success: true, message: 'User deleted successfully' };
+    if (firebaseWarning) {
+      response.warning = `Firebase deletion warning: ${firebaseWarning.message || 'Unknown error'}`;
+    }
+
+    res.json(response);
+  } catch (err) {
+    console.error('Admin delete user error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

@@ -204,8 +204,12 @@ const VolunteerDashboard = () => {
       }
 
       const [lng, lat] = report.location.coordinates;
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
-      window.open(url, "_blank", "noopener,noreferrer");
+      const destination = encodeURIComponent(`${lat},${lng}`);
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+      const newWindow = window.open(url, "_blank", "noopener,noreferrer");
+      if (newWindow) {
+        newWindow.opener = null;
+      }
     },
     [toast]
   );

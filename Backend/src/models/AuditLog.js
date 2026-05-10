@@ -33,6 +33,7 @@ const AuditLogSchema = new mongoose.Schema(
         'SETTINGS_UPDATED',
         'USER_ROLE_CHANGED',
         'USER_SUSPENDED',
+        'USER_DELETED',
       ],
     },
     entityType: {

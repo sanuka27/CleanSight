@@ -1,5 +1,6 @@
 import { firebaseAdmin } from '../config/firebaseAdmin.js';
 import User from '../models/User.js';
+import DeletedAccount from '../models/DeletedAccount.js';
 
 export const verifyToken = async (req, res, next) => {
   try {
@@ -22,8 +23,8 @@ export const verifyToken = async (req, res, next) => {
       });
     }
 
-    // Verify Firebase ID token
-    const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
+    // Verify Firebase ID token (check revocation to detect deleted/disabled users)
+    const decodedToken = await firebaseAdmin.auth().verifyIdToken(token, true);
 
     // Look up the user in the database to check suspension and attach full profile
     let dbUser;
@@ -37,12 +38,26 @@ export const verifyToken = async (req, res, next) => {
       });
     }
 
+    if (!dbUser) {
+      const deletedAccount = await DeletedAccount.findOne({ firebaseUid: decodedToken.uid }).lean();
+      if (deletedAccount) {
+        return res.status(410).json({
+          success: false,
+          message: 'Account removed',
+          deleted: true,
+          deletedReason: deletedAccount.reason,
+          deletedAt: deletedAccount.deletedAt,
+        });
+      }
+    }
+
     // If user exists and is suspended, block access
     if (dbUser && dbUser.isSuspended) {
       return res.status(403).json({
         success: false,
         message: 'Account suspended',
         suspended: true,
+        suspendedReason: dbUser.suspendedReason || null,
       });
     }
 
@@ -56,10 +71,17 @@ export const verifyToken = async (req, res, next) => {
   } catch (error) {
     console.error('Token verification error:', error);
     
-    if (error.code === 'auth/id-token-expired') {
+    if (error.code === 'auth/id-token-expired' || error.code === 'auth/id-token-revoked') {
       return res.status(401).json({ 
         success: false,
         message: 'Token expired. Please log in again.' 
+      });
+    }
+
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/user-disabled') {
+      return res.status(401).json({
+        success: false,
+        message: 'User account is no longer available. Please log in again.',
       });
     }
     

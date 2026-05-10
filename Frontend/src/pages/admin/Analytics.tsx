@@ -22,9 +22,9 @@ export default function AdminAnalytics() {
   const to = customDates.to || undefined;
 
   // React Query hooks
-  const { data: overviewRes, isLoading: overviewLoading, refetch } = useAdminOverviewQuery(range, from, to);
-  const { data: trendsRes, isLoading: trendsLoading } = useAdminTrendsQuery(range, from, to);
-  const { data: volPerfRes, isLoading: volPerfLoading } = useVolunteerPerformanceQuery(range);
+  const { data: overviewRes, isLoading: overviewLoading, refetch: refetchOverview } = useAdminOverviewQuery(range, from, to);
+  const { data: trendsRes, isLoading: trendsLoading, refetch: refetchTrends } = useAdminTrendsQuery(range, from, to);
+  const { data: volPerfRes, isLoading: volPerfLoading, refetch: refetchVolPerf } = useVolunteerPerformanceQuery(range);
 
   const overview = overviewRes?.data ?? null;
   const trends = trendsRes?.data ?? [];
@@ -46,7 +46,17 @@ export default function AdminAnalytics() {
           <p className="text-sm text-muted-foreground">
             {loading ? "Loading…" : `Showing data: ${RANGE_LABELS[range]}`}
           </p>
-          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={loading} className="gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              refetchOverview();
+              refetchTrends();
+              refetchVolPerf();
+            }}
+            disabled={loading}
+            className="gap-1.5"
+          >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>

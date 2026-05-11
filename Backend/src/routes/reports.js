@@ -113,8 +113,9 @@ router.post('/', verifyToken, async (req, res) => {
         aiReviewStatus = 'approved';
       }
 
-      // Run Phase 2 only when Phase 1 is auto-approved as trash.
-      if (imageValidationLabel === 'trash' && aiReviewStatus === 'approved') {
+      // Run Phase 2 whenever Phase 1 labels trash (even if manual review).
+      // If Phase 1 is not approved, force category review to manual review.
+      if (imageValidationLabel === 'trash') {
         const categoryPrediction = await predictCategoryWithML(imageUrl);
 
         if (categoryPrediction.success) {
@@ -124,6 +125,9 @@ router.post('/', verifyToken, async (req, res) => {
           wasteCategoryConfidenceLevel = categoryPrediction.confidenceLevel;
           wasteCategoryAllPredictions = categoryPrediction.allPredictions;
           wasteCategoryReviewStatus = categoryPrediction.reviewStatus;
+          if (aiReviewStatus !== 'approved') {
+            wasteCategoryReviewStatus = 'manual_review';
+          }
         } else {
           console.warn('Phase 2 prediction failed:', categoryPrediction.error);
           wasteCategoryPredictedLabel = 'error';

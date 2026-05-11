@@ -18,15 +18,24 @@ export async function recordVolunteerResolutions(assignedToUids = []) {
     const user = await User.findOne({ firebaseUid: uid });
     if (!user) continue;
 
-    await User.updateOne(
+    const updatedUser = await User.findOneAndUpdate(
       { _id: user._id },
-      { $inc: { cleanupsCompleted: count } }
+      { $inc: { cleanupsCompleted: count } },
+      { new: true }
     );
+
+    const totalCleanups = updatedUser?.cleanupsCompleted ?? (user.cleanupsCompleted + count);
 
     const volunteer = await Volunteer.findOneAndUpdate(
       { user: user._id },
-      { $inc: { 'stats.totalCleanups': count, 'stats.reportsResolved': count } },
-      { new: true }
+      {
+        $setOnInsert: { user: user._id, isActive: true },
+        $set: {
+          'stats.totalCleanups': totalCleanups,
+          'stats.reportsResolved': totalCleanups,
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
     if (!volunteer) continue;

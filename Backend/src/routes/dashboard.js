@@ -19,6 +19,7 @@ import Volunteer from '../models/Volunteer.js';
 import { ROLES } from '../constants/roles.js';
 import { CITIZEN_BADGES } from '../constants/citizenBadges.js';
 import { VOLUNTEER_BADGES } from '../constants/volunteerBadges.js';
+import { awardCitizenBadges, awardVolunteerBadges } from '../services/badgeService.js';
 import {
   getStatusBreakdown,
   getReportsPerDay,
@@ -142,9 +143,24 @@ router.get(
         criteria: badge.criteria || null,
       }));
 
+      let earnedBadges = user?.badges || [];
+      let newlyEarnedBadges = [];
+      if (user) {
+        newlyEarnedBadges = await awardCitizenBadges(user);
+        if (newlyEarnedBadges.length > 0) {
+          const existingIds = new Set(earnedBadges.map((b) => b.id || b.name).filter(Boolean));
+          newlyEarnedBadges.forEach((badge) => {
+            const key = badge.id || badge.name;
+            if (key && !existingIds.has(key)) {
+              earnedBadges.push(badge);
+            }
+          });
+        }
+      }
+
       const citizenProfile = {
         reportsSubmitted: user?.reportsSubmitted ?? myTotals.total,
-        badges: user?.badges || [],
+        badges: earnedBadges,
         badgeCatalog,
       };
 
@@ -154,6 +170,7 @@ router.get(
           myTotals,
           recentReports,
           citizenProfile,
+          newlyEarnedBadges,
         },
       });
     } catch (err) {
@@ -226,9 +243,40 @@ router.get(
 
       const myStats = myStatsResult || { assignedCount: 0, resolvedCount: 0 };
 
-      const volunteerProfile = await Volunteer.findOne({ user: req.dbUser._id })
+      let volunteerProfile = await Volunteer.findOne({ user: req.dbUser._id })
         .select('stats badges')
         .lean();
+
+      if (!volunteerProfile) {
+        const created = await Volunteer.create({
+          user: req.dbUser._id,
+          isActive: true,
+          stats: {
+            totalCleanups: req.dbUser.cleanupsCompleted || 0,
+            reportsResolved: req.dbUser.cleanupsCompleted || 0,
+            hoursVolunteered: 0,
+            rating: 5,
+          },
+        });
+        volunteerProfile = created.toObject();
+      }
+
+      if (volunteerProfile?.stats) {
+        const userCleanups = req.dbUser.cleanupsCompleted || 0;
+        const trackedCleanups = volunteerProfile.stats.totalCleanups || 0;
+        if (userCleanups > trackedCleanups) {
+          volunteerProfile = await Volunteer.findOneAndUpdate(
+            { user: req.dbUser._id },
+            {
+              $set: {
+                'stats.totalCleanups': userCleanups,
+                'stats.reportsResolved': userCleanups,
+              },
+            },
+            { new: true }
+          ).select('stats badges').lean();
+        }
+      }
 
       const volunteerStats = volunteerProfile?.stats || {
         totalCleanups: 0,
@@ -237,7 +285,20 @@ router.get(
         rating: 5,
       };
 
-      const earnedBadges = volunteerProfile?.badges || [];
+      let earnedBadges = volunteerProfile?.badges || [];
+      let newlyEarnedBadges = [];
+      if (volunteerProfile) {
+        newlyEarnedBadges = await awardVolunteerBadges(volunteerProfile);
+        if (newlyEarnedBadges.length > 0) {
+          const existingIds = new Set(earnedBadges.map((b) => b.id || b.name).filter(Boolean));
+          newlyEarnedBadges.forEach((badge) => {
+            const key = badge.id || badge.name;
+            if (key && !existingIds.has(key)) {
+              earnedBadges.push(badge);
+            }
+          });
+        }
+      }
 
       const badgeCatalog = VOLUNTEER_BADGES.map((badge) => ({
         id: badge.id,
@@ -262,6 +323,7 @@ router.get(
             badges: earnedBadges,
             badgeCatalog,
           },
+          newlyEarnedBadges,
         },
       });
     } catch (err) {

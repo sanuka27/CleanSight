@@ -7,6 +7,7 @@ import { AnimatePresence } from "framer-motion";
 import { PageTransition } from "./components/layout/PageTransition";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { AuthSideEffects } from "./components/auth/AuthSideEffects";
 import { queryClient } from "./lib/queryClient";
 import { lazy, Suspense } from "react";
 
@@ -161,6 +162,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <AuthSideEffects />
           <AnimatedRoutes />
         </BrowserRouter>
       </AuthProvider>

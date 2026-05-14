@@ -24,7 +24,7 @@ interface ProtectedRouteProps {
 const isDev = import.meta.env.DEV;
 
 export const ProtectedRoute = ({ children, allowedRoles, expectedRole }: ProtectedRouteProps) => {
-  const { isAuthenticated, isLoading, appUser, isAppUserLoading, needsOnboarding } = useAuth();
+  const { isAuthenticated, isLoading, appUser, isAppUserLoading, needsOnboarding, accountRemovedMessage } = useAuth();
   const location = useLocation();
   /** Prevent the toast from firing on every re-render. */
   const toastedRef = useRef(false);
@@ -84,7 +84,7 @@ export const ProtectedRoute = ({ children, allowedRoles, expectedRole }: Protect
 
   // Not logged in — redirect to login
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={accountRemovedMessage ? "/" : "/login"} replace />;
   }
 
   // Wait for backend appUser to load before rendering dashboard routes

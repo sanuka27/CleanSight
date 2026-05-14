@@ -2,9 +2,11 @@ import { useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Award,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Eye,
+  Lock,
   Megaphone,
   ShieldCheck,
   Sparkles,
@@ -180,6 +182,10 @@ export function CitizenBadgesPanel({
                 label: "Badge",
               };
               const criteriaText = criteriaLabel(badge.criteria);
+              const requiredReports = badge.criteria?.reportsSubmitted ?? null;
+              const progress = requiredReports
+                ? Math.min(reportsSubmitted / requiredReports, 1)
+                : null;
 
               return (
                 <motion.div
@@ -187,39 +193,56 @@ export function CitizenBadgesPanel({
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.04 }}
-                  className={`min-w-[220px] max-w-[240px] snap-start rounded-xl border p-4 flex gap-3 ${
+                  className={`min-w-[230px] max-w-[260px] snap-start rounded-2xl border p-4 flex gap-4 relative overflow-hidden ${
                     isUnlocked
-                      ? "border-white/10 bg-background/40"
-                      : "border-white/5 bg-muted/20 opacity-70"
+                      ? "border-amber-400/60 bg-gradient-to-br from-amber-200/80 via-amber-100/60 to-transparent"
+                      : "border-white/10 bg-muted/30"
                   }`}
                 >
+                  {isUnlocked && (
+                    <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-amber-300/40 blur-2xl" />
+                  )}
                   <div
                     className={`h-12 w-12 flex items-center justify-center ${shape.frame} ${
                       isUnlocked
-                        ? "bg-gradient-to-br from-sky-500/15 via-sky-400/10 to-sky-500/30"
-                        : "bg-muted/30"
+                        ? "bg-amber-300/50 ring-1 ring-amber-400/70"
+                        : "bg-muted/40 ring-1 ring-white/10"
                     }`}
                   >
                     <Icon
                       className={`h-5 w-5 ${shape.icon} ${
-                        isUnlocked ? "text-primary" : "text-muted-foreground"
+                        isUnlocked
+                          ? "text-amber-900"
+                          : "text-muted-foreground/70"
                       }`}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold">{badge.name}</p>
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold leading-snug">
+                        {badge.name}
+                      </p>
+                      {isUnlocked ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-200 text-amber-900 px-2 py-0.5 text-[11px] font-semibold tracking-wide shrink-0">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Achieved
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-muted/40 text-muted-foreground px-2 py-0.5 text-[11px] font-semibold tracking-wide shrink-0">
+                          <Lock className="h-3 w-3" />
+                          Locked
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {badge.description}
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={isUnlocked ? "secondary" : "outline"} className="text-[11px]">
-                        {isUnlocked ? "Unlocked" : "Locked"}
-                      </Badge>
                       <span className="text-[11px] text-muted-foreground/70">
                         {shape.label}
                       </span>
                       {isUnlocked && earnedBadge?.earnedAt && (
-                        <span className="text-[11px] text-muted-foreground/70">
+                        <span className="text-[11px] text-amber-800">
                           Earned {formatEarnedDate(earnedBadge.earnedAt)}
                         </span>
                       )}
@@ -229,6 +252,22 @@ export function CitizenBadgesPanel({
                         </span>
                       )}
                     </div>
+                    {!isUnlocked && requiredReports && progress !== null && (
+                      <div className="pt-1.5">
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground/80">
+                          <span>Progress</span>
+                          <span>
+                            {Math.min(reportsSubmitted, requiredReports)}/{requiredReports}
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-muted-foreground/70"
+                            style={{ width: `${Math.round(progress * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               );

@@ -26,20 +26,34 @@ const Login = () => {
   const ACCOUNT_REMOVED_STORAGE_KEY = "cleansight.accountRemovedMessage";
 
   useEffect(() => {
-    const stored = typeof window !== "undefined"
-      ? sessionStorage.getItem(ACCOUNT_REMOVED_STORAGE_KEY)
-      : null;
+    let stored: string | null = null;
+    if (typeof window !== "undefined") {
+      try {
+        stored = sessionStorage.getItem(ACCOUNT_REMOVED_STORAGE_KEY);
+      } catch {
+        stored = null;
+      }
+    }
+
+    const clearStoredMessage = () => {
+      if (typeof window === "undefined") return;
+      try {
+        sessionStorage.removeItem(ACCOUNT_REMOVED_STORAGE_KEY);
+      } catch {
+        // Ignore storage errors.
+      }
+    };
 
     if (accountRemovedMessage) {
       setRemovedBanner(accountRemovedMessage);
-      if (stored) sessionStorage.removeItem(ACCOUNT_REMOVED_STORAGE_KEY);
+      if (stored) clearStoredMessage();
       clearAccountRemovedMessage();
       return;
     }
 
     if (stored) {
       setRemovedBanner(stored);
-      sessionStorage.removeItem(ACCOUNT_REMOVED_STORAGE_KEY);
+      clearStoredMessage();
     }
   }, [accountRemovedMessage, clearAccountRemovedMessage]);
 

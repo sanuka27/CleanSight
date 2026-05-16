@@ -13,9 +13,13 @@ import type { AppUser, AuthContextType } from "./AuthContextShared";
 const isDev = import.meta.env.DEV;
 const enableVisibilityRefresh = import.meta.env.VITE_ENABLE_VISIBILITY_REFRESH === "true";
 const ACCOUNT_REMOVED_STORAGE_KEY = "cleansight.accountRemovedMessage";
+const MIN_PROFILE_POLL_INTERVAL_MS = 30_000;
 const profilePollMsEnv = import.meta.env.VITE_PROFILE_POLL_MS;
 const profilePollMs = profilePollMsEnv ? Number.parseInt(profilePollMsEnv, 10) : Number.NaN;
-const profilePollInterval = Number.isFinite(profilePollMs) ? profilePollMs : 0;
+const profilePollInterval =
+  Number.isFinite(profilePollMs) && profilePollMs >= MIN_PROFILE_POLL_INTERVAL_MS
+    ? profilePollMs
+    : 0;
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -99,7 +103,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             ? `Admin removed your account. Reason: ${deletedReason}`
             : "Admin removed your account.";
           if (typeof window !== "undefined") {
-            sessionStorage.setItem(ACCOUNT_REMOVED_STORAGE_KEY, removalMessage);
+            try {
+              sessionStorage.setItem(ACCOUNT_REMOVED_STORAGE_KEY, removalMessage);
+            } catch {
+              if (isDev) {
+                console.warn("[AuthContext] Failed to persist account removed message to sessionStorage");
+              }
+            }
           }
           setAccountRemovedMessage(removalMessage);
           setSuspendedMessage(null);

@@ -23,10 +23,14 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000
  */
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  details: Record<string, unknown> | null;
+  errors?: unknown;
+  constructor(message: string, status: number, details?: Record<string, unknown> | null) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.details = details ?? null;
+    this.errors = details?.errors;
   }
 }
 
@@ -82,10 +86,15 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}${endpoint}`, config);
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({
+      const payload = await response.json().catch(() => ({
         message: response.statusText,
       }));
-      throw new ApiError(error.message || "API request failed", response.status);
+      const safePayload = (payload && typeof payload === "object") ? payload : { message: response.statusText };
+      throw new ApiError(
+        (safePayload as { message?: string }).message || "API request failed",
+        response.status,
+        safePayload as Record<string, unknown>
+      );
     }
 
     return response.json();

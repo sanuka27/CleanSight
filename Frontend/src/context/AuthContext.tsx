@@ -12,6 +12,10 @@ import type { AppUser, AuthContextType } from "./AuthContextShared";
 
 const isDev = import.meta.env.DEV;
 const enableVisibilityRefresh = import.meta.env.VITE_ENABLE_VISIBILITY_REFRESH === "true";
+const ACCOUNT_REMOVED_STORAGE_KEY = "cleansight.accountRemovedMessage";
+const profilePollMsEnv = import.meta.env.VITE_PROFILE_POLL_MS;
+const profilePollMs = profilePollMsEnv ? Number.parseInt(profilePollMsEnv, 10) : Number.NaN;
+const profilePollInterval = Number.isFinite(profilePollMs) ? profilePollMs : 0;
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -24,6 +28,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isAppUserLoading, setIsAppUserLoading] = useState(false);
   const [appUserError, setAppUserError] = useState<string | null>(null);
   const [suspendedMessage, setSuspendedMessage] = useState<string | null>(null);
+  const [accountRemovedMessage, setAccountRemovedMessage] = useState<string | null>(null);
 
   /**
    * When true, a sign-in / sign-up handler is actively running.
@@ -45,8 +50,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const markSigningIn = useCallback(() => {
     signingInRef.current = true;
     setSuspendedMessage(null);
+    setAccountRemovedMessage(null);
     // Safety: auto-clear after 60 s so a crashed flow can't leave the flag stuck.
     setTimeout(() => { signingInRef.current = false; }, 60_000);
+  }, []);
+
+  const clearAccountRemovedMessage = useCallback(() => {
+    setAccountRemovedMessage(null);
   }, []);
 
   /** Fetch backend profile from /api/auth/me */
@@ -66,6 +76,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setAppUser(newUser);
         prevRoleRef.current = newUser.role;
         setSuspendedMessage(null);
+        setAccountRemovedMessage(null);
         
         // Profile found — any in-progress sign-in flow is complete.
         signingInRef.current = false;
@@ -80,6 +91,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch (err: unknown) {
       // Handle auth errors (token expired, forbidden, etc.)
       if (err instanceof ApiError) {
+        // 410 = Account removed
+        if (err.status === 410) {
+          const deletedReason =
+            typeof err.details?.deletedReason === "string" ? err.details.deletedReason : null;
+          const removalMessage = deletedReason
+            ? `Admin removed your account. Reason: ${deletedReason}`
+            : "Admin removed your account.";
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem(ACCOUNT_REMOVED_STORAGE_KEY, removalMessage);
+          }
+          setAccountRemovedMessage(removalMessage);
+          setSuspendedMessage(null);
+          setUser(null);
+          setAppUser(null);
+          prevRoleRef.current = null;
+          await firebaseSignOut(auth);
+          return null;
+        }
+
         // 401 = Unauthorized (token expired), 403 = Forbidden
         if (err.status === 401 || err.status === 403) {
           if (isDev) {
@@ -87,7 +117,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           }
           // Check for account suspension specifically
           if (err.status === 403 && err.message?.toLowerCase().includes('suspended')) {
-            setSuspendedMessage('Your account has been suspended. Please contact an administrator.');
+            const suspendedReason =
+              typeof err.details?.suspendedReason === "string" ? err.details.suspendedReason : null;
+            setSuspendedMessage(
+              suspendedReason
+                ? `Your account has been suspended. Reason: ${suspendedReason}`
+                : 'Your account has been suspended. Please contact an administrator.'
+            );
           }
           // Clear both user states immediately so needsOnboarding never
           // becomes true during the sign-out transition (before
@@ -191,6 +227,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [fetchAppUser, isAppUserLoading, isLoading]);
 
+  // Periodic profile refresh to detect account changes (e.g., deletion) promptly.
+  useEffect(() => {
+    if (!user || profilePollInterval <= 0) return;
+
+    const intervalId = setInterval(() => {
+      if (auth.currentUser && !isAppUserLoading && !isLoading) {
+        fetchAppUser();
+      }
+    }, profilePollInterval);
+
+    return () => clearInterval(intervalId);
+  }, [user, fetchAppUser, isAppUserLoading, isLoading, profilePollInterval]);
+
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
@@ -198,6 +247,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setAppUser(null);
       setAppUserError(null);
       setSuspendedMessage(null);
+      setAccountRemovedMessage(null);
     } catch (error) {
       console.error("Error signing out:", error);
       throw error;
@@ -217,6 +267,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     appUserError,
     needsOnboarding,
     suspendedMessage,
+    accountRemovedMessage,
+    clearAccountRemovedMessage,
     logout,
     refreshAppUser,
     markSigningIn,

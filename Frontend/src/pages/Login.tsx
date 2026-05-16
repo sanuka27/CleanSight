@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -20,8 +20,42 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [removedBanner, setRemovedBanner] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { refreshAppUser, markSigningIn, suspendedMessage } = useAuth();
+  const { refreshAppUser, markSigningIn, suspendedMessage, accountRemovedMessage, clearAccountRemovedMessage } = useAuth();
+  const ACCOUNT_REMOVED_STORAGE_KEY = "cleansight.accountRemovedMessage";
+
+  useEffect(() => {
+    let stored: string | null = null;
+    if (typeof window !== "undefined") {
+      try {
+        stored = sessionStorage.getItem(ACCOUNT_REMOVED_STORAGE_KEY);
+      } catch {
+        stored = null;
+      }
+    }
+
+    const clearStoredMessage = () => {
+      if (typeof window === "undefined") return;
+      try {
+        sessionStorage.removeItem(ACCOUNT_REMOVED_STORAGE_KEY);
+      } catch {
+        // Ignore storage errors.
+      }
+    };
+
+    if (accountRemovedMessage) {
+      setRemovedBanner(accountRemovedMessage);
+      if (stored) clearStoredMessage();
+      clearAccountRemovedMessage();
+      return;
+    }
+
+    if (stored) {
+      setRemovedBanner(stored);
+      clearStoredMessage();
+    }
+  }, [accountRemovedMessage, clearAccountRemovedMessage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,6 +210,14 @@ const Login = () => {
               Sign in to continue to your account
             </motion.p>
           </div>
+
+          {/* Account Removed Banner */}
+          {removedBanner && (
+            <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <p className="font-semibold">Account Removed</p>
+              <p>{removedBanner}</p>
+            </div>
+          )}
 
           {/* Suspension Banner */}
           {suspendedMessage && (

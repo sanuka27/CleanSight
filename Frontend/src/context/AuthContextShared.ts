@@ -29,6 +29,10 @@ export interface AuthContextType {
   needsOnboarding: boolean;
   /** Set when a forced logout is triggered by account suspension. */
   suspendedMessage: string | null;
+  /** Set when a forced logout is triggered by account deletion. */
+  accountRemovedMessage: string | null;
+  /** Clear the account-removed message after showing a notification. */
+  clearAccountRemovedMessage: () => void;
   logout: () => Promise<void>;
   refreshAppUser: () => Promise<AppUser | null>;
   /**

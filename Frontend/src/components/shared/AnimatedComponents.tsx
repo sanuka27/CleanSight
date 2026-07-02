@@ -17,16 +17,30 @@ export const AnimatedCounter = memo(function AnimatedCounter({
   className = "" 
 }: AnimatedCounterProps) {
   const [count, setCount] = useState(0);
+  const countRef = useRef(0);
   const ref = useRef<HTMLSpanElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px", amount: 0.3 });
 
   useEffect(() => {
-    if (!isInView) return;
+    countRef.current = count;
+  }, [count]);
+
+  useEffect(() => {
+    if (!isInView) {
+      setCount(end);
+      countRef.current = end;
+      return;
+    }
 
     let startTime: number | null = null;
-    const startValue = 0;
+    const startValue = countRef.current;
     const endValue = end;
     let rafId: number;
+
+    if (startValue === endValue) {
+      setCount(endValue);
+      return;
+    }
 
     const animate = (currentTime: number) => {
       if (startTime === null) startTime = currentTime;
@@ -41,6 +55,8 @@ export const AnimatedCounter = memo(function AnimatedCounter({
 
       if (progress < 1) {
         rafId = requestAnimationFrame(animate);
+      } else {
+        countRef.current = endValue;
       }
     };
 

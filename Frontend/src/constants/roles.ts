@@ -66,7 +66,7 @@ export const NAV_LINKS: NavLinkDef[] = [
     label: "Volunteer",
     icon: Users,
     requiresAuth: true,
-    allowedRoles: ["citizen"],
+    allowedRoles: ["volunteer", "staff", "admin"],
   },
   {
     href: "/dashboard",

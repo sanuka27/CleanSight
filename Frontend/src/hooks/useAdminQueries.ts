@@ -29,6 +29,7 @@ import {
   getAdminUserDetail,
   updateUserRole,
   updateUserSuspension,
+  deleteUser,
   bulkAssignReports,
   bulkUpdateReportStatus,
   bulkRejectReports,
@@ -399,6 +400,17 @@ export function useUpdateUserSuspensionMutation() {
       isSuspended: boolean;
       reason?: string;
     }) => updateUserSuspension(id, isSuspended, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users.all() });
+    },
+  });
+}
+
+export function useDeleteUserMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => deleteUser(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.users.all() });
     },

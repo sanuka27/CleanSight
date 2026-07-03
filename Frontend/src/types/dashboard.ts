@@ -57,6 +57,7 @@ export interface CitizenDashboardData {
   myTotals: StatusTotals;
   recentReports: DashboardReport[];
   citizenProfile: CitizenProfileSummary;
+  newlyEarnedBadges?: CitizenBadge[];
 }
 
 export interface CitizenDashboardResponse {
@@ -111,6 +112,7 @@ export interface VolunteerDashboardData {
   pendingNearby: DashboardReport[];
   myStats: VolunteerMyStats;
   volunteerProfile: VolunteerProfileSummary | null;
+  newlyEarnedBadges?: VolunteerBadge[];
 }
 
 export interface VolunteerDashboardResponse {

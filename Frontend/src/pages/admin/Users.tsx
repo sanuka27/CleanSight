@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ChevronLeft, ChevronRight, MoreVertical,
-  ShieldCheck, UserX, UserCheck, Loader2, X,
+  ShieldCheck, UserX, UserCheck, Trash2, Loader2, X,
   AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -30,6 +30,7 @@ import {
   useAdminUserDetailQuery,
   useUpdateUserRoleMutation,
   useUpdateUserSuspensionMutation,
+  useDeleteUserMutation,
 } from "@/hooks/useAdminQueries";
 import {
   getAdminUserReports,
@@ -317,6 +318,70 @@ function SuspendDialog({ user, onClose, onConfirm }: SuspendDialogProps) {
   );
 }
 
+// ── Delete Dialog ───────────────────────────────────────────────────
+
+interface DeleteDialogProps {
+  user: AdminUser;
+  onClose: () => void;
+  onConfirm: (reason: string) => Promise<void>;
+}
+
+function DeleteDialog({ user, onClose, onConfirm }: DeleteDialogProps) {
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const isValid = reason.trim().length > 0;
+
+  async function handleConfirm() {
+    if (!isValid) return;
+    setLoading(true);
+    try {
+      await onConfirm(reason.trim());
+    } catch {
+      // parent handles errors and toasts
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-destructive">Delete User</DialogTitle>
+          <DialogDescription>
+            This will remove <strong>{user.name}</strong> and immediately sign them out.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-2 space-y-3">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            This action is permanent and cannot be undone.
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">
+              Reason <span className="text-destructive">(required)</span>
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+              maxLength={500}
+              placeholder="Explain why this account is being removed..."
+              className="w-full text-sm rounded-md border border-input bg-background px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button variant="destructive" onClick={handleConfirm} disabled={loading || !isValid}>
+            {loading && <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />}
+            Delete User
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── User Detail Drawer ────────────────────────────────────────────────
 
 interface DrawerProps {
@@ -324,9 +389,10 @@ interface DrawerProps {
   onClose: () => void;
   onRoleChange: (user: AdminUser, newRole: AppRole) => Promise<void>;
   onSuspend: (user: AdminUser, isSuspended: boolean, reason?: string) => Promise<void>;
+  onDelete: (user: AdminUser, reason: string) => Promise<void>;
 }
 
-function UserDetailDrawer({ userId, onClose, onRoleChange, onSuspend }: DrawerProps) {
+function UserDetailDrawer({ userId, onClose, onRoleChange, onSuspend, onDelete }: DrawerProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "reports" | "tasks">("overview");
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [tasks, setTasks] = useState<AdminReport[]>([]);
@@ -338,6 +404,7 @@ function UserDetailDrawer({ userId, onClose, onRoleChange, onSuspend }: DrawerPr
   const [taskTotal, setTaskTotal] = useState(0);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [showSuspendDialog, setShowSuspendDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { toast } = useToast();
 
   // React Query for user detail
@@ -394,6 +461,13 @@ function UserDetailDrawer({ userId, onClose, onRoleChange, onSuspend }: DrawerPr
     await onSuspend(detail.user, isSuspended, reason);
     await refetchDetail();
     setShowSuspendDialog(false);
+  }
+
+  async function handleDelete(reason: string) {
+    if (!detail) return;
+    await onDelete(detail.user, reason);
+    setShowDeleteDialog(false);
+    onClose();
   }
 
   return (
@@ -499,6 +573,17 @@ function UserDetailDrawer({ userId, onClose, onRoleChange, onSuspend }: DrawerPr
                   )}
                 </Button>
               </div>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  Delete User
+                </Button>
+              </div>
             </div>
 
             {/* Tabs */}
@@ -553,6 +638,7 @@ function UserDetailDrawer({ userId, onClose, onRoleChange, onSuspend }: DrawerPr
                       { label: "Phone", value: detail.user.phone || "—" },
                       { label: "Verified", value: detail.user.isVerified ? "Yes" : "No" },
                       { label: "Cleanups Completed", value: String(detail.user.cleanupsCompleted) },
+                      { label: "Delete Reason", value: detail.user.deletedReason || "—" },
                       ...(detail.user.suspendedAt ? [{ label: "Suspended At", value: formatDate(detail.user.suspendedAt) }] : []),
                     ].map(({ label, value }) => (
                       <div key={label} className="flex justify-between items-center px-3 py-2.5 text-sm">
@@ -682,6 +768,15 @@ function UserDetailDrawer({ userId, onClose, onRoleChange, onSuspend }: DrawerPr
           onConfirm={handleSuspend}
         />
       )}
+
+      {/* Delete dialog */}
+      {showDeleteDialog && detail && (
+        <DeleteDialog
+          user={detail.user}
+          onClose={() => setShowDeleteDialog(false)}
+          onConfirm={handleDelete}
+        />
+      )}
     </>
   );
 }
@@ -693,9 +788,10 @@ interface RowProps {
   onView: () => void;
   onChangeRole: () => void;
   onSuspend: () => void;
+  onDelete: () => void;
 }
 
-function UserRow({ user, onView, onChangeRole, onSuspend }: RowProps) {
+function UserRow({ user, onView, onChangeRole, onSuspend, onDelete }: RowProps) {
   return (
     <motion.tr
       initial={{ opacity: 0, y: 4 }}
@@ -748,6 +844,10 @@ function UserRow({ user, onView, onChangeRole, onSuspend }: RowProps) {
             >
               {user.isSuspended ? "Unsuspend" : "Suspend"}
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onDelete} className="text-destructive">
+              Delete User
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </td>
@@ -763,6 +863,7 @@ export default function AdminUsers() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [quickRoleUser, setQuickRoleUser] = useState<AdminUser | null>(null);
   const [quickSuspendUser, setQuickSuspendUser] = useState<AdminUser | null>(null);
+  const [quickDeleteUser, setQuickDeleteUser] = useState<AdminUser | null>(null);
 
   // React Query
   const { data: usersRes, isLoading: loading, refetch } = useAdminUsersQuery(filters);
@@ -770,6 +871,7 @@ export default function AdminUsers() {
   const total = usersRes?.pagination?.total ?? 0;
   const updateRoleMutation = useUpdateUserRoleMutation();
   const updateSuspensionMutation = useUpdateUserSuspensionMutation();
+  const deleteUserMutation = useDeleteUserMutation();
 
   const LIMIT = filters.limit ?? 20;
   const currentPage = filters.page ?? 1;
@@ -801,6 +903,23 @@ export default function AdminUsers() {
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to update suspension";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+      throw e;
+    }
+  }
+
+  async function handleDelete(user: AdminUser, reason: string) {
+    try {
+      const res = await deleteUserMutation.mutateAsync({ id: user._id, reason });
+      toast({
+        title: "User Deleted",
+        description: res?.warning
+          ? `${user.name}'s account has been removed. ${res.warning}`
+          : `${user.name}'s account has been removed.`,
+      });
+      setSelectedUserId(null);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to delete user";
       toast({ title: "Error", description: msg, variant: "destructive" });
       throw e;
     }
@@ -864,6 +983,7 @@ export default function AdminUsers() {
                     onView={() => setSelectedUserId(user._id)}
                     onChangeRole={() => setQuickRoleUser(user)}
                     onSuspend={() => setQuickSuspendUser(user)}
+                    onDelete={() => setQuickDeleteUser(user)}
                   />
                 ))}
               </tbody>
@@ -906,6 +1026,7 @@ export default function AdminUsers() {
             onClose={() => setSelectedUserId(null)}
             onRoleChange={handleRoleChange}
             onSuspend={handleSuspend}
+            onDelete={handleDelete}
           />
         )}
       </AnimatePresence>
@@ -930,6 +1051,18 @@ export default function AdminUsers() {
           onConfirm={async (isSuspended, reason) => {
             await handleSuspend(quickSuspendUser, isSuspended, reason);
             setQuickSuspendUser(null);
+          }}
+        />
+      )}
+
+      {/* Quick delete dialog (from row menu) */}
+      {quickDeleteUser && (
+        <DeleteDialog
+          user={quickDeleteUser}
+          onClose={() => setQuickDeleteUser(null)}
+          onConfirm={async (reason) => {
+            await handleDelete(quickDeleteUser, reason);
+            setQuickDeleteUser(null);
           }}
         />
       )}

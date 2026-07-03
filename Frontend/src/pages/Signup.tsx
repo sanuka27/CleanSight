@@ -23,14 +23,28 @@ const Signup = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<AppRole>("citizen");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { refreshAppUser, markSigningIn } = useAuth();
 
+  const passwordsMatch =
+    password.length > 0 &&
+    confirmPassword.length > 0 &&
+    password === confirmPassword;
+  const showMismatch = confirmPassword.length > 0 && !passwordsMatch;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -277,6 +291,38 @@ const Signup = () => {
               </p>
             </div>
 
+            {/* Confirm Password */}
+            <div className="space-y-1.5">
+              <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
+              <div className="relative group">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pl-11 pr-11 h-10 rounded-xl glass border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {showMismatch ? (
+                <p className="text-xs text-destructive">Passwords do not match</p>
+              ) : passwordsMatch ? (
+                <p className="text-xs text-success">Passwords match</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Re-enter your password</p>
+              )}
+            </div>
+
             {/* Submit Button */}
             <motion.div
               whileHover={{ scale: 1.01 }}
@@ -284,7 +330,7 @@ const Signup = () => {
             >
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !passwordsMatch}
                 className="w-full h-10 gradient-primary text-white rounded-xl shadow-glow hover:shadow-glow-lg transition-all font-semibold text-sm gap-2"
               >
                 {isLoading ? (

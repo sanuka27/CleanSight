@@ -288,6 +288,16 @@ export async function updateUserSuspension(
   });
 }
 
+export async function deleteUser(
+  id: string,
+  reason: string
+): Promise<{ success: boolean; message: string; warning?: string }> {
+  return adminFetch(`/users/${id}`, {
+    method: "DELETE",
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function getAdminUserReports(
   id: string,
   page = 1,

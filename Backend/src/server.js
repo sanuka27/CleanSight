@@ -74,6 +74,10 @@ app.use('/api/volunteers', volunteerRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/contact', contactRoutes);
+// Also mount contactRoutes under /api/admin/contact so that the admin
+// sub-routes (GET /messages, PATCH /messages/:id) resolve to
+// /api/admin/contact/messages — consistent with the rest of the admin API.
+app.use('/api/admin/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ml-analytics', mlAnalyticsRoutes);
 

@@ -10,7 +10,6 @@ import { recordVolunteerResolutions } from '../services/volunteerProgressService
 import { 
   REPORT_STATUS, 
   isValidTransition, 
-  ACTIVE_STATUSES 
 } from '../constants/reportStatus.js';
 import { ROLES } from '../constants/roles.js';
 

@@ -8,8 +8,6 @@
  * For production consider `express-rate-limit` with a Redis store.
  */
 
-const stores = new Map(); // one store per limiter instance
-
 /**
  * @param {{ windowMs?: number, max?: number, message?: string }} opts
  */

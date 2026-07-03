@@ -240,7 +240,8 @@ export type AuditAction =
   | 'DOCUMENT_DELETED'
   | 'SETTINGS_UPDATED'
   | 'USER_ROLE_CHANGED'
-  | 'USER_SUSPENDED';
+  | 'USER_SUSPENDED'
+  | 'USER_DELETED';
 
 // ── Bulk Actions ─────────────────────────────────────────────────────
 
@@ -301,6 +302,8 @@ export interface AdminUser {
   isSuspended: boolean;
   suspendedReason: string | null;
   suspendedAt: string | null;
+  deletedReason?: string | null;
+  deletedAt?: string | null;
   reportsSubmitted: number;
   cleanupsCompleted: number;
   createdAt: string;

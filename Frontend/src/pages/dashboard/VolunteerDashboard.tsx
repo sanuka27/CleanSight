@@ -44,6 +44,7 @@ const VolunteerDashboard = () => {
 
   // Tasks section ref for scroll
   const tasksRef = useRef<HTMLDivElement>(null);
+  const badgeToastKeyRef = useRef<string>("");
 
   // Convert error to string for display
   const errorMessage = error instanceof Error ? error.message : error ? String(error) : null;
@@ -69,6 +70,22 @@ const VolunteerDashboard = () => {
   const badgeCatalog = volunteerProfile?.badgeCatalog ?? [];
   const totalCleanups = volunteerProfile?.stats?.totalCleanups ?? 0;
   const volunteerName = appUser?.name?.split(" ")[0] ?? "Volunteer";
+  const newlyEarnedBadges = data?.newlyEarnedBadges ?? [];
+
+  useEffect(() => {
+    if (newlyEarnedBadges.length === 0) return;
+    const key = newlyEarnedBadges.map((badge) => badge.id || badge.name).join("|");
+    if (badgeToastKeyRef.current === key) return;
+    badgeToastKeyRef.current = key;
+
+    const badgeNames = newlyEarnedBadges.map((badge) => badge.name).join(", ");
+    const title = newlyEarnedBadges.length === 1 ? "Badge unlocked!" : "Badges unlocked!";
+    const description = newlyEarnedBadges.length === 1
+      ? `You earned ${badgeNames}.`
+      : `You earned ${newlyEarnedBadges.length} badges: ${badgeNames}.`;
+
+    toast({ title, description });
+  }, [newlyEarnedBadges, toast]);
 
   /* ── Location helpers ───────────────────────────────────────────── */
   const fetchNearbyForMap = useCallback(async (loc: LatLng) => {

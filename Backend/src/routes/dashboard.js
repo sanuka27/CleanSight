@@ -129,7 +129,7 @@ router.get(
 
       // Recent reports (last 50 for client-side search/filter)
       // Note: consider adding a compound index on { firebaseUid: 1, createdAt: -1 } for perf
-      const recentReports = await Report.find({ firebaseUid })
+      const recentReports = await Report.find({ firebaseUid, isDeleted: { $ne: true } })
         .sort({ createdAt: -1 })
         .limit(50)
         .select('_id title status wasteType urgency createdAt updatedAt imageUrl location description')
@@ -344,14 +344,14 @@ router.get(
   async (req, res) => {
     try {
       // Pending reports
-      const pendingReports = await Report.find({ status: 'pending' })
+      const pendingReports = await Report.find({ status: 'pending', isDeleted: { $ne: true } })
         .sort({ createdAt: -1 })
         .limit(20)
         .select('_id status wasteType urgency createdAt imageUrl location description firebaseUid')
         .lean();
 
       // Assigned reports
-      const assignedReports = await Report.find({ status: 'assigned' })
+      const assignedReports = await Report.find({ status: 'assigned', isDeleted: { $ne: true } })
         .sort({ createdAt: -1 })
         .limit(20)
         .select('_id status wasteType urgency createdAt imageUrl location description firebaseUid assignedTo')

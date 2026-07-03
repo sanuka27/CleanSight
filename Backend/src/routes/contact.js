@@ -69,10 +69,13 @@ router.post(
   }
 );
 
-// ── GET /api/admin/contact-messages ─────────────────────────────
+// ── GET /api/admin/contact/messages ────────────────────────────
 // Admin-only — paginated list with filters.
+// NOTE: This router is mounted at BOTH /api/contact (public) and
+// /api/admin/contact (admin namespace) in server.js. Admin sub-routes
+// use relative paths so they appear under /api/admin/contact/messages.
 router.get(
-  '/admin/messages',
+  '/messages',
   adminOnly,
   async (req, res) => {
     try {
@@ -120,10 +123,10 @@ router.get(
   }
 );
 
-// ── PATCH /api/admin/contact-messages/:id ───────────────────────
+// ── PATCH /api/admin/contact/messages/:id ──────────────────────
 // Admin-only — update message status.
 router.patch(
-  '/admin/messages/:id',
+  '/messages/:id',
   adminOnly,
   async (req, res) => {
     try {

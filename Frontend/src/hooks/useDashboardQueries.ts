@@ -24,6 +24,7 @@ export function useCitizenDashboardQuery() {
       const res = await api.getCitizenDashboard();
       return res.data;
     },
+    refetchOnMount: "always",
   });
 }
 
@@ -38,6 +39,7 @@ export function useVolunteerDashboardQuery() {
       const res = await api.getVolunteerDashboard();
       return res.data;
     },
+    refetchOnMount: "always",
   });
 }
 

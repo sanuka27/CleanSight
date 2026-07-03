@@ -41,6 +41,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   SETTINGS_UPDATED:      "Settings Updated",
   USER_ROLE_CHANGED:     "Role Changed",
   USER_SUSPENDED:        "User Suspended",
+  USER_DELETED:          "User Deleted",
 };
 
 const ACTION_COLORS: Record<AuditAction, string> = {
@@ -52,6 +53,7 @@ const ACTION_COLORS: Record<AuditAction, string> = {
   SETTINGS_UPDATED:      "bg-amber-100 text-amber-700 border-amber-200",
   USER_ROLE_CHANGED:     "bg-purple-100 text-purple-700 border-purple-200",
   USER_SUSPENDED:        "bg-orange-100 text-orange-700 border-orange-200",
+  USER_DELETED:          "bg-rose-100 text-rose-700 border-rose-200",
 };
 
 const ENTITY_ICONS: Record<AuditEntityType, typeof Flag> = {
@@ -99,6 +101,12 @@ function metadataSummary(action: AuditAction, meta: Record<string, unknown>): st
       const fields = Object.keys(meta.newValues as Record<string, unknown> ?? {});
       return fields.length ? `Changed: ${fields.join(", ")}` : "";
     }
+    case "USER_DELETED":
+      return meta.reason
+        ? `Reason: ${meta.reason}`
+        : meta.targetEmail
+        ? `Deleted: ${meta.targetEmail}`
+        : "";
     default:
       return "";
   }

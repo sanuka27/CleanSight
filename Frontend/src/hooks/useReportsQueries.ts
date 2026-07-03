@@ -127,6 +127,7 @@ export function useCreateReportMutation() {
       queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
       // Also invalidate dashboard since report counts change
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      queryClient.refetchQueries({ queryKey: queryKeys.dashboard.all, type: "all" });
     },
   });
 }

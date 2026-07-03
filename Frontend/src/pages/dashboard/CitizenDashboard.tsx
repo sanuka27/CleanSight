@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useCitizenDashboardQuery } from "@/hooks/useDashboardQueries";
@@ -14,9 +14,11 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import type { DashboardReport } from "@/types/dashboard";
+import { useToast } from "@/hooks/use-toast";
 
 const CitizenDashboard = () => {
   const { data, isLoading, error, refetch } = useCitizenDashboardQuery();
+  const { toast } = useToast();
 
   // Report details modal state
   const [selectedReport, setSelectedReport] = useState<DashboardReport | null>(null);
@@ -25,6 +27,7 @@ const CitizenDashboard = () => {
   // Ref for scrolling to reports section & auto-filtering
   const reportsRef = useRef<HTMLDivElement>(null);
   const [pendingFilterActive, setPendingFilterActive] = useState(false);
+  const badgeToastKeyRef = useRef<string>("");
 
   // Convert error to string for display
   const errorMessage = error instanceof Error ? error.message : error ? String(error) : null;
@@ -40,6 +43,22 @@ const CitizenDashboard = () => {
   const citizenBadges = citizenProfile?.badges ?? [];
   const badgeCatalog = citizenProfile?.badgeCatalog ?? [];
   const reportsSubmitted = citizenProfile?.reportsSubmitted ?? totals.total;
+  const newlyEarnedBadges = data?.newlyEarnedBadges ?? [];
+
+  useEffect(() => {
+    if (newlyEarnedBadges.length === 0) return;
+    const key = newlyEarnedBadges.map((badge) => badge.id || badge.name).join("|");
+    if (badgeToastKeyRef.current === key) return;
+    badgeToastKeyRef.current = key;
+
+    const badgeNames = newlyEarnedBadges.map((badge) => badge.name).join(", ");
+    const title = newlyEarnedBadges.length === 1 ? "Badge unlocked!" : "Badges unlocked!";
+    const description = newlyEarnedBadges.length === 1
+      ? `You earned ${badgeNames}.`
+      : `You earned ${newlyEarnedBadges.length} badges: ${badgeNames}.`;
+
+    toast({ title, description });
+  }, [newlyEarnedBadges, toast]);
 
   const handleViewDetails = useCallback((report: DashboardReport) => {
     setSelectedReport(report);

@@ -76,6 +76,7 @@ export function useReports() {
       // Keep report lists + dashboards in sync with the new report
       queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      queryClient.refetchQueries({ queryKey: queryKeys.dashboard.all, type: "all" });
 
       return response.data;
     } catch (err: unknown) {

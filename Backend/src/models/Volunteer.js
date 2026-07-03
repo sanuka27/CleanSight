@@ -70,7 +70,12 @@ const volunteerSchema = new mongoose.Schema({
   timestamps: true
 });
 
-volunteerSchema.index({ 'preferredAreas': '2dsphere' });
+// NOTE: A 2dsphere index on preferredAreas has been intentionally removed.
+// MongoDB 2dsphere indexes require a valid GeoJSON object at the indexed path.
+// The current preferredAreas subdocument includes a non-GeoJSON `radius` field,
+// which prevents MongoDB from treating it as a valid GeoJSON geometry.
+// If geo-querying on preferredAreas is needed in the future, refactor the schema
+// to store pure GeoJSON Points and apply the index on `preferredAreas` only.
 volunteerSchema.index({ isActive: 1 });
 
 const Volunteer = mongoose.model('Volunteer', volunteerSchema);

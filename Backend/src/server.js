@@ -13,6 +13,7 @@ import volunteerRoutes from './routes/volunteers.js';
 import analyticsRoutes from './routes/analytics.js';
 import dashboardRoutes from './routes/dashboard.js';
 import contactRoutes from './routes/contact.js';
+import contactAdminRoutes from './routes/contactAdmin.js';
 import adminRoutes from './routes/admin.js';
 import mlAnalyticsRoutes from './routes/mlAnalytics.js';
 
@@ -74,6 +75,7 @@ app.use('/api/volunteers', volunteerRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/admin/contact', contactAdminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ml-analytics', mlAnalyticsRoutes);
 

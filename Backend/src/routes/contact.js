@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import ContactMessage from '../models/ContactMessage.js';
-import { rateLimit } from '../middleware/rateLimit.js';
+import { contactRateLimit } from '../middleware/rateLimit.js';
 
 const router = Router();
 
@@ -30,7 +30,7 @@ function validateContact(body) {
 // Public — rate-limited: 10 requests per 15 minutes per IP.
 router.post(
   '/',
-  rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: 'Too many messages. Please wait and try again.' }),
+  contactRateLimit,
   async (req, res) => {
     try {
       const { name, email, message, errors } = validateContact(req.body);

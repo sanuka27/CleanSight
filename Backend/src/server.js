@@ -31,10 +31,13 @@ const PORT = process.env.PORT || 5000;
 // a code change.
 // ─────────────────────────────────────────────────────────────────────
 const rawOrigins = process.env.CLIENT_URL || 'http://localhost:8080';
-const allowedOrigins = rawOrigins
+let allowedOrigins = rawOrigins
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
+// Guard: if CLIENT_URL is blank/whitespace-only, fall back to the dev default
+// so CORS doesn't silently block every cross-origin request.
+if (allowedOrigins.length === 0) allowedOrigins = ['http://localhost:8080'];
 
 const corsOptions = {
   origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
@@ -46,6 +49,12 @@ const corsOptions = {
 // ─────────────────────────────────────────────────────────────────────
 // Middleware
 // ─────────────────────────────────────────────────────────────────────
+// Trust the first proxy hop so that req.ip reflects the real client IP
+// (needed for express-rate-limit to key on individual clients instead of
+// the proxy's IP, which would put all traffic in a single rate-limit bucket).
+// Set to the number of proxy hops in front of this server (typically 1 for
+// a single load balancer or Nginx reverse proxy).
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
 // helmet sets security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, etc.
 app.use(helmet());
 app.use(cors(corsOptions));

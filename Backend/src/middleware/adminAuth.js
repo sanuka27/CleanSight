@@ -9,7 +9,11 @@ import { ROLES } from '../constants/roles.js';
  *   1. If a valid Firebase Bearer token is present → verify it, look up
  *      the user in MongoDB and check for the "admin" role.
  *   2. Otherwise, fall back to a simple `x-admin-key` header matched
- *      against the ADMIN_API_KEY env variable (handy for dev / curl).
+ *      against the ADMIN_API_KEY env variable.
+ *
+ * ⚠️  SECURITY: The x-admin-key fallback is disabled entirely in production
+ * (NODE_ENV === 'production'). It is retained only as a development/curl
+ * convenience. Never set ADMIN_API_KEY in a production environment.
  *
  * Usage:
  *   import { adminOnly } from '../middleware/adminAuth.js';
@@ -41,7 +45,16 @@ export async function adminOnly(req, res, next) {
     }
   }
 
-  // ── Path 2: x-admin-key header (dev / curl) ───────────────────
+  // ── Path 2: x-admin-key header (dev only) ─────────────────────
+  // This fallback is completely disabled in production to prevent accidental
+  // API key exposure from granting admin access.
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required. Provide a valid Bearer token.',
+    });
+  }
+
   const adminKey = process.env.ADMIN_API_KEY;
   const headerKey = req.headers['x-admin-key'];
 

@@ -86,11 +86,11 @@ router.get('/reports', async (req, res) => {
       if (to)   filter.createdAt.$lte = new Date(String(to));
     }
 
-    // Text search on description + title (case-insensitive, injection-safe)
+    // Full-text search on title + description via MongoDB $text index.
+    // Requires: db.reports.createIndex({ title: 'text', description: 'text' })
+    // TODO: run the index migration before deploying to production.
     if (search && String(search).trim()) {
-      const escaped = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const rx = new RegExp(escaped, 'i');
-      filter.$or = [{ title: rx }, { description: rx }];
+      filter.$text = { $search: String(search).trim() };
     }
 
     const sortDir = sortOrder === 'asc' ? 1 : -1;
@@ -516,10 +516,9 @@ router.post('/reports/bulk/export', async (req, res) => {
           filter.createdAt = createdAtFilter;
         }
       }
+      // Full-text search — same $text index as GET /admin/reports.
       if (filters.q && String(filters.q).trim()) {
-        const escaped = String(filters.q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const rx = new RegExp(escaped, 'i');
-        filter.$or = [{ title: rx }, { description: rx }];
+        filter.$text = { $search: String(filters.q).trim() };
       }
       reports = await Report.find(filter).sort({ createdAt: -1 }).limit(5000).lean();
     } else {
@@ -678,11 +677,10 @@ router.get('/reports/map', async (req, res) => {
       }
     }
 
-    // ── Text search ─────────────────────────────────────────────────
+    // ── Full-text search ─────────────────────────────────────────────
+    // Uses the same $text index as GET /admin/reports.
     if (q && String(q).trim()) {
-      const escaped = String(q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const rx = new RegExp(escaped, 'i');
-      filter.$or = [{ title: rx }, { description: rx }];
+      filter.$text = { $search: String(q).trim() };
     }
 
     // ── Query with lightweight projection ───────────────────────────
@@ -1338,6 +1336,9 @@ router.get('/volunteers', async (req, res) => {
 
     // Users with role=volunteer
     const userFilter = { role: 'volunteer' };
+    // Regex search on name + email — injection-safe (all special chars escaped).
+    // TODO: add a $text index on { name: 'text', email: 'text' } and switch to
+    //       $text/$search for better performance at scale.
     if (search && String(search).trim()) {
       const escaped = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const rx = new RegExp(escaped, 'i');
@@ -1858,6 +1859,9 @@ router.get('/users', async (req, res) => {
     if (status === 'suspended') filter.isSuspended = true;
     if (status === 'active')    filter.isSuspended = { $ne: true };
 
+    // Regex search on name + email — injection-safe (all special chars escaped).
+    // TODO: add a $text index on { name: 'text', email: 'text' } and switch to
+    //       $text/$search for better performance at scale.
     if (q && String(q).trim()) {
       const escaped = String(q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const rx = new RegExp(escaped, 'i');
@@ -2291,6 +2295,11 @@ router.get('/audit-logs', async (req, res) => {
       }
     }
 
+    // Regex search across multiple AuditLog fields — injection-safe.
+    // $text is not used here because the search spans a nested metadata field
+    // (metadata.assignedToEmail) which is incompatible with compound text indexes.
+    // TODO: consider a dedicated search service (e.g. Atlas Search) for richer
+    //       full-text capabilities on audit logs.
     if (search && String(search).trim()) {
       const escaped = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const rx = new RegExp(escaped, 'i');

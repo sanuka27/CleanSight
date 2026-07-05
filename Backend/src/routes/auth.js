@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import { verifyToken } from '../middleware/verifyToken.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ROLES, SELF_ASSIGNABLE_ROLES } from '../constants/roles.js';
+import { authRateLimit, meRateLimit } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -39,7 +40,7 @@ function validateAvatar(avatar) {
 // POST /api/auth/register
 // Register a new user (create MongoDB profile)
 // ─────────────────────────────────────────────────────────────────────
-router.post('/register', verifyToken, asyncHandler(async (req, res) => {
+router.post('/register', authRateLimit, verifyToken, asyncHandler(async (req, res) => {
   const { name, email, role } = req.body;
   const { firebaseUid } = req.user;
 
@@ -179,7 +180,7 @@ router.post('/register', verifyToken, asyncHandler(async (req, res) => {
 // GET /api/auth/me
 // Get current user profile
 // ─────────────────────────────────────────────────────────────────────
-router.get('/me', verifyToken, asyncHandler(async (req, res) => {
+router.get('/me', meRateLimit, verifyToken, asyncHandler(async (req, res) => {
   const { firebaseUid } = req.user;
 
   const user = await User.findOne({ firebaseUid }).select('-__v');

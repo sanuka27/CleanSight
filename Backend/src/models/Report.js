@@ -264,6 +264,11 @@ reportSchema.index({ wasteCategoryReviewStatus: 1 });
 reportSchema.index({ wasteCategoryPredictedLabel: 1 });
 reportSchema.index({ aiReviewStatus: 1 });
 
+// Full-text search index — required by $text queries in the admin search endpoints.
+// MongoDB allows only one text index per collection; this one covers both the
+// title and description fields used in admin report search.
+reportSchema.index({ title: 'text', description: 'text' }, { name: 'reports_text_search' });
+
 // ─────────────────────────────────────────────────────────────────────
 // Instance Methods
 // ─────────────────────────────────────────────────────────────────────

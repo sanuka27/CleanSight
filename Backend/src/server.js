@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
@@ -25,9 +26,21 @@ const PORT = process.env.PORT || 5000;
 
 // ─────────────────────────────────────────────────────────────────────
 // CORS Configuration
+// Support a comma-separated list of allowed origins via CLIENT_URL so
+// multiple frontends (e.g. staging + production) can be served without
+// a code change.
 // ─────────────────────────────────────────────────────────────────────
+const rawOrigins = process.env.CLIENT_URL || 'http://localhost:8080';
+let allowedOrigins = rawOrigins
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+// Guard: if CLIENT_URL is blank/whitespace-only, fall back to the dev default
+// so CORS doesn't silently block every cross-origin request.
+if (allowedOrigins.length === 0) allowedOrigins = ['http://localhost:8080'];
+
 const corsOptions = {
-  origin: process.env.CLIENT_URL || 'http://localhost:8080',
+  origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key'],
@@ -36,6 +49,14 @@ const corsOptions = {
 // ─────────────────────────────────────────────────────────────────────
 // Middleware
 // ─────────────────────────────────────────────────────────────────────
+// Trust the first proxy hop so that req.ip reflects the real client IP
+// (needed for express-rate-limit to key on individual clients instead of
+// the proxy's IP, which would put all traffic in a single rate-limit bucket).
+// Set to the number of proxy hops in front of this server (typically 1 for
+// a single load balancer or Nginx reverse proxy).
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
+// helmet sets security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, etc.
+app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

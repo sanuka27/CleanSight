@@ -12,6 +12,7 @@ import {
   isValidTransition, 
 } from '../constants/reportStatus.js';
 import { ROLES } from '../constants/roles.js';
+import { reportRateLimit } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ const VALID_URGENCY_LEVELS = ['low', 'medium', 'high'];
 // @route   POST /api/reports
 // @desc    Create a new report
 // @access  Private (any authenticated user)
-router.post('/', verifyToken, asyncHandler(async (req, res) => {
+router.post('/', reportRateLimit, verifyToken, asyncHandler(async (req, res) => {
   const { firebaseUid } = req.user;
   const { imageUrl, description, location, wasteType, urgency, title } = req.body;
 

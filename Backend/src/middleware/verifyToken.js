@@ -7,8 +7,15 @@ import DeletedAccount from '../models/DeletedAccount.js';
 // This eliminates the per-request DB round-trip on every authenticated API call.
 //
 // Eviction policy: simple TTL — entries are removed after TTL_MS regardless of
-// access pattern. Suspended / deleted users are never cached so bans take effect
-// immediately on the next Firebase token check.
+// access pattern.
+//
+// ⚠️  Suspension timing: if a user is suspended AFTER their profile has been
+// cached, the suspension will not be enforced until the cache entry expires
+// (within TTL_MS = 60 s). New cache entries for already-suspended users are
+// never stored (the invalidateCachedUser call below), so a newly-suspended
+// user's next request after the TTL will be blocked correctly.
+// For near-instant suspension enforcement, reduce TTL_MS or replace this
+// cache with a Redis store that can be explicitly invalidated on suspension.
 //
 // TODO (production): replace with a Redis cache (e.g. ioredis) to share state
 // across worker processes and server instances.

@@ -4,6 +4,9 @@
   "description": "CleanSight Backend API - Express.js + MongoDB",
   "type": "module",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",

@@ -13,6 +13,7 @@
 
 import express from 'express';
 import verifyToken from '../middleware/verifyToken.js';
+import { requireRole, attachDbUser } from '../middleware/roleGuard.js';
 import User from '../models/User.js';
 import Report from '../models/Report.js';
 import Volunteer from '../models/Volunteer.js';
@@ -33,49 +34,12 @@ import { parseDateRange } from '../utils/dateRange.js';
 
 const router = express.Router();
 
-/* ------------------------------------------------------------------ */
-/*  Helper: resolve user from DB by Firebase UID                      */
-/* ------------------------------------------------------------------ */
-
-async function getDbUser(firebaseUid) {
-  const user = await User.findOne({ firebaseUid });
-  return user;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Middleware: attach DB user with role check                         */
-/* ------------------------------------------------------------------ */
-
-function requireRole(...roles) {
-  return async (req, res, next) => {
-    try {
-      const user = await getDbUser(req.user.firebaseUid);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User profile not found. Please complete registration.',
-        });
-      }
-      req.dbUser = user;
-      if (roles.length > 0 && !roles.includes(user.role)) {
-        return res.status(403).json({
-          success: false,
-          message: `Role '${user.role}' is not authorized for this dashboard.`,
-        });
-      }
-      next();
-    } catch (err) {
-      console.error('Dashboard role check error:', err);
-      return res.status(500).json({ success: false, message: 'Server error' });
-    }
-  };
-}
 
 /* ------------------------------------------------------------------ */
 /*  GET /api/dashboard/me — role-aware dashboard hint                 */
 /* ------------------------------------------------------------------ */
 
-router.get('/me', verifyToken, requireRole(), async (req, res) => {
+router.get('/me', verifyToken, attachDbUser, async (req, res) => {
   try {
     const user = req.dbUser;
     res.json({
@@ -285,22 +249,42 @@ router.get(
         rating: 5,
       };
 
-      let earnedBadges = volunteerProfile?.badges || [];
-      let newlyEarnedBadges = [];
+      // Issue 4: Badges come from two separate sources of truth.
+      // Volunteer badges (cleanup milestones) → Volunteer.badges
+      // Citizen badges (report submissions)   → User.badges
+      // See services/badgeService.js for the full explanation.
+      let volunteerBadges = volunteerProfile?.badges || [];
+      let newlyEarnedVolunteerBadges = [];
       if (volunteerProfile) {
-        newlyEarnedBadges = await awardVolunteerBadges(volunteerProfile);
-        if (newlyEarnedBadges.length > 0) {
-          const existingIds = new Set(earnedBadges.map((b) => b.id || b.name).filter(Boolean));
-          newlyEarnedBadges.forEach((badge) => {
+        newlyEarnedVolunteerBadges = await awardVolunteerBadges(volunteerProfile);
+        if (newlyEarnedVolunteerBadges.length > 0) {
+          const existingIds = new Set(volunteerBadges.map((b) => b.id || b.name).filter(Boolean));
+          newlyEarnedVolunteerBadges.forEach((badge) => {
             const key = badge.id || badge.name;
             if (key && !existingIds.has(key)) {
-              earnedBadges.push(badge);
+              volunteerBadges.push(badge);
             }
           });
         }
       }
 
-      const badgeCatalog = VOLUNTEER_BADGES.map((badge) => ({
+      // Citizen badges for this user (may have been awarded via report submissions)
+      let citizenBadges = req.dbUser?.badges || [];
+      let newlyEarnedCitizenBadges = [];
+      if (req.dbUser) {
+        newlyEarnedCitizenBadges = await awardCitizenBadges(req.dbUser);
+        if (newlyEarnedCitizenBadges.length > 0) {
+          const existingIds = new Set(citizenBadges.map((b) => b.id || b.name).filter(Boolean));
+          newlyEarnedCitizenBadges.forEach((badge) => {
+            const key = badge.id || badge.name;
+            if (key && !existingIds.has(key)) {
+              citizenBadges.push(badge);
+            }
+          });
+        }
+      }
+
+      const volunteerBadgeCatalog = VOLUNTEER_BADGES.map((badge) => ({
         id: badge.id,
         name: badge.name,
         description: badge.description,
@@ -320,10 +304,14 @@ router.get(
           },
           volunteerProfile: {
             stats: volunteerStats,
-            badges: earnedBadges,
-            badgeCatalog,
+            // volunteerBadges: earned by cleanup activity (source: Volunteer.badges)
+            volunteerBadges,
+            // citizenBadges: earned by report submissions (source: User.badges)
+            citizenBadges,
+            volunteerBadgeCatalog,
           },
-          newlyEarnedBadges,
+          // Newly awarded this request (for toast notifications)
+          newlyEarnedBadges: [...newlyEarnedVolunteerBadges, ...newlyEarnedCitizenBadges],
         },
       });
     } catch (err) {

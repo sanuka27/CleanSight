@@ -1,3 +1,26 @@
+/**
+ * Badge Service
+ *
+ * BADGE STORAGE — TWO SOURCES OF TRUTH (intentional, not a bug)
+ * ─────────────────────────────────────────────────────────────
+ * CleanSight has two distinct badge sets for two distinct user roles:
+ *
+ *  1. CITIZEN BADGES  →  stored in `User.badges`
+ *     Criteria : reportsSubmitted count on the User document
+ *     Awarded by: awardCitizenBadges(user)
+ *     Catalog  : constants/citizenBadges.js
+ *
+ *  2. VOLUNTEER BADGES  →  stored in `Volunteer.badges`
+ *     Criteria : totalCleanups / reportsResolved in Volunteer.stats
+ *     Awarded by: awardVolunteerBadges(volunteer)
+ *     Catalog  : constants/volunteerBadges.js
+ *
+ * These badge sets are never synced because they track fundamentally
+ * different activities. A user who is both a citizen reporter and a
+ * volunteer will hold badges in both collections. UI layers should fetch
+ * and display them separately (see dashboard.js volunteer route).
+ */
+
 import Volunteer from '../models/Volunteer.js';
 import User from '../models/User.js';
 import { VOLUNTEER_BADGES } from '../constants/volunteerBadges.js';

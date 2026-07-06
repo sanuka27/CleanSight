@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import Report from '../models/Report.js';
 import User from '../models/User.js';
+import Volunteer from '../models/Volunteer.js';
 import verifyToken from '../middleware/verifyToken.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { predictCategoryWithML, validateImageWithML } from '../services/mlService.js';
@@ -19,6 +20,81 @@ const router = express.Router();
 // Valid waste types and urgency levels
 const VALID_WASTE_TYPES = ['general', 'recyclable', 'organic', 'construction', 'hazardous'];
 const VALID_URGENCY_LEVELS = ['low', 'medium', 'high'];
+
+/* ------------------------------------------------------------------
+ * Issue 7 — Async ML analysis
+ * Runs Phase 1 (binary validation) and Phase 2 (category prediction)
+ * after the HTTP response has already been sent. Updates the Report
+ * document in-place. Uses setImmediate as a stopgap until a proper
+ * job queue (ARCH-008) is in place.
+ * ------------------------------------------------------------------ */
+async function runMlAnalysis(reportId, imageUrl) {
+  let imageValidationLabel = 'error';
+  let imageValidationConfidence = null;
+  let aiReviewStatus = 'manual_review';
+  let wasteCategoryPredictedLabel = 'pending';
+  let wasteCategoryConfidence = null;
+  let wasteCategoryEntropy = null;
+  let wasteCategoryConfidenceLevel = null;
+  let wasteCategoryAllPredictions = null;
+  let wasteCategoryReviewStatus = 'manual_review';
+
+  try {
+    const mlValidation = await validateImageWithML(imageUrl);
+
+    if (mlValidation.success) {
+      imageValidationLabel = mlValidation.label;
+      imageValidationConfidence = mlValidation.confidence;
+
+      if (imageValidationLabel === 'non-trash') {
+        aiReviewStatus = 'flagged';
+      } else if (mlValidation.recommendation === 'manual_review') {
+        aiReviewStatus = 'manual_review';
+      } else {
+        aiReviewStatus = 'approved';
+      }
+
+      if (imageValidationLabel === 'trash') {
+        const categoryPrediction = await predictCategoryWithML(imageUrl);
+
+        if (categoryPrediction.success) {
+          wasteCategoryPredictedLabel = categoryPrediction.predictedLabel;
+          wasteCategoryConfidence = categoryPrediction.confidence;
+          wasteCategoryEntropy = categoryPrediction.entropy;
+          wasteCategoryConfidenceLevel = categoryPrediction.confidenceLevel;
+          wasteCategoryAllPredictions = categoryPrediction.allPredictions;
+          wasteCategoryReviewStatus = categoryPrediction.reviewStatus;
+          if (aiReviewStatus !== 'approved') {
+            wasteCategoryReviewStatus = 'manual_review';
+          }
+        } else {
+          console.warn('[ML] Phase 2 prediction failed:', categoryPrediction.error);
+          wasteCategoryPredictedLabel = 'error';
+          wasteCategoryReviewStatus = 'manual_review';
+        }
+      }
+    } else {
+      console.warn('[ML] Phase 1 validation failed:', mlValidation.error);
+    }
+  } catch (err) {
+    console.error('[ML] runMlAnalysis threw unexpectedly:', err);
+  }
+
+  // Persist ML results back onto the report
+  await Report.findByIdAndUpdate(reportId, {
+    imageValidationLabel,
+    imageValidationConfidence,
+    aiReviewStatus,
+    wasteCategoryPredictedLabel,
+    wasteCategoryConfidence,
+    wasteCategoryEntropy,
+    wasteCategoryConfidenceLevel,
+    wasteCategoryAllPredictions,
+    wasteCategoryReviewStatus,
+  });
+}
+
+
 
 // @route   POST /api/reports
 // @desc    Create a new report
@@ -87,55 +163,10 @@ router.post('/', reportRateLimit, verifyToken, asyncHandler(async (req, res) => 
     });
   }
 
-  // Run Phase 1 validation first.
-  const mlValidation = await validateImageWithML(imageUrl);
-  let imageValidationLabel = 'error';
-  let imageValidationConfidence = null;
-  let aiReviewStatus = 'manual_review';
-
-  // Phase 2 prediction fields (predicted-only, not final reviewed values)
-  let wasteCategoryPredictedLabel = 'pending';
-  let wasteCategoryConfidence = null;
-  let wasteCategoryEntropy = null;
-  let wasteCategoryConfidenceLevel = null;
-  let wasteCategoryAllPredictions = null;
-  let wasteCategoryReviewStatus = 'pending';
-
-  if (mlValidation.success) {
-    imageValidationLabel = mlValidation.label;
-    imageValidationConfidence = mlValidation.confidence;
-
-    if (imageValidationLabel === 'non-trash') {
-      aiReviewStatus = 'flagged';
-    } else if (mlValidation.recommendation === 'manual_review') {
-      aiReviewStatus = 'manual_review';
-    } else {
-      aiReviewStatus = 'approved';
-    }
-
-    // Run Phase 2 whenever Phase 1 labels trash (even if manual review).
-    // If Phase 1 is not approved, force category review to manual review.
-    if (imageValidationLabel === 'trash') {
-      const categoryPrediction = await predictCategoryWithML(imageUrl);
-
-      if (categoryPrediction.success) {
-        wasteCategoryPredictedLabel = categoryPrediction.predictedLabel;
-        wasteCategoryConfidence = categoryPrediction.confidence;
-        wasteCategoryEntropy = categoryPrediction.entropy;
-        wasteCategoryConfidenceLevel = categoryPrediction.confidenceLevel;
-        wasteCategoryAllPredictions = categoryPrediction.allPredictions;
-        wasteCategoryReviewStatus = categoryPrediction.reviewStatus;
-        if (aiReviewStatus !== 'approved') {
-          wasteCategoryReviewStatus = 'manual_review';
-        }
-      } else {
-        console.warn('Phase 2 prediction failed:', categoryPrediction.error);
-        wasteCategoryPredictedLabel = 'error';
-        wasteCategoryReviewStatus = 'manual_review';
-      }
-    }
-  }
-
+  // Issue 7: Save the report immediately with aiReviewStatus 'pending' so the
+  // user gets a fast 201 response. ML inference runs in the background via
+  // setImmediate (stopgap — see BACKGROUND_JOBS.md / ARCH-008 for the proper
+  // queue solution).
   const report = await Report.create({
     firebaseUid,
     title: title ? String(title).trim().slice(0, 120) : null,
@@ -143,20 +174,21 @@ router.post('/', reportRateLimit, verifyToken, asyncHandler(async (req, res) => 
     description: description.trim(),
     location: {
       type: 'Point',
-      coordinates: [lng, lat]  // GeoJSON: [lng, lat]
+      coordinates: [lng, lat], // GeoJSON: [lng, lat]
     },
     wasteType: finalWasteType,
     urgency: finalUrgency,
     status: REPORT_STATUS.PENDING,
-    imageValidationLabel,
-    imageValidationConfidence,
-    aiReviewStatus,
-    wasteCategoryPredictedLabel,
-    wasteCategoryConfidence,
-    wasteCategoryEntropy,
-    wasteCategoryConfidenceLevel,
-    wasteCategoryAllPredictions,
-    wasteCategoryReviewStatus,
+    // ML fields initialised to pending — updated asynchronously by runMlAnalysis
+    imageValidationLabel: 'pending',
+    imageValidationConfidence: null,
+    aiReviewStatus: 'pending',
+    wasteCategoryPredictedLabel: 'pending',
+    wasteCategoryConfidence: null,
+    wasteCategoryEntropy: null,
+    wasteCategoryConfidenceLevel: null,
+    wasteCategoryAllPredictions: null,
+    wasteCategoryReviewStatus: 'pending',
   });
 
   // Increment user's report count
@@ -174,23 +206,51 @@ router.post('/', reportRateLimit, verifyToken, asyncHandler(async (req, res) => 
   res.status(201).json({
     success: true,
     data: report,
-    newlyEarnedBadges
+    newlyEarnedBadges,
+    mlStatus: 'pending', // ML results will be available shortly via GET /:id
+  });
+
+  // Fire ML analysis after the response is sent
+  setImmediate(() => {
+    runMlAnalysis(report._id, imageUrl.trim()).catch((err) =>
+      console.error('[ML] Background analysis failed for report', report._id, err)
+    );
   });
 }));
 
 // @route   GET /api/reports/my
-// @desc    Get current user's reports
+// @desc    Get current user's reports (paginated)
 // @access  Private
+// Issue 6: Added pagination — previously unbounded, could return thousands of rows.
 router.get('/my', verifyToken, asyncHandler(async (req, res) => {
   const { firebaseUid } = req.user;
 
-  const reports = await Report.find({ firebaseUid, isDeleted: { $ne: true } })
-    .sort({ createdAt: -1 });
+  const MAX_LIMIT = 200;
+  const DEFAULT_LIMIT = 50;
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(req.query.limit, 10) || DEFAULT_LIMIT));
+  const skip = (page - 1) * limit;
+
+  const baseQuery = { firebaseUid, isDeleted: { $ne: true } };
+
+  const [reports, total] = await Promise.all([
+    Report.find(baseQuery)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Report.countDocuments(baseQuery),
+  ]);
 
   res.json({
     success: true,
     count: reports.length,
-    data: reports
+    total,
+    pagination: {
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+    },
+    data: reports,
   });
 }));
 
@@ -451,8 +511,35 @@ router.patch('/:id/status', verifyToken, asyncHandler(async (req, res) => {
   report.status = newStatus;
   await report.save();
 
+  // Issue 3: Remove report from the volunteer's currentTasks when it reaches a
+  // terminal state (resolved or rejected). Without this, stale tasks accumulate
+  // indefinitely in Volunteer.currentTasks.
+  if (
+    [REPORT_STATUS.RESOLVED, REPORT_STATUS.REJECTED].includes(newStatus) &&
+    report.assignedTo
+  ) {
+    try {
+      const assignedUser = await User.findOne({ firebaseUid: report.assignedTo });
+      if (assignedUser) {
+        await Volunteer.updateOne(
+          { user: assignedUser._id },
+          { $pull: { currentTasks: report._id } }
+        );
+      }
+    } catch (err) {
+      // Non-fatal: log and continue — the status update already succeeded.
+      console.error('[currentTasks] Failed to remove task from volunteer:', err);
+    }
+  }
+
+  // Issue 5: Wrap badge/stats recalculation in try/catch so a failure here
+  // does not fail the status update response.
   if (newStatus === REPORT_STATUS.RESOLVED && previousStatus !== REPORT_STATUS.RESOLVED) {
-    await recordVolunteerResolutions([report.assignedTo]);
+    try {
+      await recordVolunteerResolutions([report.assignedTo]);
+    } catch (err) {
+      console.error('[volunteerProgress] recordVolunteerResolutions failed:', err);
+    }
   }
 
   res.json({ success: true, data: report });

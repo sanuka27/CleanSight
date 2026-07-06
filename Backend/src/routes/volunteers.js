@@ -11,48 +11,13 @@ import Volunteer from '../models/Volunteer.js';
 import User from '../models/User.js';
 import Report from '../models/Report.js';
 import { verifyToken } from '../middleware/verifyToken.js';
+import { requireRole } from '../middleware/roleGuard.js';
 import { ROLES } from '../constants/roles.js';
 import { REPORT_STATUS } from '../constants/reportStatus.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 
 const router = express.Router();
 
-/* ------------------------------------------------------------------ */
-/*  Helper: require specific role(s) — always verify from DB          */
-/* ------------------------------------------------------------------ */
-
-function requireRole(...allowedRoles) {
-  return async (req, res, next) => {
-    try {
-      const { firebaseUid } = req.user;
-      const user = await User.findOne({ firebaseUid });
-      
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User profile not found. Please complete registration.'
-        });
-      }
-      
-      if (!allowedRoles.includes(user.role)) {
-        return res.status(403).json({
-          success: false,
-          message: `Role '${user.role}' is not authorized to access this route`
-        });
-      }
-      
-      // Attach full user object for convenience
-      req.dbUser = user;
-      next();
-    } catch (error) {
-      console.error('Role check error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Authorization check failed'
-      });
-    }
-  };
-}
 
 /* ------------------------------------------------------------------ */
 /*  GET /api/volunteers                                               */

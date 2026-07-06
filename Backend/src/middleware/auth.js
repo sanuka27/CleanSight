@@ -1,19 +1,42 @@
 /**
- * @deprecated This file is deprecated. Use verifyToken.js for Firebase authentication
- * and requireRole middleware for authorization.
- * 
- * This file remains for backward compatibility during migration.
- * All routes should migrate to Firebase-based authentication.
+ * @deprecated  ARCH-002 — Scheduled for removal.
+ *
+ * STATUS: Retained only for backward compatibility. No route file currently
+ * imports from this module (verified 2026-07-06). Safe to delete once the
+ * tracking ticket is closed.
+ *
+ * MIGRATION GUIDE
+ * ───────────────
+ * Replace any import from this file with the canonical alternatives:
+ *
+ *   Authentication (was `protect`):
+ *     import { verifyToken } from './verifyToken.js';
+ *
+ *   Authorization (was `requireRole` / `authorize`):
+ *     import { requireRole } from './roleGuard.js';
+ *
+ *   Convenience guards (was `requireVolunteer` / `requireStaff` / `requireAdmin`):
+ *     import { requireVolunteer, requireStaff, requireAdmin } from './roleGuard.js';
+ *
+ * WHY roleGuard.js IS SUPERIOR
+ * ─────────────────────────────
+ * • Always fetches the role fresh from the database (no stale token claims)
+ * • Checks `isSuspended` flag before allowing access
+ * • Validates role names against the `ALL_ROLES` enum at middleware-factory time
+ * • Attaches `req.dbUser` for downstream handlers to consume without a second DB call
+ *
+ * REMOVAL TIMELINE
+ * ─────────────────
+ * This file should be deleted in the next major release once ARCH-002 is closed.
+ * Before deleting: grep the entire codebase for `from.*middleware/auth` to confirm
+ * no remaining consumers.
  */
 
 import { verifyToken } from './verifyToken.js';
 import User from '../models/User.js';
 import { ROLES } from '../constants/roles.js';
 
-/**
- * @deprecated Use verifyToken middleware instead
- * This is a compatibility wrapper that delegates to Firebase auth
- */
+/** @deprecated Use {@link verifyToken} from `./verifyToken.js` instead. */
 export const protect = verifyToken;
 
 /**

@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "build": "node -e \"console.log('cleansight-backend: no build step required')\""
+    "build": "node -e \"console.log('cleansight-backend: no build step required')\"",
+    "test": "node --test src/tests/roleGuard.test.js src/tests/reportStatus.test.js src/tests/badgeService.test.js src/tests/volunteerProgress.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

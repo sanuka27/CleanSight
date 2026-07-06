@@ -15,34 +15,40 @@ export async function recordVolunteerResolutions(assignedToUids = []) {
   const awardedByVolunteer = [];
 
   for (const [uid, count] of countsByUid.entries()) {
-    const user = await User.findOne({ firebaseUid: uid });
-    if (!user) continue;
+    try {
+      const user = await User.findOne({ firebaseUid: uid });
+      if (!user) continue;
 
-    const updatedUser = await User.findOneAndUpdate(
-      { _id: user._id },
-      { $inc: { cleanupsCompleted: count } },
-      { new: true }
-    );
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: user._id },
+        { $inc: { cleanupsCompleted: count } },
+        { new: true }
+      );
 
-    const totalCleanups = updatedUser?.cleanupsCompleted ?? (user.cleanupsCompleted + count);
+      const totalCleanups = updatedUser?.cleanupsCompleted ?? (user.cleanupsCompleted + count);
 
-    const volunteer = await Volunteer.findOneAndUpdate(
-      { user: user._id },
-      {
-        $setOnInsert: { user: user._id, isActive: true },
-        $set: {
-          'stats.totalCleanups': totalCleanups,
-          'stats.reportsResolved': totalCleanups,
+      const volunteer = await Volunteer.findOneAndUpdate(
+        { user: user._id },
+        {
+          $setOnInsert: { user: user._id, isActive: true },
+          $set: {
+            'stats.totalCleanups': totalCleanups,
+            'stats.reportsResolved': totalCleanups,
+          },
         },
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
 
-    if (!volunteer) continue;
+      if (!volunteer) continue;
 
-    const newBadges = await awardVolunteerBadges(volunteer);
-    if (newBadges.length > 0) {
-      awardedByVolunteer.push({ uid, badges: newBadges });
+      const newBadges = await awardVolunteerBadges(volunteer);
+      if (newBadges.length > 0) {
+        awardedByVolunteer.push({ uid, badges: newBadges });
+      }
+    } catch (err) {
+      // Issue 5: Isolate per-volunteer failures. A DB error for one volunteer
+      // must not prevent the remaining volunteers from being processed.
+      console.error(`[volunteerProgress] Failed to process resolution for uid=${uid}:`, err);
     }
   }
 

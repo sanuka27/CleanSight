@@ -18,6 +18,7 @@ import contactAdminRoutes from './routes/contactAdmin.js';
 import adminRoutes from './routes/admin.js';
 import mlAnalyticsRoutes from './routes/mlAnalytics.js';
 import notificationRoutes from './routes/notifications.js';
+import { startMlWorker, closeMlWorker } from './workers/mlWorker.js';
 
 // Load environment variables
 dotenv.config();
@@ -117,7 +118,10 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await connectDB();
-    
+
+    // Start the BullMQ ML worker (no-op if Redis is not configured)
+    startMlWorker();
+
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -128,6 +132,16 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
+// Graceful shutdown — drain in-flight BullMQ jobs before exit
+async function shutdown(signal) {
+  console.log(`\n[server] ${signal} received — shutting down gracefully...`);
+  await closeMlWorker();
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {

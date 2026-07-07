@@ -86,7 +86,23 @@ const userSchema = new mongoose.Schema({
   lastActiveAt: {
     type: Date,
     default: null
-  }
+  },
+
+  // FCM device tokens for push notifications.
+  // One token per browser/device session; client registers after login.
+  // Stored as a set — duplicates are prevented by $addToSet.
+  // Stale tokens (device unregistered) are pruned automatically by
+  // notificationService when FCM returns registration-token-not-registered.
+  fcmTokens: [{
+    type: String,
+    trim: true,
+  }],
+
+  // Per-user notification preferences.
+  notificationPreferences: {
+    push: { type: Boolean, default: true },
+    email: { type: Boolean, default: true },
+  },
 }, {
   timestamps: true
 });

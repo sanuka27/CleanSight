@@ -58,7 +58,7 @@ class ApiClient {
     }
   }
 
-  private async request<T>(
+  public async request<T>(
     endpoint: string,
     options: RequestOptions = {}
   ): Promise<T> {
@@ -298,6 +298,39 @@ class ApiClient {
   async getAdminDashboard(): Promise<AdminDashboardResponse> {
     return this.request("/api/dashboard/admin", {
       method: "GET",
+      requiresAuth: true,
+    });
+  }
+
+  // ── Notification endpoints ────────────────────────────────────────
+
+  async registerFcmToken(token: string): Promise<{ success: boolean }> {
+    return this.request('/api/notifications/fcm-token', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+      requiresAuth: true,
+    });
+  }
+
+  async deregisterFcmToken(token: string): Promise<{ success: boolean }> {
+    return this.request('/api/notifications/fcm-token', {
+      method: 'DELETE',
+      body: JSON.stringify({ token }),
+      requiresAuth: true,
+    });
+  }
+
+  async getNotificationPreferences(): Promise<{ success: boolean; data: { push: boolean; email: boolean } }> {
+    return this.request('/api/notifications/preferences', {
+      method: 'GET',
+      requiresAuth: true,
+    });
+  }
+
+  async updateNotificationPreferences(prefs: { push?: boolean; email?: boolean }): Promise<{ success: boolean; data: { push: boolean; email: boolean } }> {
+    return this.request('/api/notifications/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(prefs),
       requiresAuth: true,
     });
   }

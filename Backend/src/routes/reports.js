@@ -5,7 +5,8 @@ import User from '../models/User.js';
 import Volunteer from '../models/Volunteer.js';
 import verifyToken from '../middleware/verifyToken.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { predictCategoryWithML, validateImageWithML } from '../services/mlService.js';
+import { enqueueMLAnalysis, mlQueue } from '../queues/mlQueue.js';
+import { runMlAnalysis } from '../workers/mlWorker.js';
 import { awardCitizenBadges } from '../services/badgeService.js';
 import { recordVolunteerResolutions } from '../services/volunteerProgressService.js';
 import { notifyStatusChange, notifyReportSubmitted } from '../services/notificationService.js';
@@ -23,77 +24,12 @@ const VALID_WASTE_TYPES = ['general', 'recyclable', 'organic', 'construction', '
 const VALID_URGENCY_LEVELS = ['low', 'medium', 'high'];
 
 /* ------------------------------------------------------------------
- * Issue 7 — Async ML analysis
- * Runs Phase 1 (binary validation) and Phase 2 (category prediction)
- * after the HTTP response has already been sent. Updates the Report
- * document in-place. Uses setImmediate as a stopgap until a proper
- * job queue (ARCH-008) is in place.
+ * ARCH-008 — BullMQ ML job queue
+ * ML inference is enqueued as a BullMQ job when Redis is available.
+ * Falls back to the original setImmediate stopgap when Redis is not
+ * configured (e.g. plain local dev without Docker).
+ * runMlAnalysis logic lives in src/workers/mlWorker.js.
  * ------------------------------------------------------------------ */
-async function runMlAnalysis(reportId, imageUrl) {
-  let imageValidationLabel = 'error';
-  let imageValidationConfidence = null;
-  let aiReviewStatus = 'manual_review';
-  let wasteCategoryPredictedLabel = 'pending';
-  let wasteCategoryConfidence = null;
-  let wasteCategoryEntropy = null;
-  let wasteCategoryConfidenceLevel = null;
-  let wasteCategoryAllPredictions = null;
-  let wasteCategoryReviewStatus = 'manual_review';
-
-  try {
-    const mlValidation = await validateImageWithML(imageUrl);
-
-    if (mlValidation.success) {
-      imageValidationLabel = mlValidation.label;
-      imageValidationConfidence = mlValidation.confidence;
-
-      if (imageValidationLabel === 'non-trash') {
-        aiReviewStatus = 'flagged';
-      } else if (mlValidation.recommendation === 'manual_review') {
-        aiReviewStatus = 'manual_review';
-      } else {
-        aiReviewStatus = 'approved';
-      }
-
-      if (imageValidationLabel === 'trash') {
-        const categoryPrediction = await predictCategoryWithML(imageUrl);
-
-        if (categoryPrediction.success) {
-          wasteCategoryPredictedLabel = categoryPrediction.predictedLabel;
-          wasteCategoryConfidence = categoryPrediction.confidence;
-          wasteCategoryEntropy = categoryPrediction.entropy;
-          wasteCategoryConfidenceLevel = categoryPrediction.confidenceLevel;
-          wasteCategoryAllPredictions = categoryPrediction.allPredictions;
-          wasteCategoryReviewStatus = categoryPrediction.reviewStatus;
-          if (aiReviewStatus !== 'approved') {
-            wasteCategoryReviewStatus = 'manual_review';
-          }
-        } else {
-          console.warn('[ML] Phase 2 prediction failed:', categoryPrediction.error);
-          wasteCategoryPredictedLabel = 'error';
-          wasteCategoryReviewStatus = 'manual_review';
-        }
-      }
-    } else {
-      console.warn('[ML] Phase 1 validation failed:', mlValidation.error);
-    }
-  } catch (err) {
-    console.error('[ML] runMlAnalysis threw unexpectedly:', err);
-  }
-
-  // Persist ML results back onto the report
-  await Report.findByIdAndUpdate(reportId, {
-    imageValidationLabel,
-    imageValidationConfidence,
-    aiReviewStatus,
-    wasteCategoryPredictedLabel,
-    wasteCategoryConfidence,
-    wasteCategoryEntropy,
-    wasteCategoryConfidenceLevel,
-    wasteCategoryAllPredictions,
-    wasteCategoryReviewStatus,
-  });
-}
 
 
 
@@ -211,13 +147,28 @@ router.post('/', reportRateLimit, verifyToken, asyncHandler(async (req, res) => 
     mlStatus: 'pending', // ML results will be available shortly via GET /:id
   });
 
-  // Fire ML analysis and submission notification after the response is sent
-  setImmediate(() => {
-    runMlAnalysis(report._id, imageUrl.trim()).catch((err) =>
-      console.error('[ML] Background analysis failed for report', report._id, err)
-    );
+  // ── Dispatch ML analysis ─────────────────────────────────────────────────
+  // Prefer BullMQ (durable, retryable). Fall back to setImmediate when Redis
+  // is not configured so the server works without Docker in plain dev.
+  const reportIdStr = report._id.toString();
+  const cleanImageUrl = imageUrl.trim();
 
-    // Send submission confirmation email to the citizen
+  if (mlQueue) {
+    // Queue path — BullMQ handles retries automatically
+    enqueueMLAnalysis(reportIdStr, cleanImageUrl).catch((err) =>
+      console.error('[mlQueue] Failed to enqueue ML job for report', reportIdStr, err)
+    );
+  } else {
+    // Fallback path — setImmediate (no retry, no persistence)
+    setImmediate(() => {
+      runMlAnalysis(reportIdStr, cleanImageUrl).catch((err) =>
+        console.error('[ML] Background analysis failed for report', reportIdStr, err)
+      );
+    });
+  }
+
+  // ── Send submission confirmation email ───────────────────────────────────
+  setImmediate(() => {
     (async () => {
       try {
         const owner = await User.findOne(

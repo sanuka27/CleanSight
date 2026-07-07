@@ -8,6 +8,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { predictCategoryWithML, validateImageWithML } from '../services/mlService.js';
 import { awardCitizenBadges } from '../services/badgeService.js';
 import { recordVolunteerResolutions } from '../services/volunteerProgressService.js';
+import { notifyStatusChange, notifyReportSubmitted } from '../services/notificationService.js';
 import { 
   REPORT_STATUS, 
   isValidTransition, 
@@ -210,11 +211,32 @@ router.post('/', reportRateLimit, verifyToken, asyncHandler(async (req, res) => 
     mlStatus: 'pending', // ML results will be available shortly via GET /:id
   });
 
-  // Fire ML analysis after the response is sent
+  // Fire ML analysis and submission notification after the response is sent
   setImmediate(() => {
     runMlAnalysis(report._id, imageUrl.trim()).catch((err) =>
       console.error('[ML] Background analysis failed for report', report._id, err)
     );
+
+    // Send submission confirmation email to the citizen
+    (async () => {
+      try {
+        const owner = await User.findOne(
+          { firebaseUid },
+          'email name notificationPreferences'
+        ).lean();
+        if (!owner) return;
+        const prefs = owner.notificationPreferences ?? { email: true };
+        if (!prefs.email) return;
+        await notifyReportSubmitted({
+          reportId: report._id,
+          reportTitle: report.title || description.trim().slice(0, 80),
+          email: owner.email,
+          userName: owner.name,
+        });
+      } catch (err) {
+        console.error('[notify] Failed to send submission confirmation email:', err);
+      }
+    })();
   });
 }));
 
@@ -540,6 +562,59 @@ router.patch('/:id/status', verifyToken, asyncHandler(async (req, res) => {
     } catch (err) {
       console.error('[volunteerProgress] recordVolunteerResolutions failed:', err);
     }
+  }
+
+  // Send push + email notification to the report owner asynchronously.
+  // We only notify on status changes that are visible to the citizen
+  // (verified, assigned, in_progress, resolved, rejected).
+  const CITIZEN_VISIBLE_STATUSES = [
+    REPORT_STATUS.VERIFIED,
+    REPORT_STATUS.ASSIGNED,
+    REPORT_STATUS.IN_PROGRESS,
+    REPORT_STATUS.RESOLVED,
+    REPORT_STATUS.REJECTED,
+  ];
+
+  if (CITIZEN_VISIBLE_STATUSES.includes(newStatus)) {
+    setImmediate(async () => {
+      try {
+        const owner = await User.findOne(
+          { firebaseUid: report.firebaseUid },
+          'email name fcmTokens notificationPreferences'
+        ).lean();
+
+        if (!owner) return;
+
+        const prefs = owner.notificationPreferences ?? { push: true, email: true };
+        // Send one push per registered token
+        const tokenJobs = (prefs.push && owner.fcmTokens?.length)
+          ? owner.fcmTokens.map((fcmToken) =>
+              notifyStatusChange({
+                status: newStatus,
+                reportId: report._id,
+                reportTitle: report.title,
+                fcmToken,
+                email: null, // don't double-email per token
+                userName: owner.name,
+              })
+            )
+          : [];
+
+        // Send one email regardless of token count
+        const emailJob = notifyStatusChange({
+          status: newStatus,
+          reportId: report._id,
+          reportTitle: report.title,
+          fcmToken: null,
+          email: prefs.email ? owner.email : null,
+          userName: owner.name,
+        });
+
+        await Promise.allSettled([...tokenJobs, emailJob]);
+      } catch (err) {
+        console.error('[notify] Failed to dispatch status-change notification:', err);
+      }
+    });
   }
 
   res.json({ success: true, data: report });

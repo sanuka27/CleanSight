@@ -17,6 +17,7 @@ import contactRoutes from './routes/contact.js';
 import contactAdminRoutes from './routes/contactAdmin.js';
 import adminRoutes from './routes/admin.js';
 import mlAnalyticsRoutes from './routes/mlAnalytics.js';
+import notificationRoutes from './routes/notifications.js';
 
 // Load environment variables
 dotenv.config();
@@ -99,6 +100,7 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/admin/contact', contactAdminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ml-analytics', mlAnalyticsRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ─────────────────────────────────────────────────────────────────────
 // Error Handling

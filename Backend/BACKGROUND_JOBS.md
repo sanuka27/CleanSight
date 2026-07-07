@@ -1,77 +1,120 @@
 # Background Jobs — CleanSight Backend
-**Tracking ID:** ARCH-008
+**Tracking ID:** ARCH-008 ✅ **Implemented**
 
 ---
 
 ## Current State
 
-CleanSight has **no job queue or background worker system**. There is no Redis, BullMQ, Agenda, or equivalent infrastructure. All side-effects currently run either:
-
-- **Synchronously** in the request/response cycle (badge recalculation, volunteer stats), or
-- **Via `setImmediate`** as a stopgap for ML inference (introduced in ARCH-007 fix)
-
----
-
-## Stopgap: `setImmediate` for ML Inference
-
-`POST /api/reports` now saves the report immediately with `aiReviewStatus: 'pending'` and then fires ML analysis via `setImmediate` after the response is sent. This eliminates the worst-case 20s latency (ML_SERVICE_TIMEOUT_MS × 2) from the user's critical path.
-
-**Limitations of this stopgap:**
-- No retry on failure — if the process crashes mid-ML-run, the report stays `pending` forever
-- No visibility — there's no way to observe queued or failed jobs without log grepping
-- Memory-bound — a sudden spike of report submissions could queue thousands of `setImmediate` callbacks in the Node.js event loop
-- No backpressure — there's nothing to throttle submission rate against ML capacity
+CleanSight uses **BullMQ + Redis** for durable, retryable background job processing (ARCH-008).
+When Redis is not available (no `REDIS_URL` configured), the system automatically falls back to
+the `setImmediate` stopgap so the server works in plain local dev without Docker.
 
 ---
 
-## Jobs That Should Move to a Proper Queue
+## Architecture
+
+```
+POST /api/reports
+      │
+      ├─ Redis available? ──YES──▶ mlQueue.add('analyze', { reportId, imageUrl })
+      │                                    │
+      │                                    ▼
+      │                           BullMQ Queue ("ml-inference")
+      │                                    │
+      │                                    ▼
+      │                           mlWorker.js (concurrency=1)
+      │                                    │
+      │                                    ├─ Phase 1: validateImageWithML()
+      │                                    ├─ Phase 2: predictCategoryWithML()
+      │                                    └─ Report.findByIdAndUpdate(...)
+      │
+      └─ Redis NOT available? ──▶ setImmediate(runMlAnalysis) [stopgap fallback]
+```
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/config/redis.js` | `createRedisConnection()` factory — shared by Queue, Worker, QueueEvents |
+| `src/queues/mlQueue.js` | BullMQ `Queue` on `"ml-inference"` channel + `enqueueMLAnalysis()` helper |
+| `src/workers/mlWorker.js` | `runMlAnalysis()` logic + BullMQ `Worker` + graceful `closeMlWorker()` |
+| `src/routes/reports.js` | Dispatch: `mlQueue.add()` with `setImmediate` fallback |
+| `src/server.js` | `startMlWorker()` on boot, `closeMlWorker()` on SIGTERM/SIGINT |
+| `docker-compose.yml` | Redis 7 Alpine for local development |
+
+---
+
+## Job Configuration
+
+| Setting | Value |
+|---------|-------|
+| Queue name | `ml-inference` |
+| Worker concurrency | `1` (single ML call at a time) |
+| Retry attempts | `3` |
+| Backoff | Exponential — 5 s → 10 s → 20 s |
+| Keep completed jobs | Last 100 |
+| Keep failed jobs | Last 500 |
+
+---
+
+## Local Development
+
+### With queue (recommended)
+
+```bash
+# 1. Start Redis
+docker compose up -d redis
+
+# 2. Enable in .env
+REDIS_URL=redis://localhost:6379
+
+# 3. Start backend
+pnpm run dev
+```
+
+The server log will show:
+```
+[redis] Connected ✓
+[mlQueue] Queue initialised on "ml-inference" channel ✓
+[mlWorker] Worker started on "ml-inference" channel (concurrency=1) ✓
+```
+
+### Without queue (plain dev — no Docker)
+
+Leave `REDIS_URL` unset. The server warns once at startup and falls back to `setImmediate`.
+
+```
+[redis] REDIS_URL / REDIS_HOST not set — job queue disabled. ML inference will fall back to setImmediate.
+```
+
+---
+
+## Jobs Remaining to Move to Queue
 
 | Job | Trigger | Current Behaviour | Priority |
 |-----|---------|-------------------|----------|
-| ML Phase 1 + Phase 2 inference | `POST /api/reports` | `setImmediate` stopgap | 🔴 High |
+| ~~ML Phase 1 + Phase 2 inference~~ | ~~POST /api/reports~~ | ✅ **BullMQ queue** | — |
 | Volunteer badge recalculation | Report resolved | Inline in request cycle | 🟡 Medium |
 | Citizen badge recalculation | Report created | Inline in request cycle | 🟡 Medium |
 | Volunteer stats update | Report resolved | Inline in request cycle | 🟡 Medium |
-| Email notifications | Status change, badge earned | Not implemented | 🟢 Low |
 | Soft-delete cleanup | Scheduled (daily) | Not implemented | 🟢 Low |
 
 ---
 
-## Recommended Solution
+## Production Deployment
 
-**BullMQ + Redis** is the recommended stack for this project:
+Use a managed Redis service:
+- **Upstash** (serverless, free tier) — set `REDIS_URL=rediss://...` and `REDIS_TLS=true`
+- **Redis Cloud** — set `REDIS_URL=redis://:password@host:port`
+- **Railway / Render Redis** — use the provided `REDIS_URL`
 
-- BullMQ is the spiritual successor to Bull, works well with Node.js ESM projects
-- Redis is already a common dependency in production Node stacks
-- BullMQ provides: retries, backoff, job visibility, rate limiting, and a UI (Bull Board)
+For high-throughput production, consider splitting the worker into a separate process:
 
-### Migration Path
-
-1. Add Redis to the infrastructure (Docker Compose for local dev, managed Redis for prod)
-2. Install `bullmq` and `ioredis` as dependencies
-3. Create `src/queues/mlQueue.js` — replace `setImmediate` in `reports.js` with `mlQueue.add('analyze', { reportId, imageUrl })`
-4. Create `src/workers/mlWorker.js` — process ML jobs and update the Report document
-5. Create `src/queues/badgeQueue.js` + `src/workers/badgeWorker.js` — move badge/stats recalculation out of the request cycle
-6. Add Bull Board or similar for job monitoring
-
-### Example (BullMQ sketch)
-```js
-// src/queues/mlQueue.js
-import { Queue } from 'bullmq';
-import { redisConnection } from '../config/redis.js';
-
-export const mlQueue = new Queue('ml-inference', { connection: redisConnection });
-```
-
-```js
-// src/workers/mlWorker.js
-import { Worker } from 'bullmq';
-import { runMlAnalysis } from '../services/mlService.js';
-import { redisConnection } from '../config/redis.js';
-
-new Worker('ml-inference', async (job) => {
-  await runMlAnalysis(job.data.reportId, job.data.imageUrl);
-}, { connection: redisConnection });
+```bash
+# Separate worker entry point (future ARCH-009)
+node src/workers/mlWorker.js
 ```
 
 ---
@@ -79,5 +122,6 @@ new Worker('ml-inference', async (job) => {
 ## References
 
 - [BullMQ Docs](https://docs.bullmq.io/)
-- [Bull Board (monitoring UI)](https://github.com/felixmosh/bull-board)
-- Related issues: ARCH-007 (async ML stopgap)
+- [ioredis Docs](https://github.com/redis/ioredis)
+- [Upstash Redis](https://upstash.com/)
+- Related: ARCH-007 (async ML stopgap), ARCH-008 (this implementation)

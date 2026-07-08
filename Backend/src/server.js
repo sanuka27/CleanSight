@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
+import { securityHeaders, additionalSecurityHeaders } from './middleware/securityHeaders.js';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import connectDB from './config/db.js';
@@ -57,8 +57,11 @@ const corsOptions = {
 // Set to the number of proxy hops in front of this server (typically 1 for
 // a single load balancer or Nginx reverse proxy).
 app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
-// helmet sets security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, etc.
-app.use(helmet());
+// Security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options,
+// Referrer-Policy, Permissions-Policy, COEP/COOP/CORP, and more.
+// See src/middleware/securityHeaders.js for the full configuration.
+app.use(securityHeaders);
+app.use(additionalSecurityHeaders);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

@@ -13,5 +13,15 @@
   },
   "keywords": ["mern", "waste-management", "community", "cleanup"],
   "author": "Sanuka",
-  "license": "MIT"
+  "license": "MIT",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@firebase/util",
+      "@swc/core",
+      "esbuild",
+      "msgpackr-extract",
+      "protobufjs"
+    ]
+  }
 }
+

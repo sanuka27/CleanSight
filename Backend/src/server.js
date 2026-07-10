@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import connectDB from './config/db.js';
 import './config/firebaseAdmin.js'; // Initialize Firebase Admin
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { rateLimitRedisClient } from './middleware/rateLimit.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -79,15 +80,22 @@ if (process.env.NODE_ENV === 'development') {
 // ─────────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   const dbConnected = mongoose.connection.readyState === 1;
-  
-  res.status(dbConnected ? 200 : 503).json({ 
-    status: dbConnected ? 'ok' : 'degraded', 
+  // ioredis statuses: 'ready' = connected, everything else = not usable
+  const rlRedisStatus = rateLimitRedisClient?.status ?? 'disabled';
+  const rlRedisReady  = rlRedisStatus === 'ready';
+
+  res.status(dbConnected ? 200 : 503).json({
+    status: dbConnected ? 'ok' : 'degraded',
     message: 'CleanSight API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     database: {
       connected: dbConnected,
       host: mongoose.connection.host || 'unknown',
+    },
+    rateLimit: {
+      store: rlRedisReady ? 'redis' : 'memory',
+      redisStatus: rlRedisStatus,
     },
   });
 });

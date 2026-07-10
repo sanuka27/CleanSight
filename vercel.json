@@ -1,0 +1,9 @@
+{
+  "buildCommand": "cd Frontend && pnpm install && pnpm run build",
+  "outputDirectory": "Frontend/dist",
+  "installCommand": "pnpm install",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

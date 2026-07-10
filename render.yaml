@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: cleansight-backend
+    runtime: node
+    rootDir: Backend
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /api/health
+    autoDeploy: true

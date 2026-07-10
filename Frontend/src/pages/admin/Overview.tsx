@@ -12,6 +12,7 @@ import { RANGE_LABELS } from "@/components/admin/Topbar";
 import { StatsGrid } from "@/components/admin/StatsGrid";
 import { ActivityChart } from "@/components/admin/Charts/ActivityChart";
 import { WasteTypeChart } from "@/components/admin/Charts/WasteTypeChart";
+import { ActivityFeed } from "@/components/admin/ActivityFeed";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/useAuth";
 import {
@@ -280,6 +281,9 @@ export default function AdminOverview() {
             ))}
           </div>
         </Card>
+
+        {/* Live Activity Feed */}
+        <ActivityFeed compact maxVisible={15} />
       </div>
     </div>
   );

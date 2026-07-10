@@ -15,10 +15,68 @@ import { recordVolunteerResolutions } from '../services/volunteerProgressService
 import { resolveDateRange } from '../utils/dateRange.js';
 import { REPORT_STATUS, isValidTransition } from '../constants/reportStatus.js';
 import { ALL_ROLES } from '../constants/roles.js';
+import { addClient, removeClient, broadcast, makeEvent } from '../services/sseService.js';
 
 const router = express.Router();
 
-// All routes require admin auth
+/* ═══════════════════════════════════════════════════════════════════
+   ACTIVITY FEED — Server-Sent Events (SSE)
+   Must be registered BEFORE router.use(adminOnly) so the adminOnly
+   middleware can run per-request (it reads the token from the query
+   string for SSE, since EventSource doesn't support custom headers).
+═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * GET /api/admin/activity-feed
+ *
+ * Opens a persistent SSE stream that emits real-time report activity
+ * events to connected admin/staff clients.
+ *
+ * Auth: Because EventSource does not support custom request headers,
+ * the Firebase ID token is passed as the `token` query parameter.
+ * The adminOnly middleware already handles this via the Bearer path;
+ * here we copy it to the Authorization header before running adminOnly.
+ */
+router.get('/activity-feed', async (req, res, next) => {
+  // Move token from ?token= query param → Authorization header so
+  // the existing adminOnly middleware can verify it unchanged.
+  if (req.query.token && !req.headers.authorization) {
+    req.headers.authorization = `Bearer ${req.query.token}`;
+  }
+
+  // Run adminOnly inline — if it rejects it will send a 401/403 response.
+  adminOnly(req, res, async () => {
+    try {
+      // SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // disable Nginx proxy buffering
+      res.flushHeaders(); // flush immediately so the browser sees the response start
+
+      const uid = req.adminUser?.firebaseUid || 'unknown';
+      const clientId = addClient(uid, res);
+
+      // Send a welcome event so the client knows it's connected
+      const welcomeEvent = makeEvent('connected', {
+        reportId: null,
+        title: null,
+        description: 'Activity feed connected',
+      });
+      res.write(`event: connected\ndata: ${JSON.stringify(welcomeEvent)}\n\n`);
+
+      // Clean up when the client disconnects
+      req.on('close', () => {
+        removeClient(uid, clientId);
+      });
+    } catch (err) {
+      console.error('[SSE] activity-feed setup error:', err);
+      next(err);
+    }
+  });
+});
+
+// All subsequent routes require admin auth
 router.use(adminOnly);
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -991,6 +1049,24 @@ router.patch('/reports/:id/status', async (req, res) => {
       },
     });
 
+    // Broadcast to all connected SSE admin clients
+    const eventType = status === REPORT_STATUS.RESOLVED
+      ? 'report_resolved'
+      : status === REPORT_STATUS.REJECTED
+        ? 'report_rejected'
+        : 'status_changed';
+    broadcast(makeEvent(eventType, {
+      reportId: id,
+      title: report.title || null,
+      description: `Report status changed from '${statusFrom}' to '${status}'`,
+      actorUid: req.adminUser?.firebaseUid || null,
+      actorName: req.adminUser?.name || null,
+      previousStatus: statusFrom,
+      newStatus: status,
+      urgency: report.urgency,
+      wasteType: report.wasteType,
+    }));
+
     res.json({ success: true, data: reportData });
   } catch (err) {
     console.error('Admin update status error:', err);
@@ -1109,6 +1185,18 @@ router.patch('/reports/:id/review', async (req, res) => {
         phase2Error,
       },
     });
+
+    // Broadcast AI review decision to admin feed
+    broadcast(makeEvent('ai_review_complete', {
+      reportId: id,
+      title: report.title || null,
+      description: `AI review '${action}' — status: ${newAiReviewStatus}`,
+      actorUid: req.adminUser?.firebaseUid || null,
+      actorName: req.adminUser?.name || null,
+      newStatus: newAiReviewStatus,
+      urgency: report.urgency,
+      wasteType: report.wasteType,
+    }));
 
     res.json({ success: true, data: report });
   } catch (err) {
@@ -1274,6 +1362,18 @@ router.patch('/reports/:id/assign', async (req, res) => {
         assignedToName:  volunteer.name  || null,
       },
     });
+
+    // Broadcast assignment to admin feed
+    broadcast(makeEvent('report_assigned', {
+      reportId: id,
+      title: report.title || null,
+      description: `Report assigned to ${volunteer.name || volunteerUid}`,
+      actorUid: req.adminUser?.firebaseUid || null,
+      actorName: req.adminUser?.name || null,
+      newStatus: REPORT_STATUS.ASSIGNED,
+      urgency: report.urgency,
+      wasteType: report.wasteType,
+    }));
 
     res.json({ success: true, data: reportData });
   } catch (err) {

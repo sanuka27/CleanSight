@@ -10,6 +10,7 @@ import { runMlAnalysis } from '../workers/mlWorker.js';
 import { awardCitizenBadges } from '../services/badgeService.js';
 import { recordVolunteerResolutions } from '../services/volunteerProgressService.js';
 import { notifyStatusChange, notifyReportSubmitted } from '../services/notificationService.js';
+import { broadcast, makeEvent } from '../services/sseService.js';
 import { 
   REPORT_STATUS, 
   isValidTransition, 
@@ -146,6 +147,17 @@ router.post('/', reportRateLimit, verifyToken, asyncHandler(async (req, res) => 
     newlyEarnedBadges,
     mlStatus: 'pending', // ML results will be available shortly via GET /:id
   });
+
+  // Broadcast new report event to admin SSE feed
+  broadcast(makeEvent('report_submitted', {
+    reportId: report._id.toString(),
+    title: report.title || null,
+    description: `New ${report.urgency} urgency ${report.wasteType} report submitted`,
+    actorUid: firebaseUid,
+    urgency: report.urgency,
+    wasteType: report.wasteType,
+    newStatus: REPORT_STATUS.PENDING,
+  }));
 
   // ── Dispatch ML analysis ─────────────────────────────────────────────────
   // Prefer BullMQ (durable, retryable). Fall back to setImmediate when Redis
@@ -366,6 +378,17 @@ router.patch('/:id/assign-self', verifyToken, asyncHandler(async (req, res) => {
   report.assignedTo = firebaseUid;
   await report.save();
 
+  // Broadcast self-assignment to admin SSE feed
+  broadcast(makeEvent('report_assigned', {
+    reportId: report._id.toString(),
+    title: report.title || null,
+    description: 'Report self-assigned by volunteer',
+    actorUid: firebaseUid,
+    newStatus: REPORT_STATUS.ASSIGNED,
+    urgency: report.urgency,
+    wasteType: report.wasteType,
+  }));
+
   res.json({ success: true, data: report });
 }));
 
@@ -410,6 +433,17 @@ router.patch('/:id/assign', verifyToken, asyncHandler(async (req, res) => {
   report.status = 'assigned';
   report.assignedTo = volunteerUid;
   await report.save();
+
+  // Broadcast staff assignment to admin SSE feed
+  broadcast(makeEvent('report_assigned', {
+    reportId: report._id.toString(),
+    title: report.title || null,
+    description: `Report assigned to volunteer by staff`,
+    actorUid: firebaseUid,
+    newStatus: REPORT_STATUS.ASSIGNED,
+    urgency: report.urgency,
+    wasteType: report.wasteType,
+  }));
 
   res.json({ success: true, data: report });
 }));
@@ -514,6 +548,23 @@ router.patch('/:id/status', verifyToken, asyncHandler(async (req, res) => {
       console.error('[volunteerProgress] recordVolunteerResolutions failed:', err);
     }
   }
+
+  // Broadcast status change to admin SSE feed
+  const sseEventType = newStatus === REPORT_STATUS.RESOLVED
+    ? 'report_resolved'
+    : newStatus === REPORT_STATUS.REJECTED
+      ? 'report_rejected'
+      : 'status_changed';
+  broadcast(makeEvent(sseEventType, {
+    reportId: report._id.toString(),
+    title: report.title || null,
+    description: `Report status changed from '${previousStatus}' to '${newStatus}'`,
+    actorUid: firebaseUid,
+    previousStatus,
+    newStatus,
+    urgency: report.urgency,
+    wasteType: report.wasteType,
+  }));
 
   // Send push + email notification to the report owner asynchronously.
   // We only notify on status changes that are visible to the citizen

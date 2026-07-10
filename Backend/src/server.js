@@ -20,6 +20,7 @@ import adminRoutes from './routes/admin.js';
 import mlAnalyticsRoutes from './routes/mlAnalytics.js';
 import notificationRoutes from './routes/notifications.js';
 import { startMlWorker, closeMlWorker } from './workers/mlWorker.js';
+import { startHeartbeat, stopHeartbeat } from './services/sseService.js';
 
 // Load environment variables
 dotenv.config();
@@ -133,6 +134,9 @@ const startServer = async () => {
     // Start the BullMQ ML worker (no-op if Redis is not configured)
     startMlWorker();
 
+    // Start SSE heartbeat (keeps proxy connections alive every 30 s)
+    startHeartbeat();
+
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -147,6 +151,7 @@ const startServer = async () => {
 // Graceful shutdown — drain in-flight BullMQ jobs before exit
 async function shutdown(signal) {
   console.log(`\n[server] ${signal} received — shutting down gracefully...`);
+  stopHeartbeat();
   await closeMlWorker();
   process.exit(0);
 }

@@ -6,6 +6,8 @@ import { useAssignSelfMutation, useUpdateReportStatusMutation } from "@/hooks/us
 import { useAuth } from "@/context/useAuth";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 import type { DashboardReport } from "@/types/dashboard";
 import type { LatLng, MapReportMarker } from "@/types/map";
 import { DEFAULT_NEAR_RADIUS_KM } from "@/constants/map";
@@ -21,10 +23,11 @@ import { VolunteerMapDrawer } from "@/components/volunteer/VolunteerMapDrawer";
 
 const VolunteerDashboard = () => {
   const { appUser } = useAuth();
-  const { data, isLoading, error, refetch } = useVolunteerDashboardQuery();
+  const { data, isLoading, isRefetching, error, refetch } = useVolunteerDashboardQuery();
   const assignSelfMutation = useAssignSelfMutation();
   const updateStatusMutation = useUpdateReportStatusMutation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Action loading: tracks which reportId is being mutated
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -146,8 +149,16 @@ const VolunteerDashboard = () => {
       return;
     }
     setMapOpen(true);
-    requestLocation((loc) => fetchNearbyForMap(loc));
-  }, [mapOpen, requestLocation, fetchNearbyForMap]);
+    // Always re-fetch nearby reports each time the drawer opens so the
+    // map is up-to-date, not just the first time.
+    if (userLocation) {
+      // Location already known — fetch immediately.
+      fetchNearbyForMap(userLocation);
+    } else {
+      // Request location first, then fetch.
+      requestLocation((loc) => fetchNearbyForMap(loc));
+    }
+  }, [mapOpen, userLocation, requestLocation, fetchNearbyForMap]);
 
   const handleMapSelectReport = useCallback(
     (r: MapReportMarker) => {
@@ -235,6 +246,14 @@ const VolunteerDashboard = () => {
     tasksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  /* ── Refresh ─────────────────────────────────────────────────────── */
+  const handleRefresh = useCallback(async () => {
+    // Invalidate the cache first so refetch always hits the server,
+    // bypassing the staleTime window that would otherwise return cached data.
+    await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.volunteer() });
+    await refetch();
+  }, [queryClient, refetch]);
+
   /* ── Render ─────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -247,9 +266,9 @@ const VolunteerDashboard = () => {
           <VolunteerDashboardHeader
             name={volunteerName}
             activeTaskCount={assignedToMe.length}
-            isLoading={isLoading}
+            isLoading={isLoading || isRefetching}
             onOpenNearMap={handleOpenNearMap}
-            onRefresh={refetch}
+            onRefresh={handleRefresh}
             onScrollToTasks={handleScrollToTasks}
           />
 

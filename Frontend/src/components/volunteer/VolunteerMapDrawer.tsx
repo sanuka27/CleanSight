@@ -6,7 +6,7 @@ import { CleanSightMap } from "@/components/map/CleanSightMap";
 import { RouteOverlay } from "@/components/map/RouteOverlay";
 import type { DashboardReport } from "@/types/dashboard";
 import type { LatLng, MapReportMarker } from "@/types/map";
-import { DEFAULT_NEAR_RADIUS_KM } from "@/constants/map";
+import { DEFAULT_NEAR_RADIUS_KM, DEFAULT_ZOOM } from "@/constants/map";
 
 interface VolunteerMapDrawerProps {
   open: boolean;
@@ -121,6 +121,9 @@ export function VolunteerMapDrawer({
                   </div>
                 ) : (
                   <CleanSightMap
+                    // Re-mount the map when the user location first arrives so it
+                    // initialises at the correct centre rather than at DEFAULT_CENTER.
+                    key={userLocation ? `${userLocation.lat},${userLocation.lng}` : "no-loc"}
                     mode="view"
                     reports={allMarkers}
                     selectedId={selectedId}
@@ -128,6 +131,13 @@ export function VolunteerMapDrawer({
                     onSelectReport={onSelectReport}
                     className="h-full w-full"
                     clusterThreshold={allMarkers.length > 10 ? 10 : 0}
+                    // Center on the user's actual location when available,
+                    // so the Near Me Map shows their surroundings, not the default.
+                    viewport={
+                      userLocation
+                        ? { center: [userLocation.lng, userLocation.lat], zoom: DEFAULT_ZOOM + 4 }
+                        : undefined
+                    }
                   >
                     {userLocation && routeTo && (
                       <RouteOverlay from={userLocation} to={routeTo} />

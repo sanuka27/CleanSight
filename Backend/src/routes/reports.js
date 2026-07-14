@@ -454,7 +454,7 @@ router.patch('/:id/assign', verifyToken, asyncHandler(async (req, res) => {
 router.patch('/:id/status', verifyToken, asyncHandler(async (req, res) => {
   const { firebaseUid } = req.user;
   const { id } = req.params;
-  const { status: newStatus } = req.body;
+  const { status: newStatus, resolutionImageUrl } = req.body;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ success: false, message: 'Invalid report ID' });
@@ -513,6 +513,22 @@ router.patch('/:id/status', verifyToken, asyncHandler(async (req, res) => {
     // Set resolvedAt timestamp
     report.resolvedAt = new Date();
     report.resolvedByUid = firebaseUid;
+
+    // Optional before/after resolution photo — validate URL if provided
+    if (resolutionImageUrl !== undefined && resolutionImageUrl !== null) {
+      if (typeof resolutionImageUrl !== 'string' || resolutionImageUrl.trim() === '') {
+        return res.status(400).json({ success: false, message: 'resolutionImageUrl must be a non-empty string' });
+      }
+      try {
+        const parsed = new URL(resolutionImageUrl.trim());
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return res.status(400).json({ success: false, message: 'resolutionImageUrl must use http or https' });
+        }
+      } catch {
+        return res.status(400).json({ success: false, message: 'resolutionImageUrl is not a valid URL' });
+      }
+      report.resolutionImageUrl = resolutionImageUrl.trim();
+    }
   }
 
   report.status = newStatus;

@@ -30,7 +30,8 @@ interface MyTasksBoardProps {
   assignedToMe: DashboardReport[];
   resolvedByMe: DashboardReport[];
   actionLoading: string | null;
-  onResolve: (id: string) => void;
+  /** Opens the resolve-with-photo modal */
+  onOpenResolve: (report: DashboardReport) => void;
   onOpenDetail: (report: DashboardReport) => void;
   onOpenMap: (report: DashboardReport) => void;
   userLat?: number;
@@ -48,7 +49,7 @@ export function MyTasksBoard({
   assignedToMe,
   resolvedByMe,
   actionLoading,
-  onResolve,
+  onOpenResolve,
   onOpenDetail,
   onOpenMap,
   userLat,
@@ -233,7 +234,7 @@ export function MyTasksBoard({
                 key={report._id}
                 report={report}
                 actionLoading={actionLoading === report._id}
-                onResolve={onResolve}
+                onOpenResolve={onOpenResolve}
                 onOpenDetail={onOpenDetail}
                 onOpenMap={onOpenMap}
                 userLat={userLat}

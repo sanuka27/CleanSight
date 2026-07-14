@@ -20,6 +20,7 @@ import { MyTasksBoard } from "@/components/volunteer/MyTasksBoard";
 import { AvailableReportsFeed } from "@/components/volunteer/AvailableReportsFeed";
 import { TaskDetailsModal } from "@/components/volunteer/TaskDetailsModal";
 import { VolunteerMapDrawer } from "@/components/volunteer/VolunteerMapDrawer";
+import { ResolveWithPhotoModal } from "@/components/volunteer/ResolveWithPhotoModal";
 
 const VolunteerDashboard = () => {
   const { appUser } = useAuth();
@@ -35,6 +36,10 @@ const VolunteerDashboard = () => {
   // Task detail modal
   const [detailReport, setDetailReport] = useState<DashboardReport | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+
+  // Resolve-with-photo modal
+  const [resolveReport, setResolveReport] = useState<DashboardReport | null>(null);
+  const [resolveModalOpen, setResolveModalOpen] = useState(false);
 
   // Map drawer
   const [mapOpen, setMapOpen] = useState(false);
@@ -149,13 +154,9 @@ const VolunteerDashboard = () => {
       return;
     }
     setMapOpen(true);
-    // Always re-fetch nearby reports each time the drawer opens so the
-    // map is up-to-date, not just the first time.
     if (userLocation) {
-      // Location already known — fetch immediately.
       fetchNearbyForMap(userLocation);
     } else {
-      // Request location first, then fetch.
       requestLocation((loc) => fetchNearbyForMap(loc));
     }
   }, [mapOpen, userLocation, requestLocation, fetchNearbyForMap]);
@@ -193,14 +194,26 @@ const VolunteerDashboard = () => {
     [actionLoading, refetch, toast, assignSelfMutation]
   );
 
+  /**
+   * Core resolve action — called by ResolveWithPhotoModal with an optional URL.
+   */
   const handleResolve = useCallback(
-    async (reportId: string) => {
+    async (reportId: string, resolutionImageUrl?: string) => {
       if (actionLoading) return;
       setActionLoading(reportId);
       try {
-        await updateStatusMutation.mutateAsync({ reportId, status: "resolved" });
+        await updateStatusMutation.mutateAsync({
+          reportId,
+          status: "resolved",
+          resolutionImageUrl,
+        });
         await refetch();
-        toast({ title: "Task resolved!", description: "Well done! The report is now marked resolved." });
+        toast({
+          title: "Task resolved!",
+          description: resolutionImageUrl
+            ? "Well done! Your cleanup photo has been saved."
+            : "Well done! The report is now marked resolved.",
+        });
       } catch {
         toast({
           title: "Failed to resolve task",
@@ -213,6 +226,12 @@ const VolunteerDashboard = () => {
     },
     [actionLoading, refetch, toast, updateStatusMutation]
   );
+
+  /* ── Resolve-with-photo modal handlers ──────────────────────────── */
+  const handleOpenResolve = useCallback((report: DashboardReport) => {
+    setResolveReport(report);
+    setResolveModalOpen(true);
+  }, []);
 
   /* ── Open detail / map for report ──────────────────────────────── */
   const handleOpenDetail = useCallback((report: DashboardReport) => {
@@ -248,8 +267,6 @@ const VolunteerDashboard = () => {
 
   /* ── Refresh ─────────────────────────────────────────────────────── */
   const handleRefresh = useCallback(async () => {
-    // Invalidate the cache first so refetch always hits the server,
-    // bypassing the staleTime window that would otherwise return cached data.
     await queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.volunteer() });
     await refetch();
   }, [queryClient, refetch]);
@@ -310,7 +327,7 @@ const VolunteerDashboard = () => {
               assignedToMe={assignedToMe}
               resolvedByMe={resolvedByMe}
               actionLoading={actionLoading}
-              onResolve={handleResolve}
+              onOpenResolve={handleOpenResolve}
               onOpenDetail={handleOpenDetail}
               onOpenMap={handleOpenMapFromCard}
               userLat={userLocation?.lat}
@@ -342,8 +359,20 @@ const VolunteerDashboard = () => {
         canAccept={detailReport?.status === "pending"}
         canResolve={detailReport?.status === "assigned"}
         onAccept={handleAccept}
-        onResolve={handleResolve}
+        onOpenResolve={handleOpenResolve}
         onOpenMap={handleOpenMapFromCard}
+      />
+
+      {/* Resolve-with-Photo Modal */}
+      <ResolveWithPhotoModal
+        report={resolveReport}
+        open={resolveModalOpen}
+        onClose={() => {
+          setResolveModalOpen(false);
+          setResolveReport(null);
+        }}
+        onConfirm={handleResolve}
+        isLoading={!!(resolveReport && actionLoading === resolveReport._id)}
       />
     </div>
   );

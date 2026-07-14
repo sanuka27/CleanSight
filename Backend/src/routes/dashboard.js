@@ -96,7 +96,7 @@ router.get(
       const recentReports = await Report.find({ firebaseUid, isDeleted: { $ne: true } })
         .sort({ createdAt: -1 })
         .limit(50)
-        .select('_id title status wasteType urgency createdAt updatedAt imageUrl location description')
+        .select('_id title status wasteType urgency createdAt updatedAt imageUrl location description assignedTo resolutionImageUrl')
         .lean();
 
       const badgeCatalog = CITIZEN_BADGES.map((badge) => ({

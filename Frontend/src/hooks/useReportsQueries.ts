@@ -170,7 +170,7 @@ export function useAssignReportMutation() {
   });
 }
 
-/** Update report status */
+/** Update report status, with optional resolution photo URL */
 export function useUpdateReportStatusMutation() {
   const queryClient = useQueryClient();
 
@@ -178,11 +178,17 @@ export function useUpdateReportStatusMutation() {
     mutationFn: async ({
       reportId,
       status,
+      resolutionImageUrl,
     }: {
       reportId: string;
       status: string;
+      resolutionImageUrl?: string;
     }): Promise<Report> => {
-      const response = await api.updateReportStatus(reportId, status);
+      const response = await api.updateReportStatus(
+        reportId,
+        status,
+        resolutionImageUrl ? { resolutionImageUrl } : undefined
+      );
       return response.data;
     },
     onSuccess: () => {

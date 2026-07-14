@@ -6,6 +6,7 @@ import {
   Loader2,
   ExternalLink,
   Eye,
+  Camera,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,8 @@ const urgencyColors: Record<string, string> = {
 interface VolunteerTaskCardProps {
   report: DashboardReport;
   actionLoading: boolean;
-  onResolve: (id: string) => void;
+  /** Opens the resolve-with-photo modal for assigned tasks */
+  onOpenResolve: (report: DashboardReport) => void;
   onOpenDetail: (report: DashboardReport) => void;
   onOpenMap?: (report: DashboardReport) => void;
   userLat?: number;
@@ -37,7 +39,7 @@ interface VolunteerTaskCardProps {
 export function VolunteerTaskCard({
   report,
   actionLoading,
-  onResolve,
+  onOpenResolve,
   onOpenDetail,
   onOpenMap,
   userLat,
@@ -45,6 +47,7 @@ export function VolunteerTaskCard({
 }: VolunteerTaskCardProps) {
   const dist = distanceLabel(report, userLat, userLng);
   const age = reportAge(report.createdAt);
+  const hasResolutionPhoto = !!report.resolutionImageUrl;
 
   return (
     <AnimatePresence>
@@ -56,14 +59,18 @@ export function VolunteerTaskCard({
         transition={{ duration: 0.25 }}
         className="group flex gap-4 p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-card hover:border-border hover:shadow-md transition-all duration-200"
       >
-        {/* Thumbnail */}
+        {/* Thumbnail — shows after-photo for resolved tasks that have one */}
         <div
-          className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer"
+          className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer relative"
           onClick={() => onOpenDetail(report)}
         >
           {report.imageUrl ? (
             <img
-              src={report.imageUrl}
+              src={
+                hasResolutionPhoto && report.status === "resolved"
+                  ? report.resolutionImageUrl!
+                  : report.imageUrl
+              }
               alt="Report"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
@@ -71,6 +78,12 @@ export function VolunteerTaskCard({
             <div className="w-full h-full bg-muted/30 flex items-center justify-center">
               <Image className="w-6 h-6 text-muted-foreground/50" />
             </div>
+          )}
+          {/* Camera badge when resolved with photo */}
+          {hasResolutionPhoto && report.status === "resolved" && (
+            <span className="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full bg-success flex items-center justify-center">
+              <Camera className="w-2.5 h-2.5 text-white" />
+            </span>
           )}
         </div>
 
@@ -93,6 +106,15 @@ export function VolunteerTaskCard({
               >
                 {report.urgency}
               </Badge>
+              {hasResolutionPhoto && report.status === "resolved" && (
+                <Badge
+                  variant="outline"
+                  className="text-xs bg-success/10 text-success border-success/20 gap-1"
+                >
+                  <Camera className="w-3 h-3" />
+                  Photo proof
+                </Badge>
+              )}
             </div>
             <button
               onClick={() => onOpenDetail(report)}
@@ -119,19 +141,21 @@ export function VolunteerTaskCard({
 
           {/* Actions */}
           <div className="flex gap-2 mt-3 flex-wrap">
-            <Button
-              size="sm"
-              className="gradient-primary text-white gap-1 h-8 px-3 hover:opacity-90 disabled:opacity-50"
-              disabled={actionLoading}
-              onClick={() => onResolve(report._id)}
-            >
-              {actionLoading ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <CheckCircle className="w-3 h-3" />
-              )}
-              Mark Resolved
-            </Button>
+            {report.status === "assigned" && (
+              <Button
+                size="sm"
+                className="gradient-primary text-white gap-1 h-8 px-3 hover:opacity-90 disabled:opacity-50"
+                disabled={actionLoading}
+                onClick={() => onOpenResolve(report)}
+              >
+                {actionLoading ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-3 h-3" />
+                )}
+                Mark Resolved
+              </Button>
+            )}
             {onOpenMap && (
               <Button
                 size="sm"

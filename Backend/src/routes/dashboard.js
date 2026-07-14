@@ -292,6 +292,17 @@ router.get(
         criteria: badge.criteria || null,
       }));
 
+      // Merge volunteer badges (cleanup milestones) + citizen badges (report submissions)
+      // into a single deduplicated list keyed by badge id.
+      const mergedBadgeMap = new Map();
+      [...volunteerBadges, ...citizenBadges].forEach((badge) => {
+        const key = badge.id || badge.name;
+        if (key && !mergedBadgeMap.has(key)) {
+          mergedBadgeMap.set(key, badge);
+        }
+      });
+      const mergedBadges = Array.from(mergedBadgeMap.values());
+
       res.json({
         success: true,
         data: {
@@ -304,11 +315,10 @@ router.get(
           },
           volunteerProfile: {
             stats: volunteerStats,
-            // volunteerBadges: earned by cleanup activity (source: Volunteer.badges)
-            volunteerBadges,
-            // citizenBadges: earned by report submissions (source: User.badges)
-            citizenBadges,
-            volunteerBadgeCatalog,
+            // 'badges' = merged volunteer + citizen badges (matches VolunteerProfileSummary type)
+            badges: mergedBadges,
+            // 'badgeCatalog' matches VolunteerProfileSummary type expected by the frontend
+            badgeCatalog: volunteerBadgeCatalog,
           },
           // Newly awarded this request (for toast notifications)
           newlyEarnedBadges: [...newlyEarnedVolunteerBadges, ...newlyEarnedCitizenBadges],

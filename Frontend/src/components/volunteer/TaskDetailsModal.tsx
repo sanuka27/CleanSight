@@ -10,6 +10,7 @@ import {
   Image,
   ArrowRight,
   ExternalLink,
+  Camera,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,8 +31,6 @@ const urgencyColors: Record<string, string> = {
   low: "bg-muted/20 text-muted-foreground border-border",
 };
 
-type ActionType = "accept" | "resolve" | null;
-
 interface TaskDetailsModalProps {
   report: DashboardReport | null;
   open: boolean;
@@ -40,7 +39,8 @@ interface TaskDetailsModalProps {
   canAccept?: boolean;
   canResolve?: boolean;
   onAccept?: (id: string) => void;
-  onResolve?: (id: string) => void;
+  /** Opens the resolve-with-photo modal instead of resolving directly */
+  onOpenResolve?: (report: DashboardReport) => void;
   onOpenMap?: (report: DashboardReport) => void;
 }
 
@@ -101,7 +101,7 @@ export function TaskDetailsModal({
   canAccept,
   canResolve,
   onAccept,
-  onResolve,
+  onOpenResolve,
   onOpenMap,
 }: TaskDetailsModalProps) {
   const mapMarker: MapReportMarker | null = useMemo(() => {
@@ -117,6 +117,8 @@ export function TaskDetailsModal({
       createdAt: report.createdAt,
     };
   }, [report]);
+
+  const hasResolutionPhoto = !!report?.resolutionImageUrl;
 
   return (
     <AnimatePresence>
@@ -163,6 +165,15 @@ export function TaskDetailsModal({
                   >
                     {report.urgency} urgency
                   </Badge>
+                  {hasResolutionPhoto && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs bg-success/10 text-success border-success/20 gap-1"
+                    >
+                      <Camera className="w-3 h-3" />
+                      Photo proof
+                    </Badge>
+                  )}
                 </div>
                 <button
                   onClick={onClose}
@@ -172,12 +183,12 @@ export function TaskDetailsModal({
                 </button>
               </div>
 
-              {/* Image */}
+              {/* Before photo */}
               <div className="relative">
                 {report.imageUrl ? (
                   <img
                     src={report.imageUrl}
-                    alt="Report"
+                    alt="Before"
                     className="w-full h-56 object-cover"
                   />
                 ) : (
@@ -185,7 +196,27 @@ export function TaskDetailsModal({
                     <Image className="w-10 h-10 text-muted-foreground/30" />
                   </div>
                 )}
+                {report.imageUrl && (
+                  <span className="absolute bottom-2 left-3 text-[11px] bg-black/50 text-white px-2 py-0.5 rounded-md font-medium">
+                    {hasResolutionPhoto ? "Before" : "Report photo"}
+                  </span>
+                )}
               </div>
+
+              {/* After / Resolution photo */}
+              {hasResolutionPhoto && (
+                <div className="relative border-t border-border/30">
+                  <img
+                    src={report.resolutionImageUrl!}
+                    alt="After cleanup"
+                    className="w-full h-48 object-cover"
+                  />
+                  <span className="absolute bottom-2 left-3 text-[11px] bg-success/80 text-white px-2 py-0.5 rounded-md font-semibold flex items-center gap-1">
+                    <Camera className="w-3 h-3" />
+                    After cleanup
+                  </span>
+                </div>
+              )}
 
               {/* Content */}
               <div className="p-5 space-y-4">
@@ -262,16 +293,16 @@ export function TaskDetailsModal({
                       Accept Task
                     </Button>
                   )}
-                  {canResolve && onResolve && report.status === "assigned" && (
+                  {canResolve && onOpenResolve && report.status === "assigned" && (
                     <Button
                       className="gap-2 gradient-primary text-white flex-1"
                       disabled={actionLoading}
-                      onClick={() => { onResolve(report._id); onClose(); }}
+                      onClick={() => { onOpenResolve(report); onClose(); }}
                     >
                       {actionLoading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <CheckCircle className="w-4 h-4" />
+                        <Camera className="w-4 h-4" />
                       )}
                       Mark Resolved
                     </Button>

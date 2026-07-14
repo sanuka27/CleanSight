@@ -227,6 +227,20 @@ const reportSchema = new mongoose.Schema({
     maxlength: [1000, 'Resolution note cannot exceed 1000 characters'],
     trim: true
   },
+  // ── Resolution photo (before/after proof) ─────────────────────────
+  // Uploaded by the volunteer at resolve time to Firebase Storage.
+  // Optional — null when the volunteer resolves without a photo.
+  resolutionImageUrl: {
+    type: String,
+    default: null,
+    validate: {
+      validator: function (v) {
+        if (v === null || v === undefined) return true;
+        return /^https?:\/\/.+/.test(v);
+      },
+      message: 'resolutionImageUrl must be a valid HTTP/HTTPS URL'
+    }
+  },
   isDeleted: {
     type: Boolean,
     default: false,

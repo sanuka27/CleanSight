@@ -211,10 +211,14 @@ class ApiClient {
     });
   }
 
-  async updateReportStatus(reportId: string, status: string): Promise<any> {
+  async updateReportStatus(
+    reportId: string,
+    status: string,
+    options?: { resolutionImageUrl?: string }
+  ): Promise<any> {
     return this.request(`/api/reports/${reportId}/status`, {
       method: "PATCH",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...options }),
       requiresAuth: true,
     });
   }

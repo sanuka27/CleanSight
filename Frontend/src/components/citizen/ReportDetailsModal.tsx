@@ -24,6 +24,7 @@ import {
   Calendar,
   Tag,
   Loader2,
+  Camera,
 } from "lucide-react";
 import {
   getStatusConfig,
@@ -122,24 +123,95 @@ export function ReportDetailsModal({
         </DialogHeader>
 
         <div className="space-y-5 px-6 pb-6">
-          {/* Image */}
-          {data.imageUrl ? (
+          {/* ── Photo section ───────────────────────────────────────── */}
+          {data.resolutionImageUrl ? (
+            /* Side-by-side BEFORE / AFTER when volunteer uploaded proof */
             <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
-              className="relative rounded-xl overflow-hidden ring-1 ring-border aspect-video"
+              className="space-y-2"
             >
-              <img
-                src={data.imageUrl}
-                alt="Report image"
-                className="w-full h-full object-cover"
-              />
+              {/* Column labels */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-bold uppercase tracking-wider border border-orange-200">
+                    <ImageIcon className="w-3 h-3" />
+                    Before
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-success text-[11px] font-bold uppercase tracking-wider border border-success/25">
+                    <Camera className="w-3 h-3" />
+                    After cleanup
+                  </span>
+                  <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-success font-medium">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Verified
+                  </span>
+                </div>
+              </div>
+
+              {/* Side-by-side photos */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Before */}
+                <div className="relative rounded-xl overflow-hidden ring-2 ring-orange-300/60 aspect-square">
+                  {data.imageUrl ? (
+                    <img
+                      src={data.imageUrl}
+                      alt="Before cleanup"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-muted-foreground/40" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                  <span className="absolute bottom-2 left-2 text-[11px] font-bold text-white bg-orange-500/80 px-2 py-0.5 rounded-md">
+                    BEFORE
+                  </span>
+                </div>
+
+                {/* After */}
+                <div className="relative rounded-xl overflow-hidden ring-2 ring-success/50 aspect-square">
+                  <img
+                    src={data.resolutionImageUrl}
+                    alt="After cleanup"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                  <span className="absolute bottom-2 left-2 text-[11px] font-bold text-white bg-success/80 px-2 py-0.5 rounded-md">
+                    AFTER
+                  </span>
+                </div>
+              </div>
+
+              {/* Trust caption */}
+              <p className="text-center text-xs text-muted-foreground pt-0.5">
+                📸 Volunteer uploaded proof of cleanup
+              </p>
             </motion.div>
           ) : (
-            <div className="rounded-xl bg-muted flex items-center justify-center aspect-video">
-              <ImageIcon className="w-12 h-12 text-muted-foreground" />
-            </div>
+            /* Single report photo — no after photo yet */
+            data.imageUrl ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+                className="relative rounded-xl overflow-hidden ring-1 ring-border aspect-video"
+              >
+                <img
+                  src={data.imageUrl}
+                  alt="Report image"
+                  className="w-full h-full object-cover"
+                />
+              </motion.div>
+            ) : (
+              <div className="rounded-xl bg-muted flex items-center justify-center aspect-video">
+                <ImageIcon className="w-12 h-12 text-muted-foreground" />
+              </div>
+            )
           )}
 
           {/* Status, Type, Urgency badges */}

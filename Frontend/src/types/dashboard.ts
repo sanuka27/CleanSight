@@ -23,6 +23,7 @@ export interface DashboardReport {
   location?: GeoJSONPoint;
   firebaseUid?: string;
   assignedTo?: string | null;
+  resolutionImageUrl?: string | null;
 }
 
 /* ── Citizen Dashboard ───────────────────────────────────────────── */

@@ -7,6 +7,7 @@ import { RANGE_LABELS } from "@/components/admin/Topbar";
 import { ActivityChart } from "@/components/admin/Charts/ActivityChart";
 import { WasteTypeChart } from "@/components/admin/Charts/WasteTypeChart";
 import { VolunteerChart } from "@/components/admin/Charts/VolunteerChart";
+import { HeatmapChart } from "@/components/admin/Charts/HeatmapChart";
 import {
   useAdminOverviewQuery,
   useAdminTrendsQuery,
@@ -114,6 +115,19 @@ export default function AdminAnalytics() {
           </div>
           <div className="h-[300px]">
             <ActivityChart data={trends} loading={loading} />
+          </div>
+        </Card>
+
+        {/* Heatmap chart */}
+        <Card className="border-border/60 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="font-semibold">Geographic Heatmap</h3>
+              <p className="text-xs text-muted-foreground">Waste density across all reported locations</p>
+            </div>
+          </div>
+          <div className="h-[400px]">
+            <HeatmapChart dateFrom={from} dateTo={to} />
           </div>
         </Card>
 

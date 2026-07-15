@@ -1468,6 +1468,121 @@ function MapClusterLayer<
   return null;
 }
 
+type MapHeatmapLayerProps<
+  P extends GeoJSON.GeoJsonProperties = GeoJSON.GeoJsonProperties
+> = {
+  /** GeoJSON FeatureCollection data or URL to fetch GeoJSON from */
+  data: string | GeoJSON.FeatureCollection<GeoJSON.Point, P>;
+  /** Optional unique identifier for the layer */
+  id?: string;
+  /** Heatmap intensity multiplier (default: 1) */
+  intensity?: number | MapLibreGL.ExpressionSpecification;
+  /** Heatmap radius in pixels (default: 30) */
+  radius?: number | MapLibreGL.ExpressionSpecification;
+  /** Heatmap weight based on properties (default: 1) */
+  weight?: number | MapLibreGL.ExpressionSpecification;
+  /** Heatmap opacity (default: 0.8) */
+  opacity?: number | MapLibreGL.ExpressionSpecification;
+  /** Heatmap color ramp (default: standard heatmap colors) */
+  color?: MapLibreGL.ExpressionSpecification;
+};
+
+function MapHeatmapLayer<
+  P extends GeoJSON.GeoJsonProperties = GeoJSON.GeoJsonProperties
+>({
+  data,
+  id: propId,
+  intensity = 1,
+  radius = 30,
+  weight = 1,
+  opacity = 0.8,
+  color = [
+    "interpolate",
+    ["linear"],
+    ["heatmap-density"],
+    0, "rgba(33,102,172,0)",
+    0.2, "rgb(103,169,207)",
+    0.4, "rgb(209,229,240)",
+    0.6, "rgb(253,219,199)",
+    0.8, "rgb(239,138,98)",
+    1, "rgb(178,24,43)",
+  ],
+}: MapHeatmapLayerProps<P>) {
+  const { map, isLoaded } = useMap();
+  const autoId = useId();
+  const id = propId ?? autoId;
+  const sourceId = `heatmap-source-${id}`;
+  const layerId = `heatmap-layer-${id}`;
+
+  const stylePropsRef = useRef({
+    intensity,
+    radius,
+    weight,
+    opacity,
+    color,
+  });
+
+  // Add source and layer on mount
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+
+    map.addSource(sourceId, {
+      type: "geojson",
+      data,
+    });
+
+    map.addLayer({
+      id: layerId,
+      type: "heatmap",
+      source: sourceId,
+      paint: {
+        "heatmap-intensity": intensity,
+        "heatmap-radius": radius,
+        "heatmap-weight": weight,
+        "heatmap-opacity": opacity,
+        "heatmap-color": color,
+      },
+    });
+
+    return () => {
+      try {
+        if (map.getLayer(layerId)) map.removeLayer(layerId);
+        if (map.getSource(sourceId)) map.removeSource(sourceId);
+      } catch {
+        // ignore
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, map, sourceId]);
+
+  // Update source data when data prop changes
+  useEffect(() => {
+    if (!isLoaded || !map || typeof data === "string") return;
+
+    const source = map.getSource(sourceId) as MapLibreGL.GeoJSONSource;
+    if (source) {
+      source.setData(data);
+    }
+  }, [isLoaded, map, data, sourceId]);
+
+  // Update paint properties when props change
+  useEffect(() => {
+    if (!isLoaded || !map || !map.getLayer(layerId)) return;
+
+    const prev = stylePropsRef.current;
+    
+    if (prev.intensity !== intensity) map.setPaintProperty(layerId, "heatmap-intensity", intensity);
+    if (prev.radius !== radius) map.setPaintProperty(layerId, "heatmap-radius", radius);
+    if (prev.weight !== weight) map.setPaintProperty(layerId, "heatmap-weight", weight);
+    if (prev.opacity !== opacity) map.setPaintProperty(layerId, "heatmap-opacity", opacity);
+    if (prev.color !== color) map.setPaintProperty(layerId, "heatmap-color", color);
+
+    stylePropsRef.current = { intensity, radius, weight, opacity, color };
+  }, [isLoaded, map, layerId, intensity, radius, weight, opacity, color]);
+
+  return null;
+}
+
 export {
   Map,
   useMap,
@@ -1480,6 +1595,7 @@ export {
   MapControls,
   MapRoute,
   MapClusterLayer,
+  MapHeatmapLayer,
 };
 
 export type { MapRef, MapViewport };

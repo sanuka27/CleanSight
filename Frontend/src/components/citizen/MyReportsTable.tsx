@@ -31,6 +31,7 @@ import {
   ChevronDown,
   Download,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RevealOnScroll } from "@/components/shared/AnimatedComponents";
 import {
   getStatusConfig,
@@ -67,7 +68,9 @@ const urgencyIcon: Record<string, React.ReactNode> = {
 
 export function MyReportsTable({ reports, isLoading, onViewDetails, initialStatusFilter = "all" }: MyReportsTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
+  const [activeTab, setActiveTab] = useState<"pending" | "solved">(
+    initialStatusFilter === "resolved" ? "solved" : "pending"
+  );
   const [wasteTypeFilter, setWasteTypeFilter] = useState<WasteTypeFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -87,9 +90,11 @@ export function MyReportsTable({ reports, isLoading, onViewDetails, initialStatu
       );
     }
 
-    // Status filter
-    if (statusFilter !== "all") {
-      result = result.filter((r) => r.status === statusFilter);
+    // Tab filter
+    if (activeTab === "pending") {
+      result = result.filter((r) => r.status === "pending" || r.status === "assigned");
+    } else if (activeTab === "solved") {
+      result = result.filter((r) => r.status === "resolved");
     }
 
     // Waste type filter
@@ -110,7 +115,7 @@ export function MyReportsTable({ reports, isLoading, onViewDetails, initialStatu
     });
 
     return result;
-  }, [reports, searchQuery, statusFilter, wasteTypeFilter, sortOrder]);
+  }, [reports, searchQuery, activeTab, wasteTypeFilter, sortOrder]);
 
   // Reset visible count when filters change
   const handleFilterChange = useCallback(
@@ -130,7 +135,6 @@ export function MyReportsTable({ reports, isLoading, onViewDetails, initialStatu
 
   const clearFilters = useCallback(() => {
     setSearchQuery("");
-    setStatusFilter("all");
     setWasteTypeFilter("all");
     setSortOrder("newest");
     setVisibleCount(PAGE_SIZE);
@@ -138,21 +142,36 @@ export function MyReportsTable({ reports, isLoading, onViewDetails, initialStatu
 
   const hasActiveFilters =
     searchQuery.trim() !== "" ||
-    statusFilter !== "all" ||
     wasteTypeFilter !== "all";
 
   return (
     <RevealOnScroll delay={0.2}>
-      <div className="glass-premium rounded-2xl border border-white/10 overflow-hidden">
+      <div className="glass-premium rounded-2xl border border-white/10 overflow-hidden max-w-4xl mx-auto w-full">
         {/* Header with controls */}
         <div className="p-4 sm:p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
-              <h3 className="font-display font-bold text-lg">My Reports</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                <h3 className="font-display font-bold text-lg hidden sm:block">My Reports</h3>
+              </div>
+              <Tabs 
+                value={activeTab} 
+                onValueChange={(v) => handleFilterChange(setActiveTab, v as "pending" | "solved")}
+                className="w-full sm:w-[240px] shrink-0"
+              >
+                <TabsList className="grid w-full grid-cols-2 h-9 bg-muted/20 border-white/10 p-1">
+                  <TabsTrigger value="pending" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+                    Pending
+                  </TabsTrigger>
+                  <TabsTrigger value="solved" className="text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+                    Solved
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground bg-muted/30 px-2.5 py-1 rounded-full">
+            <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground bg-muted/30 px-2.5 py-1 rounded-full whitespace-nowrap">
                 {filteredReports.length} of {reports.length}
               </span>
               {reports.length > 0 && (
@@ -160,11 +179,11 @@ export function MyReportsTable({ reports, isLoading, onViewDetails, initialStatu
                   variant="ghost"
                   size="sm"
                   onClick={handleExportCsv}
-                  className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-primary"
+                  className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-primary shrink-0 whitespace-nowrap"
                   title="Export to CSV"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Export</span>
+                  <Download className="w-3.5 h-3.5 shrink-0" />
+                  <span className="inline">Export</span>
                 </Button>
               )}
             </div>
@@ -184,25 +203,6 @@ export function MyReportsTable({ reports, isLoading, onViewDetails, initialStatu
                 className="pl-9 h-9 bg-muted/20 border-white/10 text-sm"
               />
             </div>
-
-            {/* Status filter */}
-            <Select
-              value={statusFilter}
-              onValueChange={(v) =>
-                handleFilterChange(setStatusFilter, v as StatusFilter)
-              }
-            >
-              <SelectTrigger className="w-full sm:w-[140px] h-9 bg-muted/20 border-white/10 text-sm">
-                <Filter className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="assigned">Assigned</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
-              </SelectContent>
-            </Select>
 
             {/* Waste type filter */}
             <Select

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ReactNode, memo } from "react";
+import { ReactNode, memo, useEffect } from "react";
 
 interface PageTransitionProps {
   children: ReactNode;
@@ -7,6 +7,10 @@ interface PageTransitionProps {
 }
 
 export const PageTransition = memo(({ children, className = "" }: PageTransitionProps) => {
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}

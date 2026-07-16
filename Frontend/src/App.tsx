@@ -27,6 +27,7 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const ChooseRole = lazy(() => import("./pages/onboarding/ChooseRole"));
 const FeatureDetail = lazy(() => import("./pages/features/FeatureDetail"));
+const PublicStats = lazy(() => import("./pages/PublicStats"));
 
 // Role-based dashboards
 const DashboardRouter = lazy(() => import("./routes/DashboardRouter"));
@@ -145,6 +146,7 @@ const AnimatedRoutes = () => {
           />
           <Route path="/volunteer" element={<PageTransition><Volunteer /></PageTransition>} />
           <Route path="/about" element={<PageTransition><About /></PageTransition>} />
+          <Route path="/stats" element={<PageTransition><PublicStats /></PageTransition>} />
           <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
           <Route path="/help" element={<PageTransition><Help /></PageTransition>} />
           <Route path="/privacy" element={<PageTransition><Privacy /></PageTransition>} />

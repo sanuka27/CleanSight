@@ -2,6 +2,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { FeaturesSection } from "@/components/landing/FeaturesSection";
 import { HowItWorks } from "@/components/landing/HowItWorks";
+import { StatsSection } from "@/components/landing/StatsSection";
 import { Footer } from "@/components/layout/Footer";
 import { MeshGradient } from "@/components/shared/MeshGradient";
 
@@ -14,7 +15,8 @@ const Landing = () => {
         <HeroSection />
         <FeaturesSection />
         <HowItWorks />
-        
+        <StatsSection />
+
         {/* Call to Action Section */}
         <section className="py-20 relative overflow-hidden">
           <MeshGradient className="opacity-20" />

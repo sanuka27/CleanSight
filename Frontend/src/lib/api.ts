@@ -306,6 +306,16 @@ class ApiClient {
     });
   }
 
+  // ── Public endpoints ──────────────────────────────────────────────
+  
+  async getPublicStats(): Promise<any> {
+    return this.request("/api/public/stats", {
+      method: "GET",
+      requiresAuth: false,
+    });
+  }
+
+
   // ── Notification endpoints ────────────────────────────────────────
 
   async registerFcmToken(token: string): Promise<{ success: boolean }> {

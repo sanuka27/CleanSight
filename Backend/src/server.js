@@ -19,6 +19,7 @@ import contactAdminRoutes from './routes/contactAdmin.js';
 import adminRoutes from './routes/admin.js';
 import mlAnalyticsRoutes from './routes/mlAnalytics.js';
 import notificationRoutes from './routes/notifications.js';
+import publicRoutes from './routes/public.js';
 import { startMlWorker, closeMlWorker } from './workers/mlWorker.js';
 import { startHeartbeat, stopHeartbeat } from './services/sseService.js';
 
@@ -114,6 +115,7 @@ app.use('/api/admin/contact', contactAdminRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ml-analytics', mlAnalyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/public', publicRoutes);
 
 // ─────────────────────────────────────────────────────────────────────
 // Error Handling

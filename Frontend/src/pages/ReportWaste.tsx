@@ -10,6 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useReports } from "@/hooks/useReports";
 import { useAuth } from "@/context/useAuth";
 import { MeshGradient } from "@/components/shared/MeshGradient";
+import { usePWA } from "@/context/PWAContext";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { enqueueReport, fileToBuffer } from "@/lib/offlineQueue";
 
 import { steps, MAX_FILE_SIZE, isLocationInRange } from "@/components/report/constants";
 import { StepPhotoEvidence } from "@/components/report/StepPhotoEvidence";
@@ -47,6 +50,8 @@ const ReportWaste = () => {
   const { createReport } = useReports();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const { refreshQueue } = usePWA();
+  const { isOnline } = useNetworkStatus();
 
   /* ── Derived: location range validation ─────────────────────── */
   const { valid: isLocationValid, error: locationRangeError } =
@@ -229,6 +234,42 @@ const ReportWaste = () => {
     }
 
     setIsSubmitting(true);
+
+    /* ── Offline path: save to IndexedDB queue ─────────────────── */
+    if (!isOnline) {
+      try {
+        const imageBuffer = await fileToBuffer(imageFile);
+        await enqueueReport({
+          userId: user.uid,
+          imageBlob: imageBuffer,
+          imageName: imageFile.name,
+          imageMime: imageFile.type,
+          description,
+          location,
+          wasteType: selectedType ?? undefined,
+          urgency: selectedUrgency ?? undefined,
+          thumbnail: imageThumbnail,
+        });
+        await refreshQueue();
+        resetWizard();
+        toast({
+          title: "Report Saved Offline",
+          description: "Your report is queued and will be submitted automatically when you reconnect.",
+        });
+        navigate("/dashboard");
+      } catch (err: unknown) {
+        toast({
+          title: "Failed to Save Offline",
+          description: err instanceof Error ? err.message : "Could not save your report. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    /* ── Online path: upload + submit immediately ──────────────── */
     try {
       await createReport(
         imageFile,
@@ -388,6 +429,7 @@ const ReportWaste = () => {
                 onSubmit={handleSubmit}
                 isSubmitting={isSubmitting}
                 canSubmit={canSubmit}
+                isOnline={isOnline}
               />
             </form>
           </motion.div>

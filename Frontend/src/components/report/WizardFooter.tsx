@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Upload, Loader2, WifiOff } from "lucide-react";
 import { steps } from "./constants";
 
 interface WizardFooterProps {
@@ -9,6 +9,8 @@ interface WizardFooterProps {
   onSubmit: () => void;
   isSubmitting: boolean;
   canSubmit: boolean;
+  /** When false, the submit button changes to "Save for Later" (offline queue). */
+  isOnline?: boolean;
 }
 
 export function WizardFooter({
@@ -18,6 +20,7 @@ export function WizardFooter({
   onSubmit,
   isSubmitting,
   canSubmit,
+  isOnline = true,
 }: WizardFooterProps) {
   return (
     <div className="flex items-center justify-between px-5 py-3 border-t border-border/50">
@@ -49,17 +52,26 @@ export function WizardFooter({
           size="sm"
           disabled={isSubmitting || !canSubmit}
           onClick={onSubmit}
-          className="gap-1.5 h-9 gradient-primary text-white shadow-glow hover:shadow-glow-lg min-w-[130px]"
+          className={`gap-1.5 h-9 text-white shadow-glow hover:shadow-glow-lg min-w-[140px] transition-all ${
+            isOnline
+              ? "gradient-primary"
+              : "bg-amber-600 hover:bg-amber-500"
+          }`}
         >
           {isSubmitting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Submitting…
+              {isOnline ? "Submitting…" : "Saving…"}
             </>
-          ) : (
+          ) : isOnline ? (
             <>
               Submit Report
               <Upload className="w-4 h-4" />
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-4 h-4" />
+              Save for Later
             </>
           )}
         </Button>

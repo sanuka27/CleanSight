@@ -10,6 +10,9 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AuthSideEffects } from "./components/auth/AuthSideEffects";
 import { queryClient } from "./lib/queryClient";
 import { lazy, Suspense } from "react";
+import { PWAProvider } from "./context/PWAContext";
+import { PWAUpdatePrompt } from "./components/pwa/PWAUpdatePrompt";
+import { PWAStatusOverlay } from "./components/pwa/PWAStatusOverlay";
 
 // Lazy load pages for better performance
 const Landing = lazy(() => import("./pages/Landing"));
@@ -163,12 +166,17 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthSideEffects />
-          <AnimatedRoutes />
-        </BrowserRouter>
+        <PWAProvider>
+          <Toaster />
+          <Sonner />
+          {/* Global PWA overlays — rendered once outside the router */}
+          <PWAStatusOverlay />
+          <PWAUpdatePrompt />
+          <BrowserRouter>
+            <AuthSideEffects />
+            <AnimatedRoutes />
+          </BrowserRouter>
+        </PWAProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

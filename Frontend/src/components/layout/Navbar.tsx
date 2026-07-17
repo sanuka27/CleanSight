@@ -6,6 +6,8 @@ import { Menu, X, Leaf, ChevronRight, LogOut } from "lucide-react";
 import { useAuth } from "@/context/useAuth";
 import { getUserRole } from "@/lib/role";
 import { NAV_LINKS, canSeeNavLink } from "@/constants/roles";
+import { PendingQueueBadge } from "@/components/pwa/PendingQueueBadge";
+import { usePWA } from "@/context/PWAContext";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,6 +17,7 @@ export function Navbar() {
 
   const { isAuthenticated, isLoading, appUser, isAppUserLoading, logout } = useAuth();
   const role = appUser ? getUserRole(appUser) : undefined;
+  const { pendingCount } = usePWA();
 
   /** Filter nav links based on auth state + role. */
   const visibleLinks = useMemo(
@@ -86,6 +89,7 @@ export function Navbar() {
               {visibleLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive = location.pathname === link.href;
+                const isReportLink = link.href === "/report";
                 
                 return (
                   <Link key={link.href} to={link.href}>
@@ -99,7 +103,10 @@ export function Navbar() {
                       whileTap={{ scale: 0.98 }}
                     >
                       <span className="relative z-10 flex items-center gap-2">
-                        <Icon className="w-4 h-4" />
+                        <span className="relative">
+                          <Icon className="w-4 h-4" />
+                          {isReportLink && <PendingQueueBadge count={pendingCount} />}
+                        </span>
                         {link.label}
                       </span>
                     </motion.div>
@@ -210,7 +217,12 @@ export function Navbar() {
                                   : "hover:bg-card/50"
                               }`}
                             >
-                              <Icon className="w-5 h-5" />
+                              <span className="relative">
+                                <Icon className="w-5 h-5" />
+                                {link.href === "/report" && (
+                                  <PendingQueueBadge count={pendingCount} />
+                                )}
+                              </span>
                               <span className="font-medium">{link.label}</span>
                             </div>
                           </Link>

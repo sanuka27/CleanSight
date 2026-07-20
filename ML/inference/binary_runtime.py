@@ -70,7 +70,7 @@ def load_binary_model(force_reload: bool = False) -> bool:
         try:
             import tensorflow as tf
 
-            _model = tf.keras.models.load_model(settings.binary_model_path)
+            _model = tf.keras.models.load_model(settings.binary_model_path, compile=False)
             _negative_label, _positive_label = _load_binary_class_names()
             _runtime_error = None
             return True

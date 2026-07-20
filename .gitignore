@@ -81,10 +81,12 @@ credentials.json
 # ML — Phase 1 & Phase 2
 ML/dataset_binary/
 ML/dataset_category/
-ML/models/*.keras
+# Model files are committed so Render can access them at runtime.
+# They are small (~9 MB + ~5 MB) and safe to version-control.
+# ML/models/*.keras  ← intentionally tracked
+# ML/models/*.pt     ← intentionally tracked
+# ML/models/*.json   ← intentionally tracked
 ML/models/*.h5
-ML/models/*.json
-ML/models/*.pt
 ML/models/checkpoints/
 ML/models/logs/
 ML/artifacts/

@@ -1,0 +1,20 @@
+# CleanSight ML Phase 1 – Binary Classifier Service
+# requirements.txt for Hugging Face Spaces Docker deployment
+
+# Web framework
+fastapi==0.103.0
+uvicorn[standard]==0.23.2
+python-multipart==0.0.6
+
+# Pydantic (must match version used in service/schemas.py – v1 API)
+pydantic==1.10.12
+
+# HTTP client for image URL fetching
+httpx==0.24.1
+
+# Image processing
+Pillow==10.0.0
+
+# ML – TensorFlow (CPU-only build keeps the image smaller)
+tensorflow-cpu==2.15.0
+numpy==1.26.4

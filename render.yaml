@@ -1,4 +1,5 @@
 services:
+  # ── Backend (Express.js) ──────────────────────────────────────────
   - type: web
     name: cleansight-backend
     runtime: node
@@ -8,5 +9,44 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Set these after the ML service is deployed and you have its URL:
+      - key: ML_SERVICE_URL
+        value: https://cleansight-ml.onrender.com
+      - key: CATEGORY_ML_SERVICE_URL
+        value: https://cleansight-ml.onrender.com
     healthCheckPath: /api/health
+    autoDeploy: true
+
+  # ── ML Combined Service (FastAPI – Python) ────────────────────────
+  # Serves both /predict (Phase 1) and /predict-category (Phase 2)
+  - type: web
+    name: cleansight-ml
+    runtime: python
+    rootDir: .
+    buildCommand: pip install -r ML/render_service/requirements.txt
+    startCommand: uvicorn ML.render_service.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: .
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Model paths (relative to ML/ dir, resolved by settings.py)
+      - key: BINARY_MODEL_PATH
+        value: models/trash_classifier.keras
+      - key: BINARY_CLASS_NAMES_PATH
+        value: models/class_names.json
+      - key: CATEGORY_MODEL_PATH
+        value: models/waste_category_classifier.pt
+      - key: CATEGORY_CLASS_NAMES_PATH
+        value: models/category_class_names.json
+      # Confidence thresholds
+      - key: BINARY_CONFIDENCE_THRESHOLD
+        value: "0.70"
+      - key: CATEGORY_HIGH_CONFIDENCE_THRESHOLD
+        value: "0.80"
+      - key: CATEGORY_MODERATE_CONFIDENCE_THRESHOLD
+        value: "0.50"
+      - key: CATEGORY_LOW_CONFIDENCE_THRESHOLD
+        value: "0.30"
+    healthCheckPath: /health
     autoDeploy: true

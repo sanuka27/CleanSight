@@ -1,0 +1,25 @@
+# CleanSight ML Combined Service – Render deployment
+# Tested with Python 3.11
+
+# Web framework
+fastapi==0.103.0
+uvicorn[standard]==0.23.2
+python-multipart==0.0.6
+
+# Pydantic – pin to v1 to stay compatible with service/schemas.py
+pydantic==1.10.12
+
+# HTTP client (image URL fetching)
+httpx==0.24.1
+
+# Image processing
+Pillow==10.0.0
+
+# Phase 1 – TensorFlow CPU-only (lighter, no CUDA)
+tensorflow-cpu==2.15.0
+numpy==1.26.4
+
+# Phase 2 – PyTorch CPU-only
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.1.0+cpu
+torchvision==0.16.0+cpu

@@ -32,7 +32,7 @@ services:
         value: "1"
       # Model paths (relative to ML/ dir, resolved by settings.py)
       - key: BINARY_MODEL_PATH
-        value: models/trash_classifier.keras
+        value: models/trash_classifier.h5
       - key: BINARY_CLASS_NAMES_PATH
         value: models/class_names.json
       - key: CATEGORY_MODEL_PATH

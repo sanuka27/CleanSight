@@ -86,7 +86,7 @@ ML/dataset_category/
 # ML/models/*.keras  ← intentionally tracked
 # ML/models/*.pt     ← intentionally tracked
 # ML/models/*.json   ← intentionally tracked
-ML/models/*.h5
+# ML/models/*.h5     ← intentionally tracked (converted model for Render compat)
 ML/models/checkpoints/
 ML/models/logs/
 ML/artifacts/

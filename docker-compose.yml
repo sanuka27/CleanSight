@@ -1,0 +1,93 @@
+version: '3.9'
+
+services:
+  # ── Frontend (React/Vite) ──────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Frontend/Dockerfile
+      target: development
+    container_name: cleansight-frontend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./Frontend/src:/app/Frontend/src
+      - ./Frontend/public:/app/Frontend/public
+      - ./Frontend/index.html:/app/Frontend/index.html
+      - ./Frontend/vite.config.ts:/app/Frontend/vite.config.ts
+      # Prevent local node_modules from overriding container node_modules
+      - /app/Frontend/node_modules
+      - /app/node_modules
+    env_file:
+      - .env.docker
+    depends_on:
+      - backend
+
+  # ── Backend (Node.js/Express) ──────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Backend/Dockerfile
+      target: development
+    container_name: cleansight-backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./Backend/src:/app/Backend/src
+      # Prevent local node_modules from overriding container node_modules
+      - /app/Backend/node_modules
+      - /app/node_modules
+    env_file:
+      - .env.docker
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── ML Combined Service (FastAPI) ──────────────────────────────────
+  ml:
+    build:
+      context: .
+      dockerfile: ML/Dockerfile
+      target: development
+    container_name: cleansight-ml
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ML/render_service:/app/ML/render_service
+      - ./ML/models:/app/ML/models
+    env_file:
+      - .env.docker
+    # Adjust shm_size if PyTorch needs more shared memory for inference
+    shm_size: '2gb'
+
+  # ── Database (MongoDB) ─────────────────────────────────────────────
+  mongodb:
+    image: mongo:6
+    container_name: cleansight-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis (Queues & Rate Limiting) ─────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cleansight-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongodb_data:

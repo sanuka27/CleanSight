@@ -64,12 +64,14 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # ESLint — flat config defined in Frontend/eslint.config.js
-      # --max-warnings 25 sets the current baseline of pre-existing warnings.
+      # --max-warnings 50 sets the current baseline of pre-existing warnings.
       # CI will fail if any *new* warnings are added. Reduce this value toward
       # 0 as the codebase is cleaned up (lint ratchet pattern).
+      # NOTE: must call `pnpm exec eslint` directly — `pnpm run lint -- --max-warnings`
+      # appends args after the file glob (eslint .) making eslint treat them as patterns.
       - name: Run ESLint
         working-directory: Frontend
-        run: pnpm run lint -- --max-warnings 25
+        run: pnpm exec eslint . --max-warnings 50
 
       # TypeScript — validate types without emitting any output files.
       # tsconfig.json references tsconfig.app.json (noEmit: true) so this

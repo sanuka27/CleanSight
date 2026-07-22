@@ -1,0 +1,103 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CleanSight — PR Quality Gate
+#
+# Runs AFTER the main CI workflow completes.
+# Posts a structured summary comment on the PR with the results of every CI
+# job, links to the coverage artifact, and marks the PR as ready or blocked.
+#
+# This workflow requires no additional secrets.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: PR Quality Gate Summary
+
+on:
+  workflow_run:
+    workflows:
+      - "CI — Lint, Type-check, Test & Docker Build"
+    types:
+      - completed
+
+permissions:
+  pull-requests: write   # Needed to post the comment
+  checks: read           # Needed to read the CI job results
+
+jobs:
+  post-summary:
+    name: "Post PR Summary Comment"
+    runs-on: ubuntu-latest
+    # Only comment when the triggering workflow was itself triggered by a PR
+    if: github.event.workflow_run.event == 'pull_request'
+
+    steps:
+      - name: Post CI summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const conclusion = run.conclusion; // 'success' | 'failure' | 'cancelled'
+            const runUrl = run.html_url;
+
+            // Determine overall status emoji
+            const statusEmoji = conclusion === 'success' ? '✅' : conclusion === 'failure' ? '❌' : '⚠️';
+            const statusText = conclusion === 'success'
+              ? 'All checks passed — this PR is ready to merge.'
+              : conclusion === 'failure'
+              ? 'One or more checks failed — please fix the issues before merging.'
+              : `CI run was ${conclusion}.`;
+
+            const body = [
+              `## ${statusEmoji} CI Quality Gate — ${conclusion.toUpperCase()}`,
+              '',
+              statusText,
+              '',
+              '| Check | Result |',
+              '|-------|--------|',
+              `| 🔍 Lint & Type-check (ESLint + tsc) | [View run](${runUrl}) |`,
+              `| 🧪 Frontend Unit Tests (Vitest) | [View run](${runUrl}) |`,
+              `| 🧪 Backend Unit Tests (node:test) | [View run](${runUrl}) |`,
+              `| 🐳 Docker Build Checks | [View run](${runUrl}) |`,
+              '',
+              conclusion === 'success'
+                ? '📦 Coverage report uploaded as a workflow artifact — check the **Artifacts** section of the run.'
+                : '> See the failed job in the run linked above for details.',
+              '',
+              `<sub>Run triggered by commit \`${run.head_sha.slice(0, 7)}\` · [Full CI run](${runUrl})</sub>`,
+            ].join('\n');
+
+            // Find the PR associated with this workflow run
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${run.head_repository.owner.login}:${run.head_branch}`,
+            });
+
+            for (const pr of prs.data) {
+              // Delete any previous quality-gate comment from this bot
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+              });
+
+              for (const comment of comments.data) {
+                if (
+                  comment.user.type === 'Bot' &&
+                  comment.body.includes('CI Quality Gate')
+                ) {
+                  await github.rest.issues.deleteComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: comment.id,
+                  });
+                }
+              }
+
+              // Post the new summary
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body,
+              });
+            }

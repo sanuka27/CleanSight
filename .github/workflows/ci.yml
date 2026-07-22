@@ -1,0 +1,265 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CleanSight — Continuous Integration
+#
+# Triggers: Every Pull Request targeting main (or develop).
+#
+# Jobs:
+#   1. lint-typecheck  — ESLint + tsc on the Frontend
+#   2. test-frontend   — Vitest unit tests on the Frontend
+#   3. test-backend    — Node built-in test runner on the Backend
+#   4. docker-build    — Build all three Docker images (Frontend/Backend/ML)
+#
+# Secrets required (set in GitHub → Settings → Secrets & variables → Actions):
+#   None required for the CI checks themselves.
+#   Optional (for future Docker Hub push caching):
+#     DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: CI — Lint, Type-check, Test & Docker Build
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  # Allow manual trigger from the Actions tab (useful for debugging)
+  workflow_dispatch:
+
+# Cancel any in-progress run for the same PR/branch to avoid queuing stale runs
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "18"
+  PYTHON_VERSION: "3.11"
+  PNPM_VERSION: "9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1 ── Frontend: ESLint + TypeScript type-checking
+# ─────────────────────────────────────────────────────────────────────────────
+  lint-typecheck:
+    name: "Frontend · Lint & Type-check"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      # Install all workspace dependencies via the root pnpm-workspace.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ESLint — flat config defined in Frontend/eslint.config.js
+      # --max-warnings 50 sets the current baseline of pre-existing warnings.
+      # CI will fail if any *new* warnings are added. Reduce this value toward
+      # 0 as the codebase is cleaned up (lint ratchet pattern).
+      # NOTE: must call `pnpm exec eslint` directly — `pnpm run lint -- --max-warnings`
+      # appends args after the file glob (eslint .) making eslint treat them as patterns.
+      - name: Run ESLint
+        working-directory: Frontend
+        run: pnpm exec eslint . --max-warnings 50
+
+      # TypeScript — validate types without emitting any output files.
+      # tsconfig.json references tsconfig.app.json (noEmit: true) so this
+      # is safe to run without a build output directory.
+      - name: Run TypeScript type-check
+        working-directory: Frontend
+        run: pnpm exec tsc --noEmit --project tsconfig.json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2 ── Frontend: Vitest unit tests
+# ─────────────────────────────────────────────────────────────────────────────
+  test-frontend:
+    name: "Frontend · Vitest Unit Tests"
+    runs-on: ubuntu-latest
+    # Run tests only after lint/type-check passes — avoids wasting runner
+    # minutes on test runs that would fail for type/style reasons anyway.
+    needs: lint-typecheck
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Vitest is executed in "run" mode (non-watch, single pass) with verbose
+      # output so individual test names appear in the Actions log.
+      # Coverage is generated and uploaded as an artifact for inspection.
+      - name: Run Vitest tests with coverage
+        working-directory: Frontend
+        run: pnpm exec vitest run --reporter=verbose --coverage
+        env:
+          # Stub Firebase config vars so the app module can be imported in JSDOM
+          # without throwing "Firebase: No Firebase App '[DEFAULT]' has been created".
+          # Real credentials are not required for isolated unit tests.
+          VITE_FIREBASE_API_KEY: "ci-stub"
+          VITE_FIREBASE_AUTH_DOMAIN: "ci-stub.firebaseapp.com"
+          VITE_FIREBASE_PROJECT_ID: "ci-stub"
+          VITE_FIREBASE_STORAGE_BUCKET: "ci-stub.appspot.com"
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+          VITE_FIREBASE_APP_ID: "1:000000000000:web:ci-stub"
+          VITE_API_BASE_URL: "http://localhost:5000"
+          VITE_PROFILE_POLL_MS: "0"
+
+      # Persist the coverage HTML/JSON report so reviewers can download it
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-report
+          path: Frontend/coverage/
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 3 ── Backend: Node built-in test runner
+# ─────────────────────────────────────────────────────────────────────────────
+  test-backend:
+    name: "Backend · Node Test Runner"
+    runs-on: ubuntu-latest
+    # Backend tests are independent of frontend lint — run in parallel
+    # to minimise the overall PR feedback time.
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # All backend tests use Node's built-in test runner (node:test).
+      # They are pure unit tests that mock every external dependency
+      # (Mongoose, Redis, Firebase Admin), so no live services are needed.
+      - name: Run backend unit tests
+        working-directory: Backend
+        run: |
+          node --test \
+            src/tests/roleGuard.test.js \
+            src/tests/reportStatus.test.js \
+            src/tests/badgeService.test.js \
+            src/tests/volunteerProgress.test.js
+        env:
+          NODE_ENV: test
+          # Stub values — tests mock all external services; no real connections needed
+          MONGODB_URI: "mongodb://localhost:27017/cleansight-ci-stub"
+          JWT_SECRET: "ci-test-secret-not-real"
+          FIREBASE_PROJECT_ID: "ci-stub"
+          FIREBASE_PRIVATE_KEY: "ci-stub"
+          FIREBASE_CLIENT_EMAIL: "ci-stub@ci-stub.iam.gserviceaccount.com"
+          REDIS_URL: "redis://localhost:6379"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 4 ── Docker: Build all images (no push)
+#
+# Purpose: Verify that every Dockerfile is syntactically valid and that all
+#          build stages complete without error. Images are NOT pushed to any
+#          registry — this is a build-correctness gate only.
+#
+# ML strategy: Only the "base" stage is built for the ML image because
+#   installing TensorFlow takes ~5–10 min and adds ~1 GB to the layer cache.
+#   The "base" stage fully validates the Dockerfile, apt installs, and pip
+#   dependency resolution — the most common failure points.
+#
+# GHA layer caching: Docker layer cache is stored in GitHub Actions Cache so
+#   subsequent runs (e.g., re-running after a comment fix) reuse unchanged
+#   layers and complete much faster.
+# ─────────────────────────────────────────────────────────────────────────────
+  docker-build:
+    name: "Docker · Build All Images"
+    runs-on: ubuntu-latest
+    # Docker builds are independent of the test jobs.
+    # They run in parallel to keep total CI wall time low.
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Enable Docker Buildx for --cache-from/--cache-to and multi-platform support
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Frontend image ──────────────────────────────────────────────────
+      # "builder" stage: installs all deps + runs `vite build`.
+      # This is the most likely stage to break (missing env var, bad import),
+      # so it gives the most useful signal without the nginx copy step.
+      - name: "Build Frontend image (builder stage)"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Frontend/Dockerfile
+          target: builder
+          push: false
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+          # Vite inlines VITE_* env vars at build time; provide stubs so the
+          # build doesn't fail with "undefined" values for required config.
+          build-args: |
+            VITE_FIREBASE_API_KEY=ci-stub
+            VITE_FIREBASE_AUTH_DOMAIN=ci-stub.firebaseapp.com
+            VITE_FIREBASE_PROJECT_ID=ci-stub
+            VITE_FIREBASE_STORAGE_BUCKET=ci-stub.appspot.com
+            VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000
+            VITE_FIREBASE_APP_ID=1:000000000000:web:ci-stub
+            VITE_API_BASE_URL=http://localhost:5000
+
+      # ── Backend image ───────────────────────────────────────────────────
+      # "production" stage: installs production-only deps.
+      - name: "Build Backend image (production stage)"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Backend/Dockerfile
+          target: production
+          push: false
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      # ── ML image ────────────────────────────────────────────────────────
+      # "base" stage: validates Dockerfile syntax, apt packages, and pip
+      # dependency resolution — the most frequent failure points — without
+      # pulling the full TensorFlow/PyTorch model weights.
+      - name: "Build ML image (base stage)"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ML/Dockerfile
+          target: base
+          push: false
+          cache-from: type=gha,scope=ml
+          cache-to: type=gha,mode=max,scope=ml

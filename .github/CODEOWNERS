@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CODEOWNERS — CleanSight
+#
+# GitHub uses this file to automatically request reviews from owners when a PR
+# modifies files matching these patterns.
+#
+# Syntax: <pattern>  <owner1>  [owner2 ...]
+# Owners can be GitHub usernames (@user), team handles (@org/team),
+# or email addresses (user@example.com).
+#
+# NOTE: Replace @sanuka27 with your actual GitHub username(s).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Global fallback — owns everything not matched by a more specific rule
+*                           @sanuka27
+
+# ── CI/CD ───────────────────────────────────────────────────────────────────
+.github/                    @sanuka27
+
+# ── Frontend ────────────────────────────────────────────────────────────────
+Frontend/                   @sanuka27
+
+# ── Backend ─────────────────────────────────────────────────────────────────
+Backend/                    @sanuka27
+
+# ── ML Service ──────────────────────────────────────────────────────────────
+ML/                         @sanuka27
+
+# ── Infrastructure / Docker ─────────────────────────────────────────────────
+docker-compose.yml          @sanuka27
+render.yaml                 @sanuka27
+vercel.json                 @sanuka27

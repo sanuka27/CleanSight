@@ -21,6 +21,7 @@
  */
 
 import admin from 'firebase-admin';
+import logger from '../config/logger.js';
 
 // ── Email provider (lazy-loaded so missing config only warns, not crashes) ───
 
@@ -40,7 +41,7 @@ async function initEmailProvider() {
   if (provider === 'resend') {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-      console.warn('[notify] EMAIL_PROVIDER=resend but RESEND_API_KEY is not set. Email disabled.');
+      logger.warn('[notify] EMAIL_PROVIDER=resend but RESEND_API_KEY is not set. Email disabled.');
       emailSend = async () => {};
       return;
     }
@@ -55,9 +56,9 @@ async function initEmailProvider() {
           html,
         });
       };
-      console.log('[notify] Email provider: Resend ✓');
+      logger.info('[notify] Email provider: Resend ✓');
     } catch (err) {
-      console.error('[notify] Failed to initialise Resend:', err.message);
+      logger.error('[notify] Failed to initialise Resend', { error: err.message });
       emailSend = async () => {};
     }
     return;
@@ -70,7 +71,7 @@ async function initEmailProvider() {
     const pass = process.env.SMTP_PASS;
 
     if (!host || !user || !pass) {
-      console.warn('[notify] EMAIL_PROVIDER=nodemailer but SMTP_HOST/SMTP_USER/SMTP_PASS are missing. Email disabled.');
+      logger.warn('[notify] EMAIL_PROVIDER=nodemailer but SMTP_HOST/SMTP_USER/SMTP_PASS are missing. Email disabled.');
       emailSend = async () => {};
       return;
     }
@@ -91,15 +92,15 @@ async function initEmailProvider() {
           html,
         });
       };
-      console.log('[notify] Email provider: Nodemailer (SMTP) ✓');
+      logger.info('[notify] Email provider: Nodemailer (SMTP) ✓');
     } catch (err) {
-      console.error('[notify] Failed to initialise Nodemailer:', err.message);
+      logger.error('[notify] Failed to initialise Nodemailer', { error: err.message });
       emailSend = async () => {};
     }
     return;
   }
 
-  console.warn(`[notify] Unknown EMAIL_PROVIDER="${provider}". Email disabled.`);
+  logger.warn(`[notify] Unknown EMAIL_PROVIDER — email disabled`, { provider });
   emailSend = async () => {};
 }
 
@@ -188,9 +189,9 @@ async function sendPushNotification({ fcmToken, status, reportId, reportTitle })
   } catch (err) {
     // FCM token may be stale — log but don't crash
     if (err.code === 'messaging/registration-token-not-registered') {
-      console.warn(`[notify] Stale FCM token for report ${reportId} — consider pruning.`);
+      logger.warn('[notify] Stale FCM token — consider pruning', { reportId });
     } else {
-      console.error('[notify] FCM send failed:', err.message);
+      logger.error('[notify] FCM send failed', { error: err.message, reportId, status });
     }
   }
 }
@@ -362,7 +363,7 @@ async function sendEmailNotification({ email, userName, status, reportId, report
       html: buildEmailHtml({ status, reportTitle, reportId, userName }),
     });
   } catch (err) {
-    console.error('[notify] Email send failed:', err.message);
+    logger.error('[notify] Email send failed', { error: err.message, status });
   }
 }
 

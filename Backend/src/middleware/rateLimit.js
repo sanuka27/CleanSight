@@ -31,6 +31,7 @@
 import { rateLimit as _rateLimit } from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
 import IORedis from 'ioredis';
+import logger from '../config/logger.js';
 
 // ── Redis client for rate limiting ────────────────────────────────────────────
 // Separate from the BullMQ client: BullMQ requires maxRetriesPerRequest=null
@@ -68,10 +69,10 @@ if (REDIS_URL || REDIS_HOST) {
     : new IORedis({ host: REDIS_HOST || 'localhost', port: REDIS_PORT, ...opts });
 
   _rateLimitRedis.on('connect', () =>
-    console.log('[rate-limit] Redis store active ✓'),
+    logger.info('[rate-limit] Redis store active ✓'),
   );
   _rateLimitRedis.on('error', (err) =>
-    console.warn('[rate-limit] Redis error (falling back to in-memory):', err.message),
+    logger.warn('[rate-limit] Redis error (falling back to in-memory)', { error: err.message }),
   );
 
   // Initiate the connection; errors are handled by the 'error' listener above.
@@ -80,7 +81,7 @@ if (REDIS_URL || REDIS_HOST) {
     // here to prevent an unhandled-rejection crash.
   });
 } else {
-  console.warn(
+  logger.warn(
     '[rate-limit] REDIS_URL / REDIS_HOST not set — using in-memory store. ' +
     'Rate-limit counters will NOT be shared across workers. ' +
     'Set REDIS_URL=redis://localhost:6379 for production.',

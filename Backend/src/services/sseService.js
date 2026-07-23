@@ -19,6 +19,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import logger from '../config/logger.js';
 
 // Map<uid, Map<clientId, res>>
 // A single admin may have multiple tabs open simultaneously.
@@ -46,7 +47,7 @@ export function addClient(uid, res) {
   }
   clients.get(uid).set(clientId, res);
 
-  console.log(`[SSE] Client connected uid=${uid} clientId=${clientId} total=${_totalClients()}`);
+  logger.info('[SSE] Client connected', { uid, clientId, totalClients: _totalClients() });
   return clientId;
 }
 
@@ -65,7 +66,7 @@ export function removeClient(uid, clientId) {
     clients.delete(uid);
   }
 
-  console.log(`[SSE] Client disconnected uid=${uid} clientId=${clientId} total=${_totalClients()}`);
+  logger.info('[SSE] Client disconnected', { uid, clientId, totalClients: _totalClients() });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,7 +91,7 @@ export function broadcast(event) {
       try {
         res.write(frame);
       } catch (err) {
-        console.warn(`[SSE] Write failed uid=${uid} clientId=${clientId} — evicting`, err.message);
+        logger.warn('[SSE] Write failed — evicting client', { uid, clientId, error: err.message });
         removeClient(uid, clientId);
       }
     }
@@ -125,7 +126,7 @@ export function startHeartbeat() {
         try {
           res.write(comment);
         } catch (err) {
-          console.warn(`[SSE] Heartbeat failed uid=${uid} clientId=${clientId} — evicting`);
+          logger.warn('[SSE] Heartbeat write failed — evicting client', { uid, clientId });
           removeClient(uid, clientId);
         }
       }

@@ -1,3 +1,10 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// IMPORTANT: Sentry MUST be initialised before any other imports so that its
+// auto-instrumentation can wrap all async operations from the very start.
+// ─────────────────────────────────────────────────────────────────────────────
+import './config/sentry.js';
+import * as Sentry from '@sentry/node';
+
 import express from 'express';
 import cors from 'cors';
 import { securityHeaders, additionalSecurityHeaders } from './middleware/securityHeaders.js';
@@ -7,6 +14,8 @@ import connectDB from './config/db.js';
 import './config/firebaseAdmin.js'; // Initialize Firebase Admin
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { rateLimitRedisClient } from './middleware/rateLimit.js';
+import requestLogger from './middleware/requestLogger.js';
+import logger from './config/logger.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -29,12 +38,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // CORS Configuration
 // Support a comma-separated list of allowed origins via CLIENT_URL so
 // multiple frontends (e.g. staging + production) can be served without
 // a code change.
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 const rawOrigins = process.env.CLIENT_URL || 'http://localhost:8080';
 let allowedOrigins = rawOrigins
   .split(',')
@@ -51,15 +60,16 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key'],
 };
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // Middleware
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // Trust the first proxy hop so that req.ip reflects the real client IP
 // (needed for express-rate-limit to key on individual clients instead of
 // the proxy's IP, which would put all traffic in a single rate-limit bucket).
 // Set to the number of proxy hops in front of this server (typically 1 for
 // a single load balancer or Nginx reverse proxy).
 app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
+
 // Security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options,
 // Referrer-Policy, Permissions-Policy, COEP/COOP/CORP, and more.
 // See src/middleware/securityHeaders.js for the full configuration.
@@ -69,17 +79,15 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logging in development
-if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
-    next();
-  });
-}
+// Sentry auto-instruments Express out of the box in v9/v10.
+// No manual request handler middleware is needed.
 
-// ─────────────────────────────────────────────────────────────────────
+// Structured HTTP request logging via Winston
+app.use(requestLogger);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Health Check
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   const dbConnected = mongoose.connection.readyState === 1;
   // ioredis statuses: 'ready' = connected, everything else = not usable
@@ -102,9 +110,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // API Routes
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/volunteers', volunteerRoutes);
@@ -117,18 +125,21 @@ app.use('/api/ml-analytics', mlAnalyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/public', publicRoutes);
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // Error Handling
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Sentry error handler — must be BEFORE custom error handlers, AFTER all routes
+Sentry.setupExpressErrorHandler(app);
+
 // 404 handler for undefined routes
 app.use(notFoundHandler);
 
-// Central error handler
+// Central error handler (logs via Winston + captures to Sentry)
 app.use(errorHandler);
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // Server Startup
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 const startServer = async () => {
   try {
     await connectDB();
@@ -140,21 +151,30 @@ const startServer = async () => {
     startHeartbeat();
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔗 Client URL: ${process.env.CLIENT_URL || 'http://localhost:8080'}`);
+      logger.info('CleanSight API server started', {
+        port: PORT,
+        environment: process.env.NODE_ENV || 'development',
+        clientUrl: process.env.CLIENT_URL || 'http://localhost:8080',
+        url: `http://localhost:${PORT}`,
+      });
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logger.error('Fatal: Failed to start server', {
+      error: error.message,
+      stack: error.stack,
+    });
+    Sentry.captureException(error);
     process.exit(1);
   }
 };
 
 // Graceful shutdown — drain in-flight BullMQ jobs before exit
 async function shutdown(signal) {
-  console.log(`\n[server] ${signal} received — shutting down gracefully...`);
+  logger.info(`Graceful shutdown initiated`, { signal });
   stopHeartbeat();
   await closeMlWorker();
+  // Flush any pending Sentry events before exiting
+  await Sentry.close(2000);
   process.exit(0);
 }
 
@@ -163,16 +183,24 @@ process.on('SIGINT',  () => shutdown('SIGINT'));
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-  // In production, you might want to exit gracefully
+  logger.error('Unhandled promise rejection', {
+    error: err?.message,
+    stack: err?.stack,
+  });
+  Sentry.captureException(err);
+  // In production, exit to allow the process manager to restart cleanly
   if (process.env.NODE_ENV === 'production') {
     process.exit(1);
   }
 });
 
-// Handle uncaught exceptions
+// Handle uncaught synchronous exceptions
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
+  logger.error('Uncaught exception — shutting down', {
+    error: err.message,
+    stack: err.stack,
+  });
+  Sentry.captureException(err);
   process.exit(1);
 });
 

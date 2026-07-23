@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -163,23 +164,42 @@ const AnimatedRoutes = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <PWAProvider>
-          <Toaster />
-          <Sonner />
-          {/* Global PWA overlays — rendered once outside the router */}
-          <PWAStatusOverlay />
-          <PWAUpdatePrompt />
-          <BrowserRouter>
-            <AuthSideEffects />
-            <AnimatedRoutes />
-          </BrowserRouter>
-        </PWAProvider>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <Sentry.ErrorBoundary
+    fallback={({ error, resetError }) => (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-center p-8">
+        <div className="text-5xl mb-4">⚠️</div>
+        <h1 className="text-2xl font-bold mb-2 text-foreground">Something went wrong</h1>
+        <p className="text-muted-foreground mb-6 max-w-md">
+          An unexpected error occurred. Our team has been notified automatically.
+        </p>
+        <button
+          onClick={resetError}
+          className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+        >
+          Try again
+        </button>
+      </div>
+    )}
+    showDialog
+  >
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <PWAProvider>
+            <Toaster />
+            <Sonner />
+            {/* Global PWA overlays — rendered once outside the router */}
+            <PWAStatusOverlay />
+            <PWAUpdatePrompt />
+            <BrowserRouter>
+              <AuthSideEffects />
+              <AnimatedRoutes />
+            </BrowserRouter>
+          </PWAProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </Sentry.ErrorBoundary>
 );
 
 export default App;

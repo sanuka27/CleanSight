@@ -17,6 +17,7 @@
  */
 
 import IORedis from 'ioredis';
+import logger from './logger.js';
 
 const REDIS_URL  = process.env.REDIS_URL;
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
@@ -35,7 +36,7 @@ let _warned = false;
 export function createRedisConnection() {
   if (!REDIS_URL && !process.env.REDIS_HOST) {
     if (!_warned) {
-      console.warn(
+      logger.warn(
         '[redis] REDIS_URL / REDIS_HOST not set — job queue disabled. ' +
         'ML inference will fall back to setImmediate. ' +
         'Set REDIS_URL=redis://localhost:6379 and run Redis to enable the queue.'
@@ -58,11 +59,11 @@ export function createRedisConnection() {
 
   connection.on('error', (err) => {
     // Log but don't crash — BullMQ handles reconnection internally.
-    console.error('[redis] Connection error:', err.message);
+    logger.error('[redis] Connection error', { error: err.message });
   });
 
   connection.on('connect', () => {
-    console.log('[redis] Connected ✓');
+    logger.info('[redis] Connected ✓');
   });
 
   return connection;

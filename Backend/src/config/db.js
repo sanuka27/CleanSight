@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import logger from './logger.js';
 
 // MongoDB connection options
 const connectionOptions = {
@@ -32,38 +33,42 @@ export const connectDB = async () => {
   try {
     const conn = await mongoose.connect(mongoUri, connectionOptions);
     
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    console.log(`📊 Database: ${conn.connection.name}`);
+    logger.info('MongoDB connected', {
+      host: conn.connection.host,
+      database: conn.connection.name,
+    });
     
     // Handle connection events
     mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
+      logger.error('MongoDB connection error', { error: err.message, stack: err.stack });
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.warn('MongoDB disconnected. Attempting reconnect...');
+      logger.warn('MongoDB disconnected — attempting reconnect...');
     });
 
     mongoose.connection.on('reconnected', () => {
-      console.log('MongoDB reconnected');
+      logger.info('MongoDB reconnected');
     });
 
     // Graceful shutdown
     process.on('SIGINT', async () => {
       try {
         await mongoose.connection.close();
-        console.log('MongoDB connection closed through app termination');
+        logger.info('MongoDB connection closed through app termination');
         process.exit(0);
       } catch (err) {
-        console.error('Error closing MongoDB connection:', err);
+        logger.error('Error closing MongoDB connection', { error: err.message });
         process.exit(1);
       }
     });
 
     return conn;
   } catch (error) {
-    console.error(`❌ MongoDB Connection Error: ${error.message}`);
-    console.error(`   Connection string (sanitized): ${sanitizedUri}`);
+    logger.error('MongoDB connection failed', {
+      error: error.message,
+      connectionString: sanitizedUri,
+    });
     process.exit(1);
   }
 };

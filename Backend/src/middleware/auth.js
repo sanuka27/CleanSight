@@ -35,6 +35,7 @@
 import { verifyToken } from './verifyToken.js';
 import User from '../models/User.js';
 import { ROLES } from '../constants/roles.js';
+import logger from '../config/logger.js';
 
 /** @deprecated Use {@link verifyToken} from `./verifyToken.js` instead. */
 export const protect = verifyToken;
@@ -66,7 +67,11 @@ export const authorize = (...roles) => {
       }
       next();
     } catch (error) {
-      console.error('Authorization error:', error);
+      logger.error('[auth] Authorization check failed', {
+        error: error.message,
+        stack: error.stack,
+        firebaseUid: req.user?.firebaseUid,
+      });
       return res.status(500).json({
         success: false,
         message: 'Authorization check failed'

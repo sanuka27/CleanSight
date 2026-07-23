@@ -4,6 +4,9 @@
  * Centralized error handling for consistent API responses.
  */
 
+import Sentry from '../config/sentry.js';
+import logger from '../config/logger.js';
+
 /**
  * Base application error class
  */
@@ -157,12 +160,34 @@ export const errorHandler = (err, req, res, next) => {
     message = firebaseMessages[err.code] || 'Authentication failed';
   }
 
-  // Log error for debugging (but not for client errors in production)
+  // ── Structured logging & Sentry capture for server errors ────────────────
   if (statusCode >= 500) {
-    console.error('Server Error:', {
+    logger.error('Unhandled server error', {
       message: err.message,
-      stack: err.stack,
       statusCode,
+      method: req.method,
+      url: req.originalUrl,
+      ip: req.ip,
+      stack: err.stack,
+    });
+
+    // Report to Sentry — only non-operational (unexpected) errors
+    if (!err.isOperational) {
+      Sentry.captureException(err, {
+        extra: {
+          method: req.method,
+          url: req.originalUrl,
+          statusCode,
+        },
+      });
+    }
+  } else if (statusCode >= 400) {
+    // Client errors are info-level — not Sentry-worthy, but useful for debugging
+    logger.warn('Client error', {
+      message: err.message,
+      statusCode,
+      method: req.method,
+      url: req.originalUrl,
     });
   }
 
@@ -183,6 +208,7 @@ export const errorHandler = (err, req, res, next) => {
  * 404 handler for undefined routes
  */
 export const notFoundHandler = (req, res) => {
+  logger.warn('Route not found', { method: req.method, url: req.originalUrl });
   res.status(404).json({
     success: false,
     message: `Route ${req.originalUrl} not found`,

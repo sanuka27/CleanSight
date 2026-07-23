@@ -1,6 +1,7 @@
 import { firebaseAdmin } from '../config/firebaseAdmin.js';
 import User from '../models/User.js';
 import DeletedAccount from '../models/DeletedAccount.js';
+import logger from '../config/logger.js';
 
 // ── Short-lived user-profile cache (Fix 7) ───────────────────────────────────
 // Caches the MongoDB user document keyed by firebaseUid for TTL_MS milliseconds.
@@ -85,7 +86,11 @@ export const verifyToken = async (req, res, next) => {
       try {
         dbUser = await User.findOne({ firebaseUid: uid }).lean();
       } catch (dbErr) {
-        console.error('Database lookup error in verifyToken:', dbErr);
+        logger.error('[verifyToken] Database lookup error', {
+          error: dbErr.message,
+          stack: dbErr.stack,
+          uid,
+        });
         return res.status(500).json({
           success: false,
           message: 'Service temporarily unavailable. Please try again.',
@@ -132,9 +137,8 @@ export const verifyToken = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
-    
     if (error.code === 'auth/id-token-expired' || error.code === 'auth/id-token-revoked') {
+      logger.warn('[verifyToken] Token expired or revoked', { code: error.code });
       return res.status(401).json({ 
         success: false,
         message: 'Token expired. Please log in again.' 
@@ -142,12 +146,18 @@ export const verifyToken = async (req, res, next) => {
     }
 
     if (error.code === 'auth/user-not-found' || error.code === 'auth/user-disabled') {
+      logger.warn('[verifyToken] Firebase user not found or disabled', { code: error.code });
       return res.status(401).json({
         success: false,
         message: 'User account is no longer available. Please log in again.',
       });
     }
-    
+
+    logger.error('[verifyToken] Unexpected token verification error', {
+      error: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
     return res.status(401).json({ 
       success: false,
       message: 'Invalid or expired token.' 

@@ -13,6 +13,7 @@
 
 import { Queue } from 'bullmq';
 import { createRedisConnection } from '../config/redis.js';
+import logger from '../config/logger.js';
 
 const connection = createRedisConnection();
 
@@ -36,7 +37,7 @@ if (connection) {
     },
   });
 
-  console.log('[mlQueue] Queue initialised on "ml-inference" channel ✓');
+  logger.info('[mlQueue] Queue initialised on "ml-inference" channel ✓');
 }
 
 /**

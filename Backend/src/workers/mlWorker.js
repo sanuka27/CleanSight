@@ -26,9 +26,11 @@
  */
 
 import { Worker } from 'bullmq';
+import * as Sentry from '@sentry/node';
 import Report from '../models/Report.js';
 import { validateImageWithML, predictCategoryWithML } from '../services/mlService.js';
 import { createRedisConnection } from '../config/redis.js';
+import logger from '../config/logger.js';
 
 // ── Core ML analysis logic ────────────────────────────────────────────────────
 
@@ -53,63 +55,97 @@ export async function runMlAnalysis(reportId, imageUrl) {
   let wasteCategoryAllPredictions  = null;
   let wasteCategoryReviewStatus    = 'manual_review';
 
-  try {
-    // ── Phase 1: Binary classifier ────────────────────────────────────────
-    const mlValidation = await validateImageWithML(imageUrl);
+  // Wrap the entire analysis in a Sentry transaction span for performance tracing
+  return await Sentry.startSpan(
+    { name: 'ml.analysis', op: 'ml', attributes: { reportId: String(reportId) } },
+    async (span) => {
+      try {
+        // ── Phase 1: Binary classifier ────────────────────────────────────────
+        const phase1Start = Date.now();
+        const mlValidation = await Sentry.startSpan(
+          { name: 'ml.phase1.binary_classifier', op: 'ml.phase1' },
+          () => validateImageWithML(imageUrl),
+        );
+        logger.info('[mlWorker] Phase 1 complete', {
+          reportId,
+          label: mlValidation.label,
+          confidence: mlValidation.confidence,
+          durationMs: Date.now() - phase1Start,
+        });
 
-    if (mlValidation.success) {
-      imageValidationLabel      = mlValidation.label;
-      imageValidationConfidence = mlValidation.confidence;
+        if (mlValidation.success) {
+          imageValidationLabel      = mlValidation.label;
+          imageValidationConfidence = mlValidation.confidence;
 
-      if (imageValidationLabel === 'non-trash') {
-        aiReviewStatus = 'flagged';
-      } else if (mlValidation.recommendation === 'manual_review') {
-        aiReviewStatus = 'manual_review';
-      } else {
-        aiReviewStatus = 'approved';
-      }
+          if (imageValidationLabel === 'non-trash') {
+            aiReviewStatus = 'flagged';
+          } else if (mlValidation.recommendation === 'manual_review') {
+            aiReviewStatus = 'manual_review';
+          } else {
+            aiReviewStatus = 'approved';
+          }
 
-      // ── Phase 2: Category classifier (only for confirmed waste) ──────────
-      if (imageValidationLabel === 'trash') {
-        const categoryPrediction = await predictCategoryWithML(imageUrl);
+          // ── Phase 2: Category classifier (only for confirmed waste) ──────────
+          if (imageValidationLabel === 'trash') {
+            const phase2Start = Date.now();
+            const categoryPrediction = await Sentry.startSpan(
+              { name: 'ml.phase2.category_classifier', op: 'ml.phase2' },
+              () => predictCategoryWithML(imageUrl),
+            );
+            logger.info('[mlWorker] Phase 2 complete', {
+              reportId,
+              predictedLabel: categoryPrediction.predictedLabel,
+              confidence: categoryPrediction.confidence,
+              confidenceLevel: categoryPrediction.confidenceLevel,
+              durationMs: Date.now() - phase2Start,
+            });
 
-        if (categoryPrediction.success) {
-          wasteCategoryPredictedLabel  = categoryPrediction.predictedLabel;
-          wasteCategoryConfidence      = categoryPrediction.confidence;
-          wasteCategoryEntropy         = categoryPrediction.entropy;
-          wasteCategoryConfidenceLevel = categoryPrediction.confidenceLevel;
-          wasteCategoryAllPredictions  = categoryPrediction.allPredictions;
-          wasteCategoryReviewStatus    = categoryPrediction.reviewStatus;
-          if (aiReviewStatus !== 'approved') {
-            wasteCategoryReviewStatus = 'manual_review';
+            if (categoryPrediction.success) {
+              wasteCategoryPredictedLabel  = categoryPrediction.predictedLabel;
+              wasteCategoryConfidence      = categoryPrediction.confidence;
+              wasteCategoryEntropy         = categoryPrediction.entropy;
+              wasteCategoryConfidenceLevel = categoryPrediction.confidenceLevel;
+              wasteCategoryAllPredictions  = categoryPrediction.allPredictions;
+              wasteCategoryReviewStatus    = categoryPrediction.reviewStatus;
+              if (aiReviewStatus !== 'approved') {
+                wasteCategoryReviewStatus = 'manual_review';
+              }
+            } else {
+              logger.warn('[mlWorker] Phase 2 prediction failed', {
+                reportId,
+                error: categoryPrediction.error,
+              });
+              wasteCategoryPredictedLabel = 'error';
+              wasteCategoryReviewStatus   = 'manual_review';
+            }
           }
         } else {
-          console.warn('[mlWorker] Phase 2 prediction failed:', categoryPrediction.error);
-          wasteCategoryPredictedLabel = 'error';
-          wasteCategoryReviewStatus   = 'manual_review';
+          logger.warn('[mlWorker] Phase 1 validation failed', {
+            reportId,
+            error: mlValidation.error,
+          });
         }
+      } catch (err) {
+        // Re-throw so BullMQ can record the failure and schedule a retry.
+        // When called directly (fallback), the caller's own try/catch handles it.
+        span?.setStatus({ code: 2, message: err.message }); // SENTRY_STATUS_ERROR
+        throw err;
       }
-    } else {
-      console.warn('[mlWorker] Phase 1 validation failed:', mlValidation.error);
-    }
-  } catch (err) {
-    // Re-throw so BullMQ can record the failure and schedule a retry.
-    // When called directly (fallback), the caller's own try/catch handles it.
-    throw err;
-  }
 
-  // Persist ML results onto the Report document
-  await Report.findByIdAndUpdate(reportId, {
-    imageValidationLabel,
-    imageValidationConfidence,
-    aiReviewStatus,
-    wasteCategoryPredictedLabel,
-    wasteCategoryConfidence,
-    wasteCategoryEntropy,
-    wasteCategoryConfidenceLevel,
-    wasteCategoryAllPredictions,
-    wasteCategoryReviewStatus,
-  });
+      // Persist ML results onto the Report document
+      await Report.findByIdAndUpdate(reportId, {
+        imageValidationLabel,
+        imageValidationConfidence,
+        aiReviewStatus,
+        wasteCategoryPredictedLabel,
+        wasteCategoryConfidence,
+        wasteCategoryEntropy,
+        wasteCategoryConfidenceLevel,
+        wasteCategoryAllPredictions,
+        wasteCategoryReviewStatus,
+      });
+    },
+  );
 }
 
 // ── BullMQ Worker ─────────────────────────────────────────────────────────────
@@ -132,9 +168,13 @@ export function startMlWorker() {
     'ml-inference',
     async (job) => {
       const { reportId, imageUrl } = job.data;
-      console.log(`[mlWorker] Processing job ${job.id} for report ${reportId} (attempt ${job.attemptsMade + 1})`);
+      logger.info('[mlWorker] Processing job', {
+        jobId: job.id,
+        reportId,
+        attempt: job.attemptsMade + 1,
+      });
       await runMlAnalysis(reportId, imageUrl);
-      console.log(`[mlWorker] Job ${job.id} completed for report ${reportId}`);
+      logger.info('[mlWorker] Job completed', { jobId: job.id, reportId });
     },
     {
       connection,
@@ -143,17 +183,29 @@ export function startMlWorker() {
   );
 
   _worker.on('failed', (job, err) => {
-    console.error(
-      `[mlWorker] Job ${job?.id} failed for report ${job?.data?.reportId} ` +
-      `(attempt ${job?.attemptsMade}/${job?.opts?.attempts}): ${err.message}`
-    );
+    logger.error('[mlWorker] Job failed', {
+      jobId: job?.id,
+      reportId: job?.data?.reportId,
+      attempt: job?.attemptsMade,
+      maxAttempts: job?.opts?.attempts,
+      error: err.message,
+      stack: err.stack,
+    });
+    // Report to Sentry after all retries are exhausted
+    if (job?.attemptsMade >= (job?.opts?.attempts ?? 1)) {
+      Sentry.captureException(err, {
+        tags: { component: 'mlWorker' },
+        extra: { jobId: job?.id, reportId: job?.data?.reportId },
+      });
+    }
   });
 
   _worker.on('error', (err) => {
-    console.error('[mlWorker] Worker error:', err.message);
+    logger.error('[mlWorker] Worker error', { error: err.message, stack: err.stack });
+    Sentry.captureException(err, { tags: { component: 'mlWorker' } });
   });
 
-  console.log('[mlWorker] Worker started on "ml-inference" channel (concurrency=1) ✓');
+  logger.info('[mlWorker] Worker started on "ml-inference" channel', { concurrency: 1 });
   return _worker;
 }
 
@@ -167,6 +219,6 @@ export async function closeMlWorker() {
   if (_worker) {
     await _worker.close();
     _worker = null;
-    console.log('[mlWorker] Worker closed gracefully.');
+    logger.info('[mlWorker] Worker closed gracefully.');
   }
 }

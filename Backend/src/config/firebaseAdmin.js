@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 import dotenv from 'dotenv';
+import logger from './logger.js';
 
 // Load environment variables
 dotenv.config();
@@ -11,11 +12,12 @@ const initializeFirebaseAdmin = () => {
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
     if (!projectId || !privateKey || !clientEmail) {
-      console.error('❌ Firebase Admin configuration is missing! Please check your .env file.');
-      console.error('Missing:', {
-        projectId: !projectId,
-        privateKey: !privateKey,
-        clientEmail: !clientEmail
+      logger.error('Firebase Admin configuration is missing', {
+        missing: {
+          projectId: !projectId,
+          privateKey: !privateKey,
+          clientEmail: !clientEmail,
+        },
       });
       process.exit(1);
     }
@@ -28,7 +30,7 @@ const initializeFirebaseAdmin = () => {
       }),
     });
 
-    console.log('✅ Firebase Admin initialized successfully');
+    logger.info('Firebase Admin SDK initialised', { projectId });
   }
   return admin;
 };

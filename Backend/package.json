@@ -11,7 +11,10 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "build": "node -e \"console.log('cleansight-backend: no build step required')\"",
-    "test": "node --test src/tests/roleGuard.test.js src/tests/reportStatus.test.js src/tests/badgeService.test.js src/tests/volunteerProgress.test.js"
+    "test": "node --test src/tests/roleGuard.test.js src/tests/reportStatus.test.js src/tests/badgeService.test.js src/tests/volunteerProgress.test.js",
+    "test:unit": "node --test src/tests/roleGuard.test.js src/tests/reportStatus.test.js src/tests/badgeService.test.js src/tests/volunteerProgress.test.js src/tests/reportStatus.constants.test.js src/tests/analyticsService.unit.test.js",
+    "test:integration": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js src/tests/auth.routes.test.js src/tests/reports.routes.test.js --testEnvironment node",
+    "test:all": "pnpm test:unit && pnpm test:integration"
   },
   "dependencies": {
     "@sentry/node": "^10.67.0",
@@ -34,7 +37,16 @@
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
+  "jest": {
+    "testEnvironment": "node",
+    "transform": {},
+    "moduleNameMapper": {},
+    "testMatch": ["**/tests/*.routes.test.js"]
+  },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "@jest/globals": "^30.4.1",
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.9",
+    "supertest": "^7.2.2"
   }
 }

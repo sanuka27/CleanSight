@@ -29,6 +29,7 @@ import adminRoutes from './routes/admin.js';
 import mlAnalyticsRoutes from './routes/mlAnalytics.js';
 import notificationRoutes from './routes/notifications.js';
 import publicRoutes from './routes/public.js';
+import { swaggerServe, swaggerSetup, swaggerSpec } from './config/swagger.js';
 import { startMlWorker, closeMlWorker } from './workers/mlWorker.js';
 import { startHeartbeat, stopHeartbeat } from './services/sseService.js';
 
@@ -88,6 +89,49 @@ app.use(requestLogger);
 // ─────────────────────────────────────────────────────────────────────────────
 // Health Check
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * @openapi
+ * /api/health:
+ *   get:
+ *     summary: Service health check
+ *     description: |
+ *       Returns the operational status of the API, MongoDB connection, and the
+ *       Redis-backed rate-limit store. Returns HTTP 200 when healthy or HTTP 503
+ *       when the database is unreachable.
+ *     tags: [Health]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: ok }
+ *                 message: { type: string, example: CleanSight API is running }
+ *                 timestamp: { type: string, format: date-time }
+ *                 environment: { type: string, example: development }
+ *                 database:
+ *                   type: object
+ *                   properties:
+ *                     connected: { type: boolean, example: true }
+ *                     host: { type: string, example: cluster0.mongodb.net }
+ *                 rateLimit:
+ *                   type: object
+ *                   properties:
+ *                     store: { type: string, enum: [redis, memory] }
+ *                     redisStatus: { type: string, example: ready }
+ *       503:
+ *         description: Database unavailable — service degraded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: degraded }
+ *                 message: { type: string }
+ */
 app.get('/api/health', (req, res) => {
   const dbConnected = mongoose.connection.readyState === 1;
   // ioredis statuses: 'ready' = connected, everything else = not usable
@@ -124,6 +168,22 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/ml-analytics', mlAnalyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/public', publicRoutes);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API Documentation (Swagger / OpenAPI)
+// Serve the interactive Swagger UI at /api/docs.
+// Only enabled outside production to avoid exposing full API surface publicly.
+// To enable in production, remove the NODE_ENV guard.
+// ─────────────────────────────────────────────────────────────────────────────
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/api/docs', swaggerServe, swaggerSetup);
+  // Also expose the raw OpenAPI JSON for tooling (e.g. Postman import, code-gen)
+  app.get('/api/docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+  });
+  logger.info('API documentation available at /api/docs');
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Error Handling

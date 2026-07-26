@@ -36,6 +36,82 @@ function validateAvatar(avatar) {
   }
 }
 
+/**
+ * @openapi
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     description: |
+ *       Creates a MongoDB user profile linked to the authenticated Firebase UID.
+ *       Must be called after the user has signed up via Firebase Authentication.
+ *       If a profile already exists for this UID the existing record is returned (idempotent).
+ *       **Rate limited:** 10 requests per 15 minutes per IP.
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, email, role]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 50
+ *                 example: Jane Doe
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: jane@example.com
+ *               role:
+ *                 type: string
+ *                 enum: [citizen, volunteer]
+ *                 example: citizen
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: User registered successfully }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user: { $ref: '#/components/schemas/UserProfile' }
+ *       200:
+ *         description: User already registered (idempotent)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: User already registered }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user: { $ref: '#/components/schemas/UserProfile' }
+ *       400:
+ *         description: Validation error (invalid name, email, or role)
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       409:
+ *         description: Email already in use by another account
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       429:
+ *         $ref: '#/components/responses/TooManyRequests'
+ */
 // ─────────────────────────────────────────────────────────────────────
 // POST /api/auth/register
 // Register a new user (create MongoDB profile)
@@ -176,6 +252,57 @@ router.post('/register', authRateLimit, verifyToken, asyncHandler(async (req, re
   });
 }));
 
+/**
+ * @openapi
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current user profile
+ *     description: |
+ *       Returns the full profile of the authenticated user.
+ *       Updates the `lastActiveAt` timestamp on each call.
+ *       **Rate limited:** stricter per-IP limit to protect sensitive data.
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile returned
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user: { $ref: '#/components/schemas/UserProfile' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Account suspended
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: false }
+ *                 message: { type: string, example: Account suspended }
+ *                 suspended: { type: boolean, example: true }
+ *                 suspendedReason: { type: string }
+ *       404:
+ *         description: User profile not found — registration required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: false }
+ *                 message: { type: string }
+ *                 needsRegistration: { type: boolean, example: true }
+ *       429:
+ *         $ref: '#/components/responses/TooManyRequests'
+ */
 // ─────────────────────────────────────────────────────────────────────
 // GET /api/auth/me
 // Get current user profile
@@ -228,6 +355,79 @@ router.get('/me', meRateLimit, verifyToken, asyncHandler(async (req, res) => {
   });
 }));
 
+/**
+ * @openapi
+ * /api/auth/profile:
+ *   put:
+ *     summary: Update user profile
+ *     description: |
+ *       Updates one or more of the authenticated user's editable fields:
+ *       `name`, `phone`, `avatar`. Only the provided fields are changed.
+ *       Suspended accounts cannot update their profile.
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 50
+ *                 example: Jane Doe
+ *               phone:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "+1-555-123-4567"
+ *               avatar:
+ *                 type: string
+ *                 format: uri
+ *                 nullable: true
+ *                 example: https://example.com/avatar.jpg
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: Profile updated successfully }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user: { $ref: '#/components/schemas/UserProfile' }
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: false }
+ *                 message: { type: string, example: Validation failed }
+ *                 errors:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       field: { type: string }
+ *                       message: { type: string }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Account suspended
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
 // ─────────────────────────────────────────────────────────────────────
 // PUT /api/auth/profile
 // Update user profile
@@ -295,6 +495,37 @@ router.put('/profile', verifyToken, asyncHandler(async (req, res) => {
   });
 }));
 
+/**
+ * @openapi
+ * /api/auth/check:
+ *   get:
+ *     summary: Check if user profile exists
+ *     description: |
+ *       Lightweight onboarding-gate check. Returns whether a MongoDB profile
+ *       exists for the authenticated Firebase UID without returning the full
+ *       profile. Used by the frontend to redirect new users to the registration flow.
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Check result returned
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 exists: { type: boolean, example: true }
+ *                 needsRegistration: { type: boolean, example: false }
+ *                 role:
+ *                   type: string
+ *                   enum: [citizen, volunteer, staff, admin]
+ *                   nullable: true
+ *                 isSuspended: { type: boolean, example: false }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
 // ─────────────────────────────────────────────────────────────────────
 // GET /api/auth/check
 // Quick check if user exists in DB (for onboarding flow)

@@ -14,6 +14,139 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 
 const router = express.Router();
 
+/**
+ * @openapi
+ * /api/notifications/fcm-token:
+ *   post:
+ *     summary: Register a device FCM token
+ *     description: |
+ *       Registers a Firebase Cloud Messaging (FCM) device token for the authenticated user.
+ *       Safe to call multiple times — duplicate tokens are automatically deduplicated.
+ *       A maximum of 10 tokens are stored per user; the oldest is evicted when the limit is reached.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: FCM device registration token
+ *                 example: fXyzAbc123...
+ *     responses:
+ *       200:
+ *         description: FCM token registered
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: FCM token registered }
+ *       400:
+ *         description: Token missing or invalid
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *   delete:
+ *     summary: Unregister a device FCM token
+ *     description: Removes a specific FCM token from the user's registered tokens. Typically called on logout or when notification permission is revoked.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 example: fXyzAbc123...
+ *     responses:
+ *       200:
+ *         description: FCM token unregistered
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: FCM token unregistered }
+ *       400:
+ *         description: Token missing
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ * /api/notifications/preferences:
+ *   get:
+ *     summary: Get notification preferences
+ *     description: Returns the authenticated user's push and email notification preferences.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Notification preferences
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/NotificationPreferences' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *   patch:
+ *     summary: Update notification preferences
+ *     description: Updates push and/or email notification preferences for the authenticated user.
+ *     tags: [Notifications]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               push: { type: boolean, example: true }
+ *               email: { type: boolean, example: false }
+ *     responses:
+ *       200:
+ *         description: Preferences updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/NotificationPreferences' }
+ *       400:
+ *         description: No valid fields provided
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
 /* ------------------------------------------------------------------
  * POST /api/notifications/fcm-token
  * Register a device FCM token for the authenticated user.

@@ -19,6 +19,156 @@ import {
 const router = express.Router();
 
 /**
+ * @openapi
+ * /api/ml-analytics/summary:
+ *   get:
+ *     summary: ML analytics overall summary
+ *     description: |
+ *       Returns combined Phase 1 (image validation) and Phase 2 (waste category
+ *       classification) ML analytics for the given date range.
+ *       Authentication required.
+ *     tags: [ML Analytics]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/DateFromParam'
+ *       - $ref: '#/components/parameters/DateToParam'
+ *     responses:
+ *       200:
+ *         description: ML summary payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/ml-analytics/phase1:
+ *   get:
+ *     summary: Phase 1 ML metrics (binary image validation)
+ *     description: Metrics for the Phase 1 binary waste-image validation model (valid vs. invalid).
+ *     tags: [ML Analytics]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/DateFromParam'
+ *       - $ref: '#/components/parameters/DateToParam'
+ *     responses:
+ *       200:
+ *         description: Phase 1 metrics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/ml-analytics/phase2:
+ *   get:
+ *     summary: Phase 2 ML metrics (category classification)
+ *     description: Metrics for the Phase 2 multi-class waste category classification model.
+ *     tags: [ML Analytics]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/DateFromParam'
+ *       - $ref: '#/components/parameters/DateToParam'
+ *     responses:
+ *       200:
+ *         description: Phase 2 metrics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/ml-analytics/trends:
+ *   get:
+ *     summary: ML prediction time-series trends
+ *     description: Daily time-series data of ML predictions and human review overrides.
+ *     tags: [ML Analytics]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/DateFromParam'
+ *       - $ref: '#/components/parameters/DateToParam'
+ *     responses:
+ *       200:
+ *         description: ML trend data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/ml-analytics/weak-points:
+ *   get:
+ *     summary: ML weak-point analysis
+ *     description: Categories with high override rates or low prediction confidence — useful for targeted model retraining.
+ *     tags: [ML Analytics]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/DateFromParam'
+ *       - $ref: '#/components/parameters/DateToParam'
+ *     responses:
+ *       200:
+ *         description: Weak-point categories
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/ml-analytics/confidence-distribution:
+ *   get:
+ *     summary: ML confidence score distribution
+ *     description: Histogram of confidence scores for Phase 1 and Phase 2 predictions across the date range.
+ *     tags: [ML Analytics]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/DateFromParam'
+ *       - $ref: '#/components/parameters/DateToParam'
+ *     responses:
+ *       200:
+ *         description: Confidence distribution data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { type: object }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
+/**
  * GET /api/ml-analytics/summary
  * Overall ML analytics summary for both phases
  */

@@ -35,6 +35,172 @@ import { parseDateRange } from '../utils/dateRange.js';
 const router = express.Router();
 
 
+/**
+ * @openapi
+ * /api/dashboard/me:
+ *   get:
+ *     summary: Get role-aware dashboard hint
+ *     description: Returns the authenticated user's role and the path of their appropriate dashboard.
+ *     tags: [Dashboard]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Role and dashboard path
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     role: { type: string, enum: [citizen, volunteer, staff, admin] }
+ *                     dashboardPath: { type: string, example: /dashboard/citizen }
+ *                     user: { $ref: '#/components/schemas/UserProfile' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/dashboard/citizen:
+ *   get:
+ *     summary: Citizen dashboard payload
+ *     description: |
+ *       Returns aggregated data for the citizen dashboard: personal report totals,
+ *       recent reports, earned badges, and the full badge catalog.
+ *       Accessible to `citizen`, `staff`, and `admin` roles.
+ *     tags: [Dashboard]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Citizen dashboard data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     myTotals: { type: object }
+ *                     recentReports: { type: array, items: { $ref: '#/components/schemas/Report' } }
+ *                     citizenProfile: { type: object }
+ *                     newlyEarnedBadges: { type: array, items: { type: object } }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/dashboard/volunteer:
+ *   get:
+ *     summary: Volunteer dashboard payload
+ *     description: |
+ *       Returns tasks assigned to the volunteer, recently resolved tasks, nearby
+ *       pending reports, personal 7-day stats, and earned badges.
+ *       Accessible to `volunteer`, `staff`, and `admin` roles.
+ *     tags: [Dashboard]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Volunteer dashboard data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     assignedToMe: { type: array, items: { $ref: '#/components/schemas/Report' } }
+ *                     resolvedByMe: { type: array, items: { $ref: '#/components/schemas/Report' } }
+ *                     pendingNearby: { type: array, items: { $ref: '#/components/schemas/Report' } }
+ *                     myStats: { type: object }
+ *                     volunteerProfile: { type: object }
+ *                     newlyEarnedBadges: { type: array, items: { type: object } }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/dashboard/staff:
+ *   get:
+ *     summary: Staff dashboard payload
+ *     description: |
+ *       Returns pending and assigned reports for triage, today's resolved count,
+ *       top 5 volunteer performers (7 days), and available volunteers for assignment.
+ *       Accessible to `staff` and `admin` roles.
+ *     tags: [Dashboard]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Staff dashboard data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     pendingReports: { type: array, items: { $ref: '#/components/schemas/Report' } }
+ *                     assignedReports: { type: array, items: { $ref: '#/components/schemas/Report' } }
+ *                     resolvedTodayCount: { type: integer }
+ *                     volunteerSnapshot: { type: array, items: { type: object } }
+ *                     availableVolunteers: { type: array, items: { type: object } }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/dashboard/admin:
+ *   get:
+ *     summary: Admin dashboard payload (7-day aggregated analytics)
+ *     description: |
+ *       Returns a comprehensive analytics payload for the admin dashboard covering
+ *       the last 7 days: status breakdown, time-series, performance KPIs, volunteer stats,
+ *       recent activity, and user counts. Accessible to `admin` only.
+ *     tags: [Dashboard]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Admin dashboard data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     range: { type: object }
+ *                     totals: { type: object }
+ *                     rates: { type: object }
+ *                     series: { type: array, items: { type: object } }
+ *                     topWasteTypes: { type: array, items: { type: object } }
+ *                     urgencyBreakdown: { type: array, items: { type: object } }
+ *                     performance: { type: object }
+ *                     volunteers: { type: array, items: { type: object } }
+ *                     recentReports: { type: array, items: { $ref: '#/components/schemas/Report' } }
+ *                     userCounts: { type: object }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 /* ------------------------------------------------------------------ */
 /*  GET /api/dashboard/me — role-aware dashboard hint                 */
 /* ------------------------------------------------------------------ */

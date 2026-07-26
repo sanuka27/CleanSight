@@ -9,6 +9,51 @@ import Report from '../models/Report.js';
 
 const router = express.Router();
 
+/**
+ * @openapi
+ * /api/public/stats:
+ *   get:
+ *     summary: Get city-level cleanup statistics (public)
+ *     description: |
+ *       Returns aggregate waste-report statistics for use on the public landing page.
+ *       No authentication required. Data covers all reports since 2020.
+ *       Also returns up to 3 recently resolved reports as showcase examples.
+ *     tags: [Public]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Public statistics payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totals:
+ *                       type: object
+ *                       properties:
+ *                         total: { type: integer }
+ *                         resolved: { type: integer }
+ *                         inProgress: { type: integer }
+ *                         pending: { type: integer }
+ *                     resolutionRate: { type: number, example: 72.4 }
+ *                     series:
+ *                       type: array
+ *                       description: Daily report counts
+ *                       items: { type: object }
+ *                     topWasteTypes:
+ *                       type: array
+ *                       items: { type: object }
+ *                     recentResolved:
+ *                       type: array
+ *                       maxItems: 3
+ *                       items: { $ref: '#/components/schemas/Report' }
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 /* ================================================================== */
 /*  GET /api/public/stats                                             */
 /*  Public endpoint for city-level cleanup stats                      */

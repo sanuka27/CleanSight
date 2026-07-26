@@ -26,6 +26,60 @@ function validateContact(body) {
   return { name, email, message, errors };
 }
 
+/**
+ * @openapi
+ * /api/contact:
+ *   post:
+ *     summary: Submit a contact form message
+ *     description: |
+ *       Public endpoint for submitting a contact form message. No authentication
+ *       required. The message is stored for admin review.
+ *       **Rate limited:** 10 requests per 15 minutes per IP.
+ *     tags: [Contact]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, email, message]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 80
+ *                 example: Jane Doe
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: jane@example.com
+ *               message:
+ *                 type: string
+ *                 minLength: 5
+ *                 maxLength: 2000
+ *                 example: I would like to report a recurring dumping issue on Elm Street.
+ *     responses:
+ *       201:
+ *         description: Message received successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, example: true }
+ *                 id: { type: string }
+ *                 message: { type: string, example: "Message received. We will get back to you soon!" }
+ *       422:
+ *         description: Validation failed
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ValidationError' }
+ *       429:
+ *         $ref: '#/components/responses/TooManyRequests'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 // ── POST /api/contact ───────────────────────────────────────────
 // Public — rate-limited: 10 requests per 15 minutes per IP.
 router.post(

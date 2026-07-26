@@ -50,6 +50,115 @@ async function resolveUserContext(firebaseUid) {
   return { role, filter: {}, user };
 }
 
+/**
+ * @openapi
+ * /api/analytics/summary:
+ *   get:
+ *     summary: Get aggregated analytics summary
+ *     description: |
+ *       Returns status breakdown, time-series data, waste-type distribution, and
+ *       urgency breakdown for the given date range.
+ *
+ *       Role-based filtering:
+ *       - **citizen** → only their own reports
+ *       - **volunteer** → global + `myAssigned` section
+ *       - **staff/admin** → full global metrics
+ *     tags: [Analytics]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/DateFromParam'
+ *       - $ref: '#/components/parameters/DateToParam'
+ *     responses:
+ *       200:
+ *         description: Analytics summary data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/AnalyticsSummary' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/analytics/performance:
+ *   get:
+ *     summary: Get resolution performance metrics
+ *     description: |
+ *       Returns average and median resolution times, time-to-assign, and related
+ *       counts for the specified date range. Role-based filtering applies.
+ *     tags: [Analytics]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/DateFromParam'
+ *       - $ref: '#/components/parameters/DateToParam'
+ *     responses:
+ *       200:
+ *         description: Performance metrics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     range: { type: object }
+ *                     avgResolutionHours: { type: number, nullable: true }
+ *                     medianResolutionHours: { type: number, nullable: true }
+ *                     resolvedCount: { type: integer }
+ *                     avgTimeToAssignHours: { type: number, nullable: true }
+ *                     assignedCount: { type: integer }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/analytics/volunteers:
+ *   get:
+ *     summary: Get per-volunteer analytics (staff/admin only)
+ *     description: |
+ *       Returns assigned and resolved report counts per volunteer for the
+ *       specified date range. Only accessible to `staff` and `admin` users.
+ *     tags: [Analytics]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/DateFromParam'
+ *       - $ref: '#/components/parameters/DateToParam'
+ *     responses:
+ *       200:
+ *         description: Volunteer analytics data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     range: { type: object }
+ *                     volunteers:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           firebaseUid: { type: string }
+ *                           name: { type: string }
+ *                           email: { type: string, format: email }
+ *                           assignedCount: { type: integer }
+ *                           resolvedCount: { type: integer }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 /* ================================================================== */
 /*  GET /api/analytics/summary                                        */
 /* ================================================================== */

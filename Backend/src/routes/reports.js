@@ -34,6 +34,129 @@ const VALID_URGENCY_LEVELS = ['low', 'medium', 'high'];
 
 
 
+/**
+ * @openapi
+ * /api/reports:
+ *   post:
+ *     summary: Submit a new waste report
+ *     description: |
+ *       Creates a new waste-dumping report linked to the authenticated user.
+ *       ML image validation and waste category classification are enqueued
+ *       asynchronously after a fast 201 response.
+ *       **Rate limited:** 5 reports per 15 minutes per IP.
+ *     tags: [Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [imageUrl, description, location]
+ *             properties:
+ *               imageUrl:
+ *                 type: string
+ *                 format: uri
+ *                 example: https://firebasestorage.googleapis.com/v0/b/bucket/o/image.jpg
+ *               description:
+ *                 type: string
+ *                 minLength: 10
+ *                 maxLength: 500
+ *                 example: Large pile of construction debris near the bus stop
+ *               location:
+ *                 type: object
+ *                 required: [lat, lng]
+ *                 properties:
+ *                   lat:
+ *                     type: number
+ *                     minimum: -90
+ *                     maximum: 90
+ *                     example: 13.0827
+ *                   lng:
+ *                     type: number
+ *                     minimum: -180
+ *                     maximum: 180
+ *                     example: 80.2707
+ *               wasteType:
+ *                 type: string
+ *                 enum: [general, recyclable, organic, construction, hazardous]
+ *                 default: general
+ *               urgency:
+ *                 type: string
+ *                 enum: [low, medium, high]
+ *                 default: medium
+ *               title:
+ *                 type: string
+ *                 maxLength: 120
+ *                 nullable: true
+ *                 example: Illegal dumping near park entrance
+ *     responses:
+ *       201:
+ *         description: Report created — ML analysis is pending
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/Report' }
+ *                 newlyEarnedBadges:
+ *                   type: array
+ *                   items: { type: object }
+ *                 mlStatus: { type: string, example: pending }
+ *       400:
+ *         description: Validation error (missing / invalid fields)
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         $ref: '#/components/responses/TooManyRequests'
+ *   get:
+ *     summary: List reports (map-ready, with filters)
+ *     description: |
+ *       Returns a filtered list of reports. Citizens always see only their own
+ *       reports; other roles see all unless `mine=true` is passed.
+ *       Supports geographic filtering via bounding box or proximity radius.
+ *       Results are capped at 500 for map performance.
+ *     tags: [Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - name: status
+ *         in: query
+ *         description: Comma-separated list of statuses to include
+ *         schema: { type: string, example: "pending,assigned" }
+ *       - name: mine
+ *         in: query
+ *         description: If true, return only the authenticated user's reports
+ *         schema: { type: boolean }
+ *       - name: bbox
+ *         in: query
+ *         description: Bounding box filter — `west,south,east,north` in decimal degrees
+ *         schema: { type: string, example: "80.1,12.9,80.4,13.2" }
+ *       - name: near
+ *         in: query
+ *         description: Proximity filter — `lat,lng,radiusKm`
+ *         schema: { type: string, example: "13.08,80.27,5" }
+ *     responses:
+ *       200:
+ *         description: List of reports
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 count: { type: integer }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/Report' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
 // @route   POST /api/reports
 // @desc    Create a new report
 // @access  Private (any authenticated user)
@@ -203,6 +326,39 @@ router.post('/', reportRateLimit, verifyToken, asyncHandler(async (req, res) => 
   });
 }));
 
+/**
+ * @openapi
+ * /api/reports/my:
+ *   get:
+ *     summary: Get the authenticated user's own reports (paginated)
+ *     description: Returns a paginated list of reports submitted by the current user. Results are sorted by newest first.
+ *     tags: [Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/PageParam'
+ *       - name: limit
+ *         in: query
+ *         description: Items per page (max 200)
+ *         schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+ *     responses:
+ *       200:
+ *         description: Paginated list of the user's reports
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 count: { type: integer }
+ *                 total: { type: integer }
+ *                 pagination: { $ref: '#/components/schemas/PaginationMeta' }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/Report' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
 // @route   GET /api/reports/my
 // @desc    Get current user's reports (paginated)
 // @access  Private
@@ -253,6 +409,37 @@ router.get('/volunteers', verifyToken, asyncHandler(async (req, res) => {
   res.json({ success: true, data: volunteers });
 }));
 
+/**
+ * @openapi
+ * /api/reports/{id}:
+ *   get:
+ *     summary: Get a single report by ID
+ *     description: Returns the full details of a single report. The caller must be authenticated.
+ *     tags: [Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/ReportIdParam'
+ *     responses:
+ *       200:
+ *         description: Full report object
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/Report' }
+ *       400:
+ *         description: Invalid report ID format
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
 // @route   GET /api/reports/:id
 // @desc    Get a single report by ID (full details)
 // @access  Private
@@ -346,6 +533,41 @@ router.get('/', verifyToken, asyncHandler(async (req, res) => {
 
 // NOTE: GET /api/reports/volunteers is defined above GET /:id (see above)
 
+/**
+ * @openapi
+ * /api/reports/{id}/assign-self:
+ *   patch:
+ *     summary: Volunteer self-assigns a pending report
+ *     description: |
+ *       Allows an authenticated volunteer to self-assign a `pending` report to themselves.
+ *       Only users with the `volunteer` role may call this endpoint.
+ *     tags: [Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/ReportIdParam'
+ *     responses:
+ *       200:
+ *         description: Report assigned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/Report' }
+ *       400:
+ *         description: Report is not in pending status or invalid ID
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
 // @route   PATCH /api/reports/:id/assign-self
 // @desc    Volunteer self-assigns a pending report
 // @access  Private (volunteer only)
@@ -392,6 +614,53 @@ router.patch('/:id/assign-self', verifyToken, asyncHandler(async (req, res) => {
   res.json({ success: true, data: report });
 }));
 
+/**
+ * @openapi
+ * /api/reports/{id}/assign:
+ *   patch:
+ *     summary: Staff/Admin assigns a report to a specific volunteer
+ *     description: |
+ *       Assigns a `pending` report to a target volunteer identified by their
+ *       Firebase UID. Only `staff` and `admin` users may call this endpoint.
+ *     tags: [Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/ReportIdParam'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [volunteerUid]
+ *             properties:
+ *               volunteerUid:
+ *                 type: string
+ *                 description: Firebase UID of the volunteer to assign
+ *                 example: abc123xyz
+ *     responses:
+ *       200:
+ *         description: Report assigned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/Report' }
+ *       400:
+ *         description: Validation error or target user is not a volunteer
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
 // @route   PATCH /api/reports/:id/assign
 // @desc    Staff/Admin assigns a pending report to a volunteer
 // @access  Private (staff/admin only)
@@ -448,6 +717,64 @@ router.patch('/:id/assign', verifyToken, asyncHandler(async (req, res) => {
   res.json({ success: true, data: report });
 }));
 
+/**
+ * @openapi
+ * /api/reports/{id}/status:
+ *   patch:
+ *     summary: Update a report's status
+ *     description: |
+ *       Transitions a report through valid status states. Allowed transitions
+ *       and required role depend on the target status:
+ *       - `assigned` → staff/admin only
+ *       - `in_progress` → volunteer (assigned to this report) or staff/admin
+ *       - `resolved` → volunteer (assigned) or staff/admin; optionally accepts a `resolutionImageUrl`
+ *
+ *       Status machine: `pending` → `assigned` → `in_progress` → `resolved`
+ *     tags: [Reports]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/ReportIdParam'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [assigned, in_progress, resolved]
+ *                 example: resolved
+ *               resolutionImageUrl:
+ *                 type: string
+ *                 format: uri
+ *                 nullable: true
+ *                 description: Optional before/after photo URL (required for resolved status is encouraged)
+ *                 example: https://firebasestorage.googleapis.com/v0/b/bucket/o/resolved.jpg
+ *     responses:
+ *       200:
+ *         description: Status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/Report' }
+ *       400:
+ *         description: Invalid status value or disallowed state transition
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
 // @route   PATCH /api/reports/:id/status
 // @desc    Update report status with transition validation
 // @access  Private (role-based)

@@ -19,6 +19,43 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 const router = express.Router();
 
 
+/**
+ * @openapi
+ * /api/volunteers:
+ *   get:
+ *     summary: List all volunteer profiles
+ *     description: Returns a paginated, publicly accessible list of volunteer profiles sorted by cleanup count.
+ *     tags: [Volunteers]
+ *     security: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/PageParam'
+ *       - $ref: '#/components/parameters/LimitParam'
+ *       - name: isActive
+ *         in: query
+ *         description: Filter by active status
+ *         schema: { type: boolean }
+ *       - name: availability
+ *         in: query
+ *         description: Filter by availability slot
+ *         schema: { type: string, enum: [weekdays, weekends, flexible, evenings] }
+ *     responses:
+ *       200:
+ *         description: Paginated volunteer list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 count: { type: integer }
+ *                 total: { type: integer }
+ *                 pagination: { $ref: '#/components/schemas/PaginationMeta' }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/VolunteerProfile' }
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 /* ------------------------------------------------------------------ */
 /*  GET /api/volunteers                                               */
 /*  Get all volunteer profiles (public)                               */
@@ -57,6 +94,62 @@ router.get('/', asyncHandler(async (req, res) => {
   });
 }));
 
+/**
+ * @openapi
+ * /api/volunteers/register:
+ *   post:
+ *     summary: Register as a volunteer
+ *     description: |
+ *       Creates a volunteer profile for the authenticated citizen and upgrades their
+ *       role from `citizen` to `volunteer`. Idempotent — returns 400 if already registered.
+ *     tags: [Volunteers]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bio:
+ *                 type: string
+ *                 maxLength: 300
+ *                 example: Passionate about keeping the city clean.
+ *               skills:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum: [waste-sorting, heavy-lifting, driving, coordination, community-outreach]
+ *                 example: [waste-sorting, driving]
+ *               availability:
+ *                 type: string
+ *                 enum: [weekdays, weekends, flexible, evenings]
+ *                 example: weekends
+ *               preferredAreas:
+ *                 type: array
+ *                 items: { type: string }
+ *                 example: [Downtown, North Park]
+ *     responses:
+ *       201:
+ *         description: Volunteer profile created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: Successfully registered as a volunteer }
+ *                 data: { $ref: '#/components/schemas/VolunteerProfile' }
+ *       400:
+ *         description: Already registered as a volunteer or invalid skills/availability
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
 /* ------------------------------------------------------------------ */
 /*  POST /api/volunteers/register                                     */
 /*  Register as a volunteer (upgrades citizen to volunteer role)      */

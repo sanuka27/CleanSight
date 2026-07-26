@@ -12,6 +12,107 @@ import { Router } from 'express';
 import ContactMessage from '../models/ContactMessage.js';
 import { adminOnly } from '../middleware/adminAuth.js';
 
+/**
+ * @openapi
+ * /api/admin/contact/messages:
+ *   get:
+ *     summary: List contact messages (admin only)
+ *     description: |
+ *       Returns a paginated list of contact form submissions with optional filtering
+ *       by status or search query. Requires admin authentication via `x-admin-key` header
+ *       or a valid admin Bearer token.
+ *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
+ *       - AdminKey: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/PageParam'
+ *       - $ref: '#/components/parameters/LimitParam'
+ *       - name: status
+ *         in: query
+ *         description: Filter by message status
+ *         schema: { type: string, enum: [new, read, replied] }
+ *       - name: q
+ *         in: query
+ *         description: Search term for name, email, or message content
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Paginated contact message list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 page: { type: integer }
+ *                 limit: { type: integer }
+ *                 total: { type: integer }
+ *                 totalPages: { type: integer }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/ContactMessage' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ * /api/admin/contact/messages/{id}:
+ *   patch:
+ *     summary: Update contact message status (admin only)
+ *     description: Updates the status of a specific contact message to `new`, `read`, or `replied`.
+ *     tags: [Admin]
+ *     security:
+ *       - BearerAuth: []
+ *       - AdminKey: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: MongoDB ObjectId of the contact message
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [new, read, replied]
+ *                 example: read
+ *     responses:
+ *       200:
+ *         description: Message status updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/ContactMessage' }
+ *       400:
+ *         description: Invalid message ID
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       422:
+ *         description: Invalid status value
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 const router = Router();
 
 // ── GET /api/admin/contact/messages ─────────────────────────────

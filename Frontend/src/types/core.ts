@@ -91,7 +91,7 @@ export interface PaginatedResponse<T> {
 // Date Range Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type DateRangePreset = '7d' | '30d' | '90d' | 'custom';
+export type DateRangePreset = '7d' | '30d' | '90d' | 'all' | 'custom';
 
 export interface DateRange {
   from: string; // ISO-8601

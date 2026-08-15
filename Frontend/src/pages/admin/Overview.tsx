@@ -39,7 +39,7 @@ export default function AdminOverview() {
   const { appUser } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [range, setRange] = useState<DateRange>("7d");
+  const [range, setRange] = useState<DateRange>("all");
   const [customDates, setCustomDates] = useState({ from: "", to: "" });
 
   // React Query hooks

@@ -9,18 +9,19 @@ const PRESET_DAYS = {
   '7d': 7,
   '30d': 30,
   '90d': 90,
+  'all': 3650,
 };
 
 /**
  * Parse a date-range from query parameters.
  *
- * Priority: explicit `from`/`to` > `preset` > default (7d).
+ * Priority: explicit `from`/`to` > `preset` > default (all/7d).
  *
- * @param {{ from?: string, to?: string, preset?: string }} query
+ * @param {{ from?: string, to?: string, preset?: string, range?: string }} query
  * @returns {{ from: Date, to: Date }}
  */
 export function parseDateRange(query = {}) {
-  const { from, to, preset } = query;
+  const { from, to, preset, range } = query;
 
   // If both explicit dates are provided, use them
   if (from && to) {
@@ -30,8 +31,16 @@ export function parseDateRange(query = {}) {
     };
   }
 
+  const selectedPreset = preset || range;
+  if (selectedPreset === 'all') {
+    return {
+      from: new Date('2020-01-01T00:00:00.000Z'),
+      to: endOfDayUTC(new Date()),
+    };
+  }
+
   // Determine days from preset (fallback: 7d)
-  const days = PRESET_DAYS[preset] || PRESET_DAYS['7d'];
+  const days = PRESET_DAYS[selectedPreset] || PRESET_DAYS['7d'];
 
   const now = new Date();
   return {
@@ -44,12 +53,12 @@ export function parseDateRange(query = {}) {
  * Resolve date range from query params (alternative interface).
  * Used by admin routes with `range` param instead of `preset`.
  *
- * @param {string} range - '7d' | '30d' | '90d' | 'custom'
+ * @param {string} range - '7d' | '30d' | '90d' | 'all' | 'custom'
  * @param {string|Date} from - Start date (ISO string or Date)
  * @param {string|Date} to - End date (ISO string or Date)
  * @returns {{ start: Date, end: Date }}
  */
-export function resolveDateRange(range = '7d', from, to) {
+export function resolveDateRange(range = 'all', from, to) {
   // If explicit from/to provided, use them
   if (from && to) {
     return {
@@ -58,8 +67,15 @@ export function resolveDateRange(range = '7d', from, to) {
     };
   }
 
-  // Otherwise use range preset
   const end = new Date();
+  if (range === 'all') {
+    return {
+      start: new Date('2020-01-01T00:00:00.000Z'),
+      end,
+    };
+  }
+
+  // Otherwise use range preset
   const start = new Date();
   const days = range === '90d' ? 90 : range === '30d' ? 30 : 7;
   start.setDate(start.getDate() - days);

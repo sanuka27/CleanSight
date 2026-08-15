@@ -1,4 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
+// CleanSight API Server
 // IMPORTANT: Sentry MUST be initialised before any other imports so that its
 // auto-instrumentation can wrap all async operations from the very start.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,20 +46,51 @@ const PORT = process.env.PORT || 5000;
 // multiple frontends (e.g. staging + production) can be served without
 // a code change.
 // ─────────────────────────────────────────────────────────────────────────────
-const rawOrigins = process.env.CLIENT_URL || 'http://localhost:8080';
-let allowedOrigins = rawOrigins
+const defaultDevOrigins = [
+  'http://localhost:8080',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:8080',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+  'https://clean-sight-frontend.vercel.app',
+];
+
+const rawOrigins = process.env.CLIENT_URL || '';
+const configuredOrigins = rawOrigins
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
-// Guard: if CLIENT_URL is blank/whitespace-only, fall back to the dev default
-// so CORS doesn't silently block every cross-origin request.
-if (allowedOrigins.length === 0) allowedOrigins = ['http://localhost:8080'];
+
+const allowedOrigins = Array.from(new Set([
+  ...defaultDevOrigins,
+  ...configuredOrigins,
+]));
 
 const corsOptions = {
-  origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
+  origin: (origin, callback) => {
+    // Allow non-browser requests (e.g. mobile apps, curl, server-to-server, Postman)
+    if (!origin) return callback(null, true);
+
+    // In development mode, allow any localhost/127.0.0.1 port
+    if (process.env.NODE_ENV !== 'production') {
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Disallow other origins
+    return callback(null, false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  optionsSuccessStatus: 204,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

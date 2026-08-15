@@ -222,7 +222,7 @@ export interface ReportFilters {
   limit?: number;
 }
 
-export type DateRange = '7d' | '30d' | '90d' | 'custom';
+export type DateRange = 'all' | '7d' | '30d' | '90d' | 'custom';
 
 // ── Audit Log ────────────────────────────────────────────────────────
 

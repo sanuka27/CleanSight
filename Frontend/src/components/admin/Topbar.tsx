@@ -23,6 +23,7 @@ interface TopbarProps {
 }
 
 export const RANGE_LABELS: Record<DateRange, string> = {
+  all: "All Time",
   "7d": "This Week",
   "30d": "This Month",
   "90d": "Last 90 Days",

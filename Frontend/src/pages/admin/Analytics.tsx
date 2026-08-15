@@ -16,7 +16,7 @@ import {
 import type { DateRange } from "@/types/admin";
 
 export default function AdminAnalytics() {
-  const [range, setRange] = useState<DateRange>("30d");
+  const [range, setRange] = useState<DateRange>("all");
   const [customDates, setCustomDates] = useState({ from: "", to: "" });
 
   const from = customDates.from || undefined;

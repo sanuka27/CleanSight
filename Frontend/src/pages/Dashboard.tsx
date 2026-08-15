@@ -45,18 +45,6 @@ import { canViewVolunteerAnalytics } from "@/lib/role";
 import type { AnalyticsPreset } from "@/types/analytics";
 import { useState } from "react";
 
-/* ── Fallback mock data (used while loading / on error) ────────── */
-
-const FALLBACK_CHART_DATA = [
-  { name: 'Mon', reports: 12, resolved: 8 },
-  { name: 'Tue', reports: 19, resolved: 12 },
-  { name: 'Wed', reports: 15, resolved: 10 },
-  { name: 'Thu', reports: 22, resolved: 18 },
-  { name: 'Fri', reports: 28, resolved: 20 },
-  { name: 'Sat', reports: 35, resolved: 25 },
-  { name: 'Sun', reports: 10, resolved: 15 },
-];
-
 const WASTE_TYPE_COLORS: Record<string, string> = {
   general: 'hsl(var(--primary))',
   recyclable: 'hsl(var(--info))',
@@ -64,20 +52,6 @@ const WASTE_TYPE_COLORS: Record<string, string> = {
   construction: 'hsl(var(--warning))',
   hazardous: 'hsl(var(--destructive))',
 };
-
-const FALLBACK_PIE_DATA = [
-  { name: 'Plastic', value: 400, color: 'hsl(var(--primary))' },
-  { name: 'Organic', value: 300, color: 'hsl(var(--success))' },
-  { name: 'Hazardous', value: 100, color: 'hsl(var(--destructive))' },
-  { name: 'Metal', value: 200, color: 'hsl(var(--info))' },
-];
-
-const FALLBACK_STATS = [
-  { label: "Total Reports", value: 0, suffix: "", change: "--", trend: "up" as const, icon: MapPin, color: "primary" },
-  { label: "Active Volunteers", value: 0, suffix: "", change: "--", trend: "up" as const, icon: Users, color: "info" },
-  { label: "Cleanups Completed", value: 0, suffix: "", change: "--", trend: "up" as const, icon: CheckCircle, color: "success" },
-  { label: "Avg. Response Time", value: 0, suffix: "h", change: "--", trend: "down" as const, icon: Clock, color: "warning" },
-];
 
 /* recentActivity is now loaded from /api/dashboard/admin endpoint */
 
@@ -149,7 +123,7 @@ const Dashboard = () => {
     }, [summary, performance]);
 
     const CHART_DATA = useMemo(() => {
-      if (!summary?.series?.length) return FALLBACK_CHART_DATA;
+      if (!summary?.series?.length) return [];
       return summary.series.map((b) => ({
         name: b.date.slice(5), // MM-DD
         reports: b.count,
@@ -158,7 +132,7 @@ const Dashboard = () => {
     }, [summary]);
 
     const PIE_DATA = useMemo(() => {
-      if (!summary?.topWasteTypes?.length) return FALLBACK_PIE_DATA;
+      if (!summary?.topWasteTypes?.length) return [];
       return summary.topWasteTypes.map((w) => ({
         name: w.wasteType,
         value: w.count,

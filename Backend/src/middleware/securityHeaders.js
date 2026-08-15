@@ -40,12 +40,21 @@ const isProd = process.env.NODE_ENV === 'production';
  * server.js).  Used to build a safe CSP `connect-src` directive.
  */
 function getAllowedOrigins() {
-  const raw = process.env.CLIENT_URL || 'http://localhost:8080';
+  const defaults = [
+    'http://localhost:8080',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+    'https://clean-sight-frontend.vercel.app',
+  ];
+  const raw = process.env.CLIENT_URL || '';
   const origins = raw
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
-  return origins.length ? origins : ['http://localhost:8080'];
+  return Array.from(new Set([...defaults, ...origins]));
 }
 
 /**
@@ -168,19 +177,16 @@ export const securityHeaders = helmet({
   // Disables Flash/PDF cross-domain access (legacy, still good to set).
   permittedCrossDomainPolicies: { permittedPolicies: 'none' },
 
-  // ── Cross-Origin-Embedder-Policy ─────────────────────────────────────
-  // 'require-corp' enables SharedArrayBuffer, useful for WASM-heavy ML
-  // workloads. Pairs with CORP header below.
-  crossOriginEmbedderPolicy: { policy: 'require-corp' },
-
-  // ── Cross-Origin-Opener-Policy ───────────────────────────────────────
-  // Prevents cross-origin windows from keeping a reference to this origin.
-  crossOriginOpenerPolicy: { policy: 'same-origin' },
-
   // ── Cross-Origin-Resource-Policy ─────────────────────────────────────
   // Restricts cross-origin reads of our API responses.
-  // CORS handles actual access control; this adds a defence-in-depth layer.
-  crossOriginResourcePolicy: { policy: 'same-origin' },
+  // Set to 'cross-origin' so authorized frontend applications can consume the API.
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+
+  // ── Cross-Origin-Embedder-Policy ─────────────────────────────────────
+  crossOriginEmbedderPolicy: false,
+
+  // ── Cross-Origin-Opener-Policy ───────────────────────────────────────
+  crossOriginOpenerPolicy: false,
 
   // ── X-DNS-Prefetch-Control ───────────────────────────────────────────
   xDnsPrefetchControl: { allow: false },

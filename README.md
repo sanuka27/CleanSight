@@ -32,6 +32,53 @@ CleanSight bridges the gap between environmental awareness and actionable commun
 - **⚡ Real-Time Coordination:** Connects on-the-ground volunteers with reported tasks dynamically.
 - **📈 Impact Analytics:** Dashboards displaying environmental impact metrics and community progress.
 
+## 📸 Screenshots & UI Showcase
+
+### 🌐 Landing & Authentication
+
+| Landing Page (Hero) | Platform Overview & Stats |
+| :---: | :---: |
+| ![Landing Page 1](docs/screenshots/landing-page-1.png) | ![Landing Page 2](docs/screenshots/landing-page-2.png) |
+
+| Get Started / Role Selection | Sign In |
+| :---: | :---: |
+| ![Get Started](docs/screenshots/get-started.png) | ![Sign In](docs/screenshots/sign-in.png) |
+
+---
+
+### 👤 Citizen Portal & Report Workflow
+
+| Citizen Dashboard | Report Upload (Step 1 - Photo Selection) |
+| :---: | :---: |
+| ![Citizen Dashboard](docs/screenshots/citizen-dashboard-1.png) | ![Uploading Page 1](docs/screenshots/uploading-page-1.png) |
+
+| Report Upload (Step 2 - Location & Details) | Report Upload (Step 3 - AI Verification) |
+| :---: | :---: |
+| ![Uploading Page 2](docs/screenshots/uploading-page-2.png) | ![Uploading Page 3](docs/screenshots/uploading-page-3.png) |
+
+---
+
+### 🤝 Volunteer Portal
+
+| Available Tasks & List View | Task Location & Cleanup Mapping |
+| :---: | :---: |
+| ![Volunteer Dashboard 1](docs/screenshots/volunteer-dashboard-1.png) | ![Volunteer Dashboard 2](docs/screenshots/volunteer-dashboard-2.png) |
+
+---
+
+### 🛡️ Admin Dashboard & ML Analytics
+
+| System Overview & Metrics | Report Moderation & Review Queue |
+| :---: | :---: |
+| ![Admin Dashboard 1](docs/screenshots/admin-dashboard-1.png) | ![Admin Dashboard 2](docs/screenshots/admin-dashboard-2.png) |
+
+<br />
+
+#### 📈 ML Model Performance Analytics
+![Admin Dashboard 3](docs/screenshots/admin-dashboard-3.png)
+
+---
+
 ## 🏗️ System Architecture
 
 ```text

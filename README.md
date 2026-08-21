@@ -36,45 +36,55 @@ CleanSight bridges the gap between environmental awareness and actionable commun
 
 ### 🌐 Landing & Authentication
 
-| Landing Page (Hero) | Platform Overview & Stats |
-| :---: | :---: |
-| ![Landing Page 1](docs/screenshots/landing-page-1.png) | ![Landing Page 2](docs/screenshots/landing-page-2.png) |
+#### 1. Landing Page (Hero)
+![Landing Page 1](docs/screenshots/landing-page-1.png)
 
-| Get Started / Role Selection | Sign In |
-| :---: | :---: |
-| ![Get Started](docs/screenshots/get-started.png) | ![Sign In](docs/screenshots/sign-in.png) |
+#### 2. Platform Overview & Features
+![Landing Page 2](docs/screenshots/landing-page-2.png)
+
+#### 3. Get Started (Role Selection)
+![Get Started](docs/screenshots/get-started.png)
+
+#### 4. Sign In Page
+![Sign In](docs/screenshots/sign-in.png)
 
 ---
 
 ### 👤 Citizen Portal & Report Workflow
 
-| Citizen Dashboard | Report Upload (Step 1 - Photo Selection) |
-| :---: | :---: |
-| ![Citizen Dashboard](docs/screenshots/citizen-dashboard-1.png) | ![Uploading Page 1](docs/screenshots/uploading-page-1.png) |
+#### 5. Citizen Dashboard
+![Citizen Dashboard](docs/screenshots/citizen-dashboard-1.png)
 
-| Report Upload (Step 2 - Location & Details) | Report Upload (Step 3 - AI Verification) |
-| :---: | :---: |
-| ![Uploading Page 2](docs/screenshots/uploading-page-2.png) | ![Uploading Page 3](docs/screenshots/uploading-page-3.png) |
+#### 6. Report Upload - Step 1 (Photo Selection)
+![Uploading Page 1](docs/screenshots/uploading-page-1.png)
+
+#### 7. Report Upload - Step 2 (Location Tagging & Details)
+![Uploading Page 2](docs/screenshots/uploading-page-2.png)
+
+#### 8. Report Upload - Step 3 (AI Verification & Submission)
+![Uploading Page 3](docs/screenshots/uploading-page-3.png)
 
 ---
 
 ### 🤝 Volunteer Portal
 
-| Available Tasks & List View | Task Location & Cleanup Mapping |
-| :---: | :---: |
-| ![Volunteer Dashboard 1](docs/screenshots/volunteer-dashboard-1.png) | ![Volunteer Dashboard 2](docs/screenshots/volunteer-dashboard-2.png) |
+#### 9. Volunteer Dashboard - Available Tasks
+![Volunteer Dashboard 1](docs/screenshots/volunteer-dashboard-1.png)
+
+#### 10. Volunteer Dashboard - Cleanup Location Mapping
+![Volunteer Dashboard 2](docs/screenshots/volunteer-dashboard-2.png)
 
 ---
 
 ### 🛡️ Admin Dashboard & ML Analytics
 
-| System Overview & Metrics | Report Moderation & Review Queue |
-| :---: | :---: |
-| ![Admin Dashboard 1](docs/screenshots/admin-dashboard-1.png) | ![Admin Dashboard 2](docs/screenshots/admin-dashboard-2.png) |
+#### 11. Admin System Overview & Metrics
+![Admin Dashboard 1](docs/screenshots/admin-dashboard-1.png)
 
-<br />
+#### 12. Report Moderation & Review Queue
+![Admin Dashboard 2](docs/screenshots/admin-dashboard-2.png)
 
-#### 📈 ML Model Performance Analytics
+#### 13. AI Model Performance Analytics
 ![Admin Dashboard 3](docs/screenshots/admin-dashboard-3.png)
 
 ---
